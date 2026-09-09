@@ -4,15 +4,20 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
     "id": "radlina-remote-mcp@0.1.0",
     "name": "radlina-remote-mcp",
     "version": "0.1.0",
-    "size": 139703,
-    "unpackedSize": 1188195,
-    "shasum": "adc5129130374133faa103dea118eff6928b8bc5",
-    "integrity": "sha512-H96q9yxZmKOoo7OwNOOBoYWfT3FD4BIGCEkLfNCI2mhI1dP0qb/NL3PifZLy8lx0bsJPQm1d58hbgfzW+kAKDA==",
+    "size": 139935,
+    "unpackedSize": 1189644,
+    "shasum": "69eddebafbd3c3befd42e16bead83a171bcb7948",
+    "integrity": "sha512-XB6ViBsxpz2lHMAQucfF/vmxeBtEm8ZDPBWAFDUsZvVEbYeTyPJd+/3YMssq8KCdXGxGTPDLmGAZDDw1/7sIEQ==",
     "filename": "radlina-remote-mcp-0.1.0.tgz",
     "files": [
       {
         "path": ".env.example",
         "size": 216,
+        "mode": 420
+      },
+      {
+        "path": ".prettierignore",
+        "size": 136,
         "mode": 420
       },
       {
@@ -117,7 +122,7 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
       },
       {
         "path": "evidence/PH-01/P001/format-check.txt",
-        "size": 259,
+        "size": 137,
         "mode": 420
       },
       {
@@ -132,7 +137,7 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
       },
       {
         "path": "evidence/PH-01/P001/package-dry-run.txt",
-        "size": 9048,
+        "size": 10483,
         "mode": 420
       },
       {
@@ -451,7 +456,7 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
         "mode": 420
       }
     ],
-    "entryCount": 88,
+    "entryCount": 89,
     "bundled": []
   }
 ]

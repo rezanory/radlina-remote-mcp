@@ -3,7 +3,5 @@
 > prettier --check .
 
 Checking formatting...
-[warn] evidence/PH-01/P001/validation-summary.json
-[warn] reports/PH-01/sbom.cdx.json
-[warn] Code style issues found in 2 files. Run Prettier with --write to fix.
+All matched files use Prettier code style!
 

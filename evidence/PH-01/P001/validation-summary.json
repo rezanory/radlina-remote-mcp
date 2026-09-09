@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-09-09T13:14:35.0694414Z",
+  "generatedAt": "2026-09-09T13:18:02.4009367Z",
   "sourceRoot": "C:\\radlina-remote-mcp",
   "node": "v24.20.0",
-  "sourceCommit": "46fb847766892b6cad77ac56326f2ec9c0abdaa7",
-  "sourceTree": "f49ee68e2bc6f1a19745d30c5379ef47b75ec49b",
+  "sourceCommit": "11ce5cdfb8788391cf4c6552667e36b7b1b61d1a",
+  "sourceTree": "2791a6d38b3062b6c3622a5f75b8f4bc44a7bea2",
   "initialGitStatus": null,
   "gates": [
     {
@@ -14,11 +14,11 @@
         "ci",
         "--ignore-scripts"
       ],
-      "startedAt": "2026-09-09T13:11:56.7161680Z",
-      "durationMs": 47010,
+      "startedAt": "2026-09-09T13:15:43.2532622Z",
+      "durationMs": 36402,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/clean-install.txt",
-      "outputSha256": "da549e097e47a656045f3789714a162a47b86ae2f6d05574cc773e93991732cc"
+      "outputSha256": "a88daf8834c2a230da2e72f83b800b781bb079e19341ed911acb200f06f4a36e"
     },
     {
       "name": "format-check",
@@ -27,11 +27,11 @@
         "run",
         "format:check"
       ],
-      "startedAt": "2026-09-09T13:12:43.8622830Z",
-      "durationMs": 6055,
-      "exitCode": 1,
+      "startedAt": "2026-09-09T13:16:19.7729823Z",
+      "durationMs": 4685,
+      "exitCode": 0,
       "output": "evidence/PH-01/P001/format-check.txt",
-      "outputSha256": "3b74d6eeac71f715fc9119b28a62177b2cb348e268d639e1310ae77ca5f29a7e"
+      "outputSha256": "48b027d834b60c0acf34c843663ad49e62a6876e1319d0ea681c45891a843637"
     },
     {
       "name": "lint",
@@ -40,8 +40,8 @@
         "run",
         "lint"
       ],
-      "startedAt": "2026-09-09T13:12:49.9415859Z",
-      "durationMs": 44264,
+      "startedAt": "2026-09-09T13:16:24.5222510Z",
+      "durationMs": 41979,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/lint.txt",
       "outputSha256": "6c260764a13677f67a8addb0bc2ad98e25ba9dbe80b7e176ac70af4aa3172887"
@@ -53,8 +53,8 @@
         "run",
         "typecheck"
       ],
-      "startedAt": "2026-09-09T13:13:34.2133213Z",
-      "durationMs": 2879,
+      "startedAt": "2026-09-09T13:17:06.5208823Z",
+      "durationMs": 2808,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/typecheck.txt",
       "outputSha256": "5cee664259d451f0e8b56a5131010b9049879709e3996f851269028a125e1136"
@@ -65,11 +65,11 @@
       "arguments": [
         "test"
       ],
-      "startedAt": "2026-09-09T13:13:37.1084668Z",
-      "durationMs": 18254,
+      "startedAt": "2026-09-09T13:17:09.3501713Z",
+      "durationMs": 16526,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/test-all.txt",
-      "outputSha256": "022dfbff7cdecb6169a1ebb51fe40539c81f7c266a4a99cb0a349013dc1ab0aa"
+      "outputSha256": "eb9a3d2325607ca45d2dc30549aa6c2abcf40fe805d71c0f0c4963dd6b196db6"
     },
     {
       "name": "build",
@@ -78,8 +78,8 @@
         "run",
         "build"
       ],
-      "startedAt": "2026-09-09T13:13:55.3814818Z",
-      "durationMs": 3114,
+      "startedAt": "2026-09-09T13:17:25.8932754Z",
+      "durationMs": 3106,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/build.txt",
       "outputSha256": "6cfc1b741c577d22c9cbfef42b79542412393f394de05ce4cf19e3b3dcf5ff05"
@@ -92,11 +92,11 @@
         "--dry-run",
         "--json"
       ],
-      "startedAt": "2026-09-09T13:13:58.5215884Z",
-      "durationMs": 2300,
+      "startedAt": "2026-09-09T13:17:29.0278264Z",
+      "durationMs": 2036,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/package-dry-run.txt",
-      "outputSha256": "f4a31daad95525c721c29e7514d7335356e9e012b4d2a79f6d0440829d5599ef"
+      "outputSha256": "86828dcd4048aa948b410e8d3b6319dd383b8d4b3c76508ed1a4eb48a57af697"
     },
     {
       "name": "dependency-audit",
@@ -105,8 +105,8 @@
         "run",
         "security:audit"
       ],
-      "startedAt": "2026-09-09T13:14:00.8448811Z",
-      "durationMs": 3660,
+      "startedAt": "2026-09-09T13:17:31.0858489Z",
+      "durationMs": 2843,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/dependency-audit.txt",
       "outputSha256": "936477786b41f19dd02376a936cc71f794aed37682bc226c19301e5afed09b0f"
@@ -118,8 +118,8 @@
         "run",
         "sbom"
       ],
-      "startedAt": "2026-09-09T13:14:04.5214506Z",
-      "durationMs": 14151,
+      "startedAt": "2026-09-09T13:17:33.9393710Z",
+      "durationMs": 12093,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/sbom.txt",
       "outputSha256": "d07030237e1b60185073416ecb5fc87ac04f3f689ae8504c97349284626331d5"
@@ -131,8 +131,8 @@
         "run",
         "licenses"
       ],
-      "startedAt": "2026-09-09T13:14:18.6886629Z",
-      "durationMs": 710,
+      "startedAt": "2026-09-09T13:17:46.0490528Z",
+      "durationMs": 646,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/license-inventory.txt",
       "outputSha256": "8ec7105c320e61847d383748d9ee7c16769f6ba2cd24cbbf3e2bd0622c5712fe"
@@ -149,8 +149,8 @@
         "-File",
         "C:\\radlina-remote-mcp\\scripts\\operations\\security-scan.ps1"
       ],
-      "startedAt": "2026-09-09T13:14:19.4083393Z",
-      "durationMs": 455,
+      "startedAt": "2026-09-09T13:17:46.7040698Z",
+      "durationMs": 488,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/secret-scan.txt",
       "outputSha256": "0d83f2e09412066d3669b579c7f9808a588a0aca36553ee2b2abf0501704da03"
@@ -162,11 +162,11 @@
         "run",
         "benchmark"
       ],
-      "startedAt": "2026-09-09T13:14:19.8796796Z",
-      "durationMs": 15141,
+      "startedAt": "2026-09-09T13:17:47.1990988Z",
+      "durationMs": 15158,
       "exitCode": 0,
       "output": "evidence/PH-01/P001/benchmark.txt",
-      "outputSha256": "2de834fed8fbd5670a0d4db91cbe0b0ab7f42fa8aef9f33d362e5aa6b0ed56f0"
+      "outputSha256": "3a7996d8519ea6eb10dacbe01e7e26de7d1b39ab548c3a6ce9a536b997b12c3e"
     }
   ],
   "artifacts": [
@@ -183,12 +183,12 @@
     {
       "path": "reports/PH-01/sbom.cdx.json",
       "bytes": 847606,
-      "sha256": "130af798e3bf1e2511d311a41770f3aad5705ca42817ba7ab389bc04a561b55f"
+      "sha256": "65f26b0e5e9416961768b385adee7b063a923b210991c4e84c313152b00c2f56"
     },
     {
       "path": "reports/PH-01/licenses.json",
       "bytes": 57019,
-      "sha256": "599766cedf30bd138ef88e7dd8283b2360ffbfe68946cead563272450fcb2d45"
+      "sha256": "741e55df86cb45a1e517823df8e6d02cf1ec5a7e44d034954f9d20ba0993477d"
     },
     {
       "path": "service/RadlinaRemoteMCP.xml",

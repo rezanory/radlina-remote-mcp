@@ -12,8 +12,8 @@ Unblock condition: install the service under the low-privilege `Radlina` identit
 
 ## Exact source identity
 
-- Source commit: `91dd2f21908b51cb5b4b99c7c451b166dbd7a7a0`
-- Source tree: `ca1578d91c318f40799c05792ffd1486871479e7`
+- Source commit: `11ce5cdfb8788391cf4c6552667e36b7b1b61d1a`
+- Source tree: `2791a6d38b3062b6c3622a5f75b8f4bc44a7bea2`
 - Initial worktree state recorded by the validation runner: clean
 - MCP baseline: `2026-07-28`
 - MCP SDK packages: `2.0.0`
@@ -73,6 +73,7 @@ Manual built-artifact smoke test:
 - Listener: only `127.0.0.1:7337`
 - Anonymous MCP request: `401` with OAuth protected-resource discovery challenge
 - Graceful SIGINT shutdown message observed; listener stopped afterward
+- Backup archive creation, manifest/hash verification, and restore diagnostics passed against project-local state
 
 ## Local benchmark
 
@@ -80,14 +81,14 @@ Conditions: Windows x64 on `LAPTOP-13QINEIF`, Node 24.20.0, loopback Streamable 
 
 | Operation                   | Samples |  p50 ms |  p95 ms |
 | --------------------------- | ------: | ------: | ------: |
-| Ping                        |     100 |  29.982 |  49.932 |
-| Small file read             |      25 |  32.160 |  47.413 |
-| Directory list              |      25 |  33.815 |  50.827 |
-| Ping at bounded concurrency |      48 | 144.722 | 201.888 |
-| Search start                |      10 | 103.088 | 121.319 |
-| Search results              |      10 |  31.949 |  36.200 |
-| Short process start         |      10 | 537.370 | 557.589 |
-| Persistent process output   |      10 |  30.463 |  36.709 |
+| Ping                        |     100 |  23.323 |  34.985 |
+| Small file read             |      25 |  32.650 |  41.723 |
+| Directory list              |      25 |  30.939 |  39.406 |
+| Ping at bounded concurrency |      48 | 131.107 | 162.872 |
+| Search start                |      10 |  46.990 |  54.174 |
+| Search results              |      10 |  31.609 |  34.314 |
+| Short process start         |      10 | 489.470 | 531.423 |
+| Persistent process output   |      10 |  28.621 |  49.125 |
 
 These are local measurements, not claims about Internet, Funnel, or ChatGPT latency.
 
