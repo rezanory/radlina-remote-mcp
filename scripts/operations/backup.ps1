@@ -62,7 +62,7 @@ try {
     createdAt = (Get-Date).ToUniversalTime().ToString('o')
     machine = $env:COMPUTERNAME
     user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-    note = 'DPAPI-protected material can only be restored by the same Windows identity on this machine.'
+    note = 'DPAPI-protected material can only be restored on this Windows machine by an identity allowed by the project ACL.'
     items = @($manifestItems)
   }
   $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $stage 'manifest.json') -Encoding utf8NoBOM

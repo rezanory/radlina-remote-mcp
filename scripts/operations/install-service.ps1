@@ -3,9 +3,17 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+  throw 'Run this script from an elevated PowerShell terminal.'
+}
+
 $runtimeBootstrap = Join-Path $PSScriptRoot 'bootstrap-runtime.ps1'
 & $runtimeBootstrap
 
+$workspaceDirectory = Join-Path $projectRoot 'workspace'
+New-Item -ItemType Directory -Force -Path $workspaceDirectory | Out-Null
 $localConfig = Join-Path $projectRoot 'config\local.yaml'
 if (-not (Test-Path -LiteralPath $localConfig)) {
   Copy-Item -LiteralPath (Join-Path $projectRoot 'config\example.yaml') -Destination $localConfig
@@ -34,22 +42,22 @@ $expectedWinSw = '05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0
 $actualWinSw = (Get-FileHash -Algorithm SHA256 -LiteralPath $serviceExecutable).Hash.ToLowerInvariant()
 if ($actualWinSw -ne $expectedWinSw) { throw 'copied WinSW executable failed integrity verification' }
 
-$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = [Security.Principal.WindowsPrincipal]::new($identity)
-if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-  throw 'Run this script from an elevated PowerShell terminal. WinSW will then prompt for the low-privilege Windows account and password used by the service.'
-}
-
 $existing = Get-Service -Name 'RadlinaRemoteMCP' -ErrorAction SilentlyContinue
 if ($existing) { throw 'RadlinaRemoteMCP is already installed; use update-service.ps1 or uninstall-service.ps1' }
 
+& (Join-Path $PSScriptRoot 'migrate-dpapi-protection.ps1')
+& (Join-Path $PSScriptRoot 'configure-service-acl.ps1')
 & (Join-Path $PSScriptRoot 'configure-firewall.ps1')
-Write-Output 'At the WinSW prompts enter .\Radlina, then the Windows password, then answer y to grant Log on as a service. Do not choose LocalSystem.'
-& $serviceExecutable install /p
+Write-Output 'Installing with the built-in low-privilege NT AUTHORITY\LocalService identity; no password is required.'
+& $serviceExecutable install
 if ($LASTEXITCODE -ne 0) { throw 'WinSW service installation failed' }
+$installedService = Get-CimInstance Win32_Service -Filter "Name='RadlinaRemoteMCP'"
+if (-not $installedService -or $installedService.StartName -ne 'NT AUTHORITY\LocalService') {
+  throw "service identity verification failed: $($installedService.StartName)"
+}
 & $serviceExecutable start
 if ($LASTEXITCODE -ne 0) { throw 'WinSW service start failed' }
 Start-Sleep -Seconds 2
 $service = Get-Service -Name 'RadlinaRemoteMCP' -ErrorAction Stop
 if ($service.Status -ne 'Running') { throw "service is not running; current status: $($service.Status)" }
-Write-Output 'RadlinaRemoteMCP service installed and running.'
+Write-Output 'RadlinaRemoteMCP service installed as LocalService and is running.'

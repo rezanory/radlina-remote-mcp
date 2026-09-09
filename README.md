@@ -16,7 +16,7 @@ Copy-Item .\config\example.yaml .\config\local.yaml
 & .\.runtime\node-v24.20.0-win-x64\npm.cmd start
 ```
 
-The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid bearer token return `401`. The example profile allows only `C:\radlina-remote-mcp` and allows no executable by default.
+The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid bearer token return `401`. The example profile allows only `C:\radlina-remote-mcp\workspace` and allows no executable by default.
 
 ## Local safety controls
 
@@ -31,7 +31,7 @@ The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid b
 
 ## Deployment
 
-- Windows service: `scripts\operations\install-service.ps1` from an elevated PowerShell terminal. WinSW prompts locally for the low-privilege `Radlina` Windows account; no password belongs in configuration or chat.
+- Windows service: `scripts\operations\install-service.ps1` from an elevated PowerShell terminal. WinSW uses the built-in low-privilege `NT AUTHORITY\LocalService` identity and does not require a service password.
 - Service start/stop/restart/status: `scripts\operations\service-control.ps1 -Action <Start|Stop|Restart|Status>`.
 - Private tailnet ingress: `scripts\operations\configure-tailscale.ps1 -Mode Serve`.
 - ChatGPT-compatible public HTTPS ingress: `scripts\operations\configure-tailscale.ps1 -Mode Funnel`.

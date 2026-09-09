@@ -6,7 +6,7 @@ const PROTECT_SCRIPT = `
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Security
 $raw=[Convert]::FromBase64String([Console]::In.ReadToEnd())
-$out=[Security.Cryptography.ProtectedData]::Protect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)
+$out=[Security.Cryptography.ProtectedData]::Protect($raw,$null,[Security.Cryptography.DataProtectionScope]::LocalMachine)
 [Console]::Out.Write([Convert]::ToBase64String($out))
 `;
 
@@ -14,7 +14,7 @@ const UNPROTECT_SCRIPT = `
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Security
 $raw=[Convert]::FromBase64String([Console]::In.ReadToEnd())
-$out=[Security.Cryptography.ProtectedData]::Unprotect($raw,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser)
+$out=[Security.Cryptography.ProtectedData]::Unprotect($raw,$null,[Security.Cryptography.DataProtectionScope]::LocalMachine)
 [Console]::Out.Write([Convert]::ToBase64String($out))
 `;
 

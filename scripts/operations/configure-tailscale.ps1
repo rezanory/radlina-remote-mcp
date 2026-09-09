@@ -22,12 +22,18 @@ if (-not (Test-Path -LiteralPath $configBackup)) {
   Copy-Item -LiteralPath $localConfig -Destination $configBackup
 }
 
+$statusCode = $null
 try {
-  $probe = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7337/mcp' -Method Post -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck
-  if ($probe.StatusCode -ne 401) { throw "local MCP auth gate returned $($probe.StatusCode), expected 401" }
+  $probe = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7337/mcp' -Method Post -ContentType 'application/json' -Body '{}' -TimeoutSec 5
+  $statusCode = [int]$probe.StatusCode
 } catch {
-  throw "local MCP preflight failed: $($_.Exception.Message)"
+  if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+    $statusCode = [int]$_.Exception.Response.StatusCode
+  } else {
+    throw "local MCP preflight failed: $($_.Exception.Message)"
+  }
 }
+if ($statusCode -ne 401) { throw "local MCP auth gate returned $statusCode, expected 401" }
 
 if ($Mode -eq 'Serve') {
   & tailscale.exe serve --bg --https=$HttpsPort 'http://127.0.0.1:7337'

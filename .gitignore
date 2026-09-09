@@ -6,6 +6,7 @@ dist/
 .backup-*/
 .restore-*/
 backups/
+workspace/
 coverage/
 *.log
 *.db

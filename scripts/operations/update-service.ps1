@@ -10,16 +10,22 @@ $principal = [Security.Principal.WindowsPrincipal]::new($identity)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw 'Run this script from an elevated PowerShell terminal' }
 
 & (Join-Path $PSScriptRoot 'backup.ps1')
-if ($LASTEXITCODE -ne 0) { throw 'pre-update backup failed' }
 & $serviceExecutable stop
 if ($LASTEXITCODE -ne 0) { throw 'service stop failed' }
 $nodeRoot = Join-Path $projectRoot '.runtime\node-v24.20.0-win-x64'
-& (Join-Path $nodeRoot 'npm.cmd') ci --ignore-scripts
-if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
-& (Join-Path $nodeRoot 'npm.cmd') run build
-if ($LASTEXITCODE -ne 0) { throw 'build failed' }
-& (Join-Path $nodeRoot 'npm.cmd') test
-if ($LASTEXITCODE -ne 0) { throw 'tests failed; service remains stopped' }
+Push-Location -LiteralPath $projectRoot
+try {
+  & (Join-Path $nodeRoot 'npm.cmd') ci --ignore-scripts
+  if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+  & (Join-Path $nodeRoot 'npm.cmd') run build
+  if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+  & (Join-Path $nodeRoot 'npm.cmd') test
+  if ($LASTEXITCODE -ne 0) { throw 'tests failed; service remains stopped' }
+} finally {
+  Pop-Location
+}
+& (Join-Path $PSScriptRoot 'migrate-dpapi-protection.ps1')
+& (Join-Path $PSScriptRoot 'configure-service-acl.ps1')
 & $serviceExecutable start
 if ($LASTEXITCODE -ne 0) { throw 'service restart failed' }
 Write-Output 'RadlinaRemoteMCP service updated and running.'

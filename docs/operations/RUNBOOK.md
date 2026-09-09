@@ -19,7 +19,7 @@ Run service installation from an elevated PowerShell terminal:
 .\scripts\operations\install-service.ps1
 ```
 
-At the local WinSW prompt, use `.\Radlina` and enter the Windows password only into that prompt. The service binds only to `127.0.0.1:7337`. The firewall rule blocks direct inbound connections to the pinned Node runtime.
+The installer uses `NT AUTHORITY\LocalService` without a password, hardens the project ACL, and grants that identity write access only to `.state` and `workspace`. The service binds only to `127.0.0.1:7337`. The firewall rule blocks direct inbound connections to the pinned Node runtime.
 
 ```powershell
 .\scripts\operations\service-control.ps1 -Action Status
@@ -41,7 +41,7 @@ $backup = .\scripts\operations\backup.ps1
 .\scripts\operations\restore.ps1 -Archive C:\radlina-remote-mcp\backups\radlina-backup-YYYYMMDDTHHMMSSZ.zip
 ```
 
-Backups contain the local configuration, SQLite state, DPAPI-protected signing key, audit chain, and release metadata. Restore verifies every manifest hash before changing live state and retains the replaced state under `backups\pre-restore-*`. DPAPI data is usable only by the same Windows identity on this machine.
+Backups contain the local configuration, SQLite state, DPAPI-protected signing key, audit chain, and release metadata. Restore verifies every manifest hash before changing live state and retains the replaced state under `backups\pre-restore-*`. DPAPI data is usable only on this Windows machine by identities permitted through the restricted project ACL.
 
 For a source rollback, first select the reviewed prior Git commit, then run:
 

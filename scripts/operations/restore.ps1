@@ -70,6 +70,8 @@ try {
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $configTarget) | Out-Null
     Copy-Item -LiteralPath $restoredConfig -Destination $configTarget
   }
+  & (Join-Path $PSScriptRoot 'migrate-dpapi-protection.ps1')
+  & (Join-Path $PSScriptRoot 'configure-service-acl.ps1')
   $node = Join-Path $projectRoot '.runtime\node-v24.20.0-win-x64\node.exe'
   & $node (Join-Path $projectRoot 'dist\src\cli\diagnose.js') | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'restored configuration/state failed diagnostics' }

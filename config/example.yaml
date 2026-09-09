@@ -34,7 +34,7 @@ dependencies:
 profiles:
   radlina:
     roots:
-      - C:\\radlina-remote-mcp
+      - C:\\radlina-remote-mcp\\workspace
     commands: []
     allowShell: false
     allowTrash: false

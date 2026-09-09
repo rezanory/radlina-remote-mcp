@@ -9,17 +9,23 @@ $serviceExecutable = Join-Path $projectRoot 'service\RadlinaRemoteMCP.exe'
 $service = Get-Service -Name 'RadlinaRemoteMCP' -ErrorAction SilentlyContinue
 
 if ($Action -eq 'Status') {
-  $probe = $null
+  $statusCode = $null
   try {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7337/mcp' -Method Post -ContentType 'application/json' -Body '{}' -SkipHttpErrorCheck -TimeoutSec 3
-    $probe = [ordered]@{ reachable = $true; status = $response.StatusCode; authGate = $response.StatusCode -eq 401 }
+    $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:7337/mcp' -Method Post -ContentType 'application/json' -Body '{}' -TimeoutSec 3
+    $statusCode = [int]$response.StatusCode
   } catch {
-    $probe = [ordered]@{ reachable = $false; status = $null; authGate = $false }
+    if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+      $statusCode = [int]$_.Exception.Response.StatusCode
+    }
   }
+  $probe = [ordered]@{ reachable = $null -ne $statusCode; status = $statusCode; authGate = $statusCode -eq 401 }
+  $serviceRecord = Get-CimInstance Win32_Service -Filter "Name='RadlinaRemoteMCP'" -ErrorAction SilentlyContinue
   [ordered]@{
     installed = [bool]$service
     status = if ($service) { [string]$service.Status } else { 'NotInstalled' }
     startType = if ($service) { [string]$service.StartType } else { $null }
+    identity = if ($serviceRecord) { [string]$serviceRecord.StartName } else { $null }
+    identityIsLeastPrivilege = [bool]($serviceRecord -and $serviceRecord.StartName -eq 'NT AUTHORITY\LocalService')
     loopback = $probe
   } | ConvertTo-Json -Depth 3
   return
