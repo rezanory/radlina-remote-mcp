@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-09T13:00:36.7193559Z",
+  "sourceRoot": "C:\\radlina-remote-mcp",
+  "node": "v24.20.0",
+  "sourceCommit": "91dd2f21908b51cb5b4b99c7c451b166dbd7a7a0",
+  "sourceTree": "ca1578d91c318f40799c05792ffd1486871479e7",
+  "initialGitStatus": null,
+  "gates": [
+    {
+      "name": "clean-install",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "ci",
+        "--ignore-scripts"
+      ],
+      "startedAt": "2026-09-09T12:58:11.9506748Z",
+      "durationMs": 36986,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/clean-install.txt",
+      "outputSha256": "a88daf8834c2a230da2e72f83b800b781bb079e19341ed911acb200f06f4a36e"
+    },
+    {
+      "name": "format-check",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "format:check"
+      ],
+      "startedAt": "2026-09-09T12:58:49.0546654Z",
+      "durationMs": 4989,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/format-check.txt",
+      "outputSha256": "48b027d834b60c0acf34c843663ad49e62a6876e1319d0ea681c45891a843637"
+    },
+    {
+      "name": "lint",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "lint"
+      ],
+      "startedAt": "2026-09-09T12:58:54.0684517Z",
+      "durationMs": 43837,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/lint.txt",
+      "outputSha256": "6c260764a13677f67a8addb0bc2ad98e25ba9dbe80b7e176ac70af4aa3172887"
+    },
+    {
+      "name": "typecheck",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "typecheck"
+      ],
+      "startedAt": "2026-09-09T12:59:37.9269163Z",
+      "durationMs": 2922,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/typecheck.txt",
+      "outputSha256": "5cee664259d451f0e8b56a5131010b9049879709e3996f851269028a125e1136"
+    },
+    {
+      "name": "test-all",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "test"
+      ],
+      "startedAt": "2026-09-09T12:59:40.8671541Z",
+      "durationMs": 17036,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/test-all.txt",
+      "outputSha256": "fe8e844c27107ed6f8ff3f8de056e8c601bc69a46b3d4ecf26ed259a23fcf50f"
+    },
+    {
+      "name": "build",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "build"
+      ],
+      "startedAt": "2026-09-09T12:59:57.9230742Z",
+      "durationMs": 3163,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/build.txt",
+      "outputSha256": "6cfc1b741c577d22c9cbfef42b79542412393f394de05ce4cf19e3b3dcf5ff05"
+    },
+    {
+      "name": "package-dry-run",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "pack",
+        "--dry-run",
+        "--json"
+      ],
+      "startedAt": "2026-09-09T13:00:01.1013112Z",
+      "durationMs": 2057,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/package-dry-run.txt",
+      "outputSha256": "1943ca4e37cdbb4d5a191b780871d73baf3fd6ef431275aa28e74fdb4c04494d"
+    },
+    {
+      "name": "dependency-audit",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "security:audit"
+      ],
+      "startedAt": "2026-09-09T13:00:03.1803435Z",
+      "durationMs": 2382,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/dependency-audit.txt",
+      "outputSha256": "936477786b41f19dd02376a936cc71f794aed37682bc226c19301e5afed09b0f"
+    },
+    {
+      "name": "sbom",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "sbom"
+      ],
+      "startedAt": "2026-09-09T13:00:05.5689876Z",
+      "durationMs": 12916,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/sbom.txt",
+      "outputSha256": "d07030237e1b60185073416ecb5fc87ac04f3f689ae8504c97349284626331d5"
+    },
+    {
+      "name": "license-inventory",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "licenses"
+      ],
+      "startedAt": "2026-09-09T13:00:18.5040294Z",
+      "durationMs": 719,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/license-inventory.txt",
+      "outputSha256": "8ec7105c320e61847d383748d9ee7c16769f6ba2cd24cbbf3e2bd0622c5712fe"
+    },
+    {
+      "name": "secret-scan",
+      "executable": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+      "arguments": [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\radlina-remote-mcp\\scripts\\operations\\security-scan.ps1"
+      ],
+      "startedAt": "2026-09-09T13:00:19.2297481Z",
+      "durationMs": 455,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/secret-scan.txt",
+      "outputSha256": "0d83f2e09412066d3669b579c7f9808a588a0aca36553ee2b2abf0501704da03"
+    },
+    {
+      "name": "benchmark",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\npm.cmd",
+      "arguments": [
+        "run",
+        "benchmark"
+      ],
+      "startedAt": "2026-09-09T13:00:19.6924753Z",
+      "durationMs": 16980,
+      "exitCode": 0,
+      "output": "evidence/PH-01/P001/benchmark.txt",
+      "outputSha256": "83db2d3e4d5417887c1eeb7cffad9426b0f2a23e8f2fb2274d1dde2fbac29c8f"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "package.json",
+      "bytes": 2072,
+      "sha256": "68cbfd18ccd2f58a909d339a894f3ff614244f064b3fe5c50a22410780e31e3e"
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 288746,
+      "sha256": "d33ed287375540820e8984d30a1a79015619d32d3b777285286a402b9ad43099"
+    },
+    {
+      "path": "reports/PH-01/sbom.cdx.json",
+      "bytes": 847606,
+      "sha256": "3190cd3404f063de9bd931db1a73e8d0a796ed2bd2945c8c4eea06ac1a9d4453"
+    },
+    {
+      "path": "reports/PH-01/licenses.json",
+      "bytes": 57019,
+      "sha256": "ee73c42dba6bfd1daa99cbdded99fc30ee0ca06b3714681798f5ebec73920265"
+    },
+    {
+      "path": "service/RadlinaRemoteMCP.xml",
+      "bytes": 1138,
+      "sha256": "4ee92316cdcd1bbf40c55dcdbec7cae3e459b4798866320d81469413f931e857"
+    },
+    {
+      "path": "third_party/runtime-manifest.json",
+      "bytes": 997,
+      "sha256": "09544a3186e6f44951f490d6dd591d077a0afef925698da25865b5ababe1fd2c"
+    }
+  ]
+}

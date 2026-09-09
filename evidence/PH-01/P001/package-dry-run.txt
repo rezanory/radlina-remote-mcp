@@ -1,0 +1,398 @@
+npm warn gitignore-fallback No .npmignore file found, using .gitignore for file exclusion. Consider creating a .npmignore file to explicitly control published files.
+[
+  {
+    "id": "radlina-remote-mcp@0.1.0",
+    "name": "radlina-remote-mcp",
+    "version": "0.1.0",
+    "size": 66259,
+    "unpackedSize": 254982,
+    "shasum": "8001a0eac9307065884cf94caa8143ab24661914",
+    "integrity": "sha512-lz9uMYI+7OzXIDB7tOeyyeU/zK4ZfbrqtkELpRqdi+difJoda5prCuDl1eYXn4AmoF4LoYutAfxAi5ZiUpkyPg==",
+    "filename": "radlina-remote-mcp-0.1.0.tgz",
+    "files": [
+      {
+        "path": ".env.example",
+        "size": 216,
+        "mode": 420
+      },
+      {
+        "path": ".prettierrc.json",
+        "size": 90,
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "size": 2883,
+        "mode": 420
+      },
+      {
+        "path": "SPEC.md",
+        "size": 7220,
+        "mode": 420
+      },
+      {
+        "path": "THIRD_PARTY_NOTICES.md",
+        "size": 2217,
+        "mode": 420
+      },
+      {
+        "path": "config/example.yaml",
+        "size": 1113,
+        "mode": 420
+      },
+      {
+        "path": "docs/architecture/ADR-001-direct-sdk.md",
+        "size": 1017,
+        "mode": 420
+      },
+      {
+        "path": "docs/architecture/ADR-002-windows-persistence.md",
+        "size": 1611,
+        "mode": 420
+      },
+      {
+        "path": "docs/architecture/ADR-003-authentication.md",
+        "size": 1298,
+        "mode": 420
+      },
+      {
+        "path": "docs/CAPABILITY-MATRIX.md",
+        "size": 4219,
+        "mode": 420
+      },
+      {
+        "path": "docs/operations/AVAILABILITY.md",
+        "size": 919,
+        "mode": 420
+      },
+      {
+        "path": "docs/operations/CHATGPT-CONNECT.md",
+        "size": 1511,
+        "mode": 420
+      },
+      {
+        "path": "docs/operations/RUNBOOK.md",
+        "size": 3175,
+        "mode": 420
+      },
+      {
+        "path": "docs/security/THREAT-MODEL.md",
+        "size": 6025,
+        "mode": 420
+      },
+      {
+        "path": "docs/USER-GUIDE.md",
+        "size": 2471,
+        "mode": 420
+      },
+      {
+        "path": "eslint.config.js",
+        "size": 793,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/build.txt",
+        "size": 64,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/clean-install.txt",
+        "size": 910,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/format-check.txt",
+        "size": 137,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/lint.txt",
+        "size": 51,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/test-all.txt",
+        "size": 273,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/typecheck.txt",
+        "size": 77,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 2072,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/backup.ps1",
+        "size": 3768,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/bootstrap-runtime.ps1",
+        "size": 2394,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/configure-firewall.ps1",
+        "size": 1174,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/configure-tailscale.ps1",
+        "size": 2317,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/install-service.ps1",
+        "size": 2708,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/license-inventory.mjs",
+        "size": 947,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/remove-firewall.ps1",
+        "size": 359,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/restore-tailscale.ps1",
+        "size": 779,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/restore.ps1",
+        "size": 5157,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/rollback-service.ps1",
+        "size": 386,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/security-scan.ps1",
+        "size": 992,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/uninstall-service.ps1",
+        "size": 1244,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/update-service.ps1",
+        "size": 1337,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/validate-release.ps1",
+        "size": 4738,
+        "mode": 420
+      },
+      {
+        "path": "service/RadlinaRemoteMCP.xml",
+        "size": 1138,
+        "mode": 420
+      },
+      {
+        "path": "src/audit/chain.ts",
+        "size": 6477,
+        "mode": 420
+      },
+      {
+        "path": "src/audit/redaction.ts",
+        "size": 1383,
+        "mode": 420
+      },
+      {
+        "path": "src/auth/dpapi.ts",
+        "size": 2215,
+        "mode": 420
+      },
+      {
+        "path": "src/auth/service.ts",
+        "size": 20751,
+        "mode": 420
+      },
+      {
+        "path": "src/cli/benchmark.ts",
+        "size": 11717,
+        "mode": 420
+      },
+      {
+        "path": "src/cli/configure-public-url.ts",
+        "size": 2428,
+        "mode": 420
+      },
+      {
+        "path": "src/cli/control.ts",
+        "size": 2900,
+        "mode": 420
+      },
+      {
+        "path": "src/cli/diagnose.ts",
+        "size": 2372,
+        "mode": 420
+      },
+      {
+        "path": "src/config/index.ts",
+        "size": 1989,
+        "mode": 420
+      },
+      {
+        "path": "src/config/schema.ts",
+        "size": 3894,
+        "mode": 420
+      },
+      {
+        "path": "src/errors.ts",
+        "size": 1602,
+        "mode": 420
+      },
+      {
+        "path": "src/http.ts",
+        "size": 2735,
+        "mode": 420
+      },
+      {
+        "path": "src/index.ts",
+        "size": 1175,
+        "mode": 420
+      },
+      {
+        "path": "src/mcp.ts",
+        "size": 25660,
+        "mode": 420
+      },
+      {
+        "path": "src/persistence/store.ts",
+        "size": 6314,
+        "mode": 420
+      },
+      {
+        "path": "src/policy/engine.ts",
+        "size": 3341,
+        "mode": 420
+      },
+      {
+        "path": "src/policy/runtime.ts",
+        "size": 4957,
+        "mode": 420
+      },
+      {
+        "path": "src/runtime.ts",
+        "size": 2612,
+        "mode": 420
+      },
+      {
+        "path": "src/tools/filesystem/safe-path.ts",
+        "size": 3192,
+        "mode": 420
+      },
+      {
+        "path": "src/tools/filesystem/service.ts",
+        "size": 12912,
+        "mode": 420
+      },
+      {
+        "path": "src/tools/process/manager.ts",
+        "size": 12334,
+        "mode": 420
+      },
+      {
+        "path": "src/tools/search/manager.ts",
+        "size": 9453,
+        "mode": 420
+      },
+      {
+        "path": "src/transport/rate-limit.ts",
+        "size": 1158,
+        "mode": 420
+      },
+      {
+        "path": "src/utils/json.ts",
+        "size": 891,
+        "mode": 420
+      },
+      {
+        "path": "tests/helpers/config.ts",
+        "size": 1413,
+        "mode": 420
+      },
+      {
+        "path": "tests/helpers/oauth.ts",
+        "size": 1997,
+        "mode": 420
+      },
+      {
+        "path": "tests/integration/mcp-http.test.ts",
+        "size": 4919,
+        "mode": 420
+      },
+      {
+        "path": "tests/integration/oauth.test.ts",
+        "size": 4871,
+        "mode": 420
+      },
+      {
+        "path": "tests/integration/search-process.test.ts",
+        "size": 8185,
+        "mode": 420
+      },
+      {
+        "path": "tests/resilience/audit-idempotency.test.ts",
+        "size": 4563,
+        "mode": 420
+      },
+      {
+        "path": "tests/security/external-auth.test.ts",
+        "size": 4010,
+        "mode": 420
+      },
+      {
+        "path": "tests/security/http-boundary.test.ts",
+        "size": 3278,
+        "mode": 420
+      },
+      {
+        "path": "tests/security/safe-path.test.ts",
+        "size": 3385,
+        "mode": 420
+      },
+      {
+        "path": "tests/unit/policy.test.ts",
+        "size": 1499,
+        "mode": 420
+      },
+      {
+        "path": "tests/unit/redaction.test.ts",
+        "size": 583,
+        "mode": 420
+      },
+      {
+        "path": "third_party/runtime-manifest.json",
+        "size": 997,
+        "mode": 420
+      },
+      {
+        "path": "tsconfig.json",
+        "size": 780,
+        "mode": 420
+      },
+      {
+        "path": "vitest.config.ts",
+        "size": 240,
+        "mode": 420
+      }
+    ],
+    "entryCount": 76,
+    "bundled": []
+  }
+]
+

@@ -1,0 +1,5 @@
+
+> radlina-remote-mcp@0.1.0 sbom
+> cyclonedx-npm --output-file reports/PH-01/sbom.cdx.json --output-format JSON --spec-version 1.6
+
+

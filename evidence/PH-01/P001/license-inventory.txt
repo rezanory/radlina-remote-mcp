@@ -1,0 +1,6 @@
+
+> radlina-remote-mcp@0.1.0 licenses
+> node scripts/operations/license-inventory.mjs
+
+wrote 573 package license records
+

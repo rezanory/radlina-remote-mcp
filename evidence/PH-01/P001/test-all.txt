@@ -1,0 +1,14 @@
+
+> radlina-remote-mcp@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 C:/radlina-remote-mcp
+
+
+ Test Files  9 passed (9)
+      Tests  19 passed (19)
+   Start at  15:59:45
+   Duration  12.65s (transform 3.43s, setup 0ms, import 24.55s, tests 17.90s, environment 2ms)
+
+

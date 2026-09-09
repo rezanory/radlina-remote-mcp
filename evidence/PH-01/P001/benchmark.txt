@@ -1,0 +1,7 @@
+
+> radlina-remote-mcp@0.1.0 benchmark
+> node --enable-source-maps dist/src/cli/benchmark.js
+
+dangerouslyAllowInsecureIssuerUrl is enabled - HTTP issuer URLs are allowed. Do not use in production.
+{"conditions":{"timestamp":"2026-09-09T13:00:36.544Z","hostname":"LAPTOP-13QINEIF","platform":"win32-x64","node":"v24.20.0","protocol":"2026-07-28","transport":"loopback Streamable HTTP","sequentialReadOnlyRequests":100,"concurrency":8,"concurrentRequests":48},"measurements":{"ping":{"samples":100,"successes":100,"failures":0,"successRate":1,"p50Ms":29.982,"p95Ms":49.932},"readFile":{"samples":25,"successes":25,"failures":0,"successRate":1,"p50Ms":32.16,"p95Ms":47.413},"listDirectory":{"samples":25,"successes":25,"failures":0,"successRate":1,"p50Ms":33.815,"p95Ms":50.827},"boundedConcurrency":{"samples":48,"successes":48,"failures":0,"successRate":1,"p50Ms":144.722,"p95Ms":201.888},"searchStart":{"samples":10,"successes":10,"failures":0,"successRate":1,"p50Ms":103.088,"p95Ms":121.319},"searchResults":{"samples":10,"successes":10,"failures":0,"successRate":1,"p50Ms":31.949,"p95Ms":36.2},"shortProcessStart":{"samples":10,"successes":10,"failures":0,"successRate":1,"p50Ms":537.37,"p95Ms":557.589},"persistentProcessOutput":{"samples":10,"successes":10,"failures":0,"successRate":1,"p50Ms":30.463,"p95Ms":36.709}}}
+
