@@ -24,23 +24,13 @@ function Convert-ToMachineDpapi {
   }
 
   try {
-    $alreadyMachineProtected = [Security.Cryptography.ProtectedData]::Unprotect(
+    $plain = [Security.Cryptography.ProtectedData]::Unprotect(
       $protected,
       $null,
-      [Security.Cryptography.DataProtectionScope]::LocalMachine
+      [Security.Cryptography.DataProtectionScope]::CurrentUser
     )
-    [Array]::Clear($alreadyMachineProtected, 0, $alreadyMachineProtected.Length)
-    return
   } catch {
-    try {
-      $plain = [Security.Cryptography.ProtectedData]::Unprotect(
-        $protected,
-        $null,
-        [Security.Cryptography.DataProtectionScope]::CurrentUser
-      )
-    } catch {
-      throw "DPAPI blob is neither machine-protected nor migratable by the current Windows identity: $Path"
-    }
+    throw "DPAPI blob cannot be migrated by the current Windows identity: $Path"
   }
 
   try {
@@ -51,8 +41,9 @@ function Convert-ToMachineDpapi {
     )
     $replacement = [Convert]::ToBase64String($machineProtected)
     $temporary = "$Path.migrate-$([guid]::NewGuid().ToString('N')).tmp"
+    $replacementBackup = "$Path.pre-machine-$([guid]::NewGuid().ToString('N')).bak"
     [IO.File]::WriteAllText($temporary, $replacement, [Text.UTF8Encoding]::new($false))
-    [IO.File]::Replace($temporary, $Path, $null)
+    [IO.File]::Replace($temporary, $Path, $replacementBackup)
     $verified = [Security.Cryptography.ProtectedData]::Unprotect(
       [Convert]::FromBase64String((Get-Content -LiteralPath $Path -Raw).Trim()),
       $null,
@@ -66,6 +57,9 @@ function Convert-ToMachineDpapi {
     if ($verified) { [Array]::Clear($verified, 0, $verified.Length) }
     if ($temporary -and (Test-Path -LiteralPath $temporary)) {
       [IO.File]::Delete($temporary)
+    }
+    if ($replacementBackup -and (Test-Path -LiteralPath $replacementBackup)) {
+      [IO.File]::Delete($replacementBackup)
     }
   }
 }
