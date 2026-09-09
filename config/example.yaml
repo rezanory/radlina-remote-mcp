@@ -1,0 +1,49 @@
+server:
+  host: 127.0.0.1
+  port: 7337
+  publicUrl: http://127.0.0.1:7337
+  allowedHosts:
+    - 127.0.0.1
+    - localhost
+  allowedOrigins: []
+  requestBodyBytes: 1048576
+  requestTimeoutMs: 30000
+auth:
+  mode: internal
+  accessTokenTtlSeconds: 600
+  refreshTokenTtlSeconds: 86400
+  pairingCodeTtlSeconds: 600
+  allowedRedirectHosts:
+    - chatgpt.com
+    - openai.com
+    - 127.0.0.1
+    - localhost
+policy:
+  defaultProfile: radlina
+  emergencyReadOnly: false
+  killSwitch: false
+  maxConcurrentRequests: 8
+  rateLimitPerMinute: 60
+  maxFileBytes: 10485760
+  maxOutputBytes: 1048576
+  maxProcessRuntimeMs: 900000
+  maxSearchRuntimeMs: 120000
+  maxSessions: 12
+dependencies:
+  ripgrepExecutable: C:\\radlina-remote-mcp\\.runtime\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe
+profiles:
+  radlina:
+    roots:
+      - C:\\radlina-remote-mcp
+    commands: []
+    allowShell: false
+    allowTrash: false
+    envAllowlist:
+      - PATH
+      - SYSTEMROOT
+storage:
+  directory: C:\\radlina-remote-mcp\\.state
+audit:
+  directory: C:\\radlina-remote-mcp\\.state\\audit
+  rotateBytes: 5242880
+  userRedactionPatterns: []

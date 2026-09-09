@@ -1,0 +1,21 @@
+{
+  "node": {
+    "version": "24.20.0",
+    "url": "https://nodejs.org/dist/v24.20.0/node-v24.20.0-win-x64.zip",
+    "sha256": "6cac9ffbca8f6a47091e4b5c772e0606049c3871cb67d900c0cedde630e545ba",
+    "checksumSource": "https://nodejs.org/dist/v24.20.0/SHASUMS256.txt"
+  },
+  "ripgrep": {
+    "version": "15.2.0",
+    "commit": "e89fff89ac",
+    "url": "https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-pc-windows-msvc.zip",
+    "sha256": "71b2fef860abe467217a538ff31de02f5258807c0129f771846f87bd029aafc5"
+  },
+  "winsw": {
+    "version": "2.12.0",
+    "commit": "eef5bade59fca0254e387ac73ed7625ba6aa7147",
+    "url": "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe",
+    "sha256": "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da",
+    "signature": "upstream asset is not Authenticode-signed; identity is pinned to the official GitHub release URL, signed release tag, exact commit, size, and this observed SHA-256"
+  }
+}

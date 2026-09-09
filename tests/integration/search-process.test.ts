@@ -1,0 +1,198 @@
+import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
+
+import { Store } from "../../src/persistence/store.js";
+import { PolicyEngine } from "../../src/policy/engine.js";
+import { FilesystemService } from "../../src/tools/filesystem/service.js";
+import { ProcessManager } from "../../src/tools/process/manager.js";
+import { SearchManager } from "../../src/tools/search/manager.js";
+import { testConfig } from "../helpers/config.js";
+
+const cleanup: string[] = [];
+
+afterEach(async () => {
+  for (const directory of cleanup.splice(0)) await rm(directory, { recursive: true, force: true });
+});
+
+async function waitFor(read: () => { status: string }): Promise<{ status: string }> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const value = read();
+    if (value.status !== "running") return value;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error("session did not complete before timeout");
+}
+
+describe("reconnectable jobs", () => {
+  it("persists paged ripgrep results", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-search-"));
+    cleanup.push(root);
+    await writeFile(path.join(root, "one.txt"), "needle\n", "utf8");
+    const config = testConfig(root);
+    config.dependencies.ripgrepExecutable =
+      "C:\\radlina-remote-mcp\\.runtime\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe";
+    const store = new Store(config.storage.directory);
+    const searches = new SearchManager(config, store);
+    const files = new FilesystemService([root], 1024 * 1024, path.join(root, ".trash"), false);
+    const started = (await searches.start("subject", "test", files.resolver, {
+      mode: "content",
+      path: root,
+      pattern: "needle",
+      literal: true,
+      maxResults: 10,
+    })) as { searchId: string };
+    await waitFor(() => searches.status(started.searchId, "subject") as { status: string });
+    const result = (await searches.results(started.searchId, "subject")) as { results: unknown[] };
+    expect(result.results).toHaveLength(1);
+    store.close();
+  });
+
+  it("persists process output for reconnectable reads", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-process-"));
+    cleanup.push(root);
+    const config = testConfig(root);
+    const profile = config.profiles["test"];
+    if (!profile) throw new Error("test profile missing");
+    profile.commands = [{ executable: process.execPath, argumentPatterns: ["^--version$"] }];
+    const store = new Store(config.storage.directory);
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    const processes = new ProcessManager(config, store, policy);
+    const files = new FilesystemService([root], 1024 * 1024, path.join(root, ".trash"), false);
+    const started = (await processes.start("subject", "test", profile, files.resolver, {
+      executable: process.execPath,
+      args: ["--version"],
+      cwd: root,
+    })) as { sessionId: string };
+    await waitFor(() => {
+      const row = store.db
+        .prepare("SELECT status FROM process_sessions WHERE id=?")
+        .get(started.sessionId) as {
+        status: string;
+      };
+      return row;
+    });
+    const result = (await processes.readOutput(started.sessionId, "subject")) as { output: string };
+    expect(result.output).toContain(process.version);
+    store.close();
+  });
+
+  it("enforces process timeouts and bounded output", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-process-limits-"));
+    cleanup.push(root);
+    const config = testConfig(root);
+    config.policy.maxProcessRuntimeMs = 2_000;
+    config.policy.maxOutputBytes = 4096;
+    const profile = config.profiles["test"];
+    if (!profile) throw new Error("test profile missing");
+    profile.commands = [{ executable: process.execPath, argumentPatterns: [".*"] }];
+    const store = new Store(config.storage.directory);
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    const processes = new ProcessManager(config, store, policy);
+    const files = new FilesystemService([root], 1024 * 1024, path.join(root, ".trash"), false);
+
+    const timed = (await processes.start("subject", "test", profile, files.resolver, {
+      executable: process.execPath,
+      args: ["-e", "setInterval(() => {}, 1000)"],
+      cwd: root,
+      timeoutMs: 100,
+    })) as { sessionId: string };
+    const timedStatus = await waitFor(
+      () =>
+        store.db.prepare("SELECT status FROM process_sessions WHERE id=?").get(timed.sessionId) as {
+          status: string;
+        },
+    );
+    expect(timedStatus.status).toBe("timed-out");
+
+    const noisy = (await processes.start("subject", "test", profile, files.resolver, {
+      executable: process.execPath,
+      args: ["-e", "process.stdout.write('x'.repeat(200000));setInterval(() => {}, 1000)"],
+      cwd: root,
+    })) as { sessionId: string };
+    const noisyStatus = await waitFor(
+      () =>
+        store.db.prepare("SELECT status FROM process_sessions WHERE id=?").get(noisy.sessionId) as {
+          status: string;
+        },
+    );
+    expect(noisyStatus.status).toBe("output-limit");
+    const output = (await processes.readOutput(noisy.sessionId, "subject", undefined, 8192)) as {
+      bytesRead: number;
+    };
+    expect(output.bytesRead).toBeLessThanOrEqual(config.policy.maxOutputBytes);
+    const row = store.db
+      .prepare("SELECT output_path FROM process_sessions WHERE id=?")
+      .get(noisy.sessionId) as { output_path: string };
+    expect((await stat(row.output_path)).size).toBeLessThanOrEqual(config.policy.maxOutputBytes);
+    store.close();
+  });
+
+  it("reconciles orphaned process rows after restart", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-process-reconcile-"));
+    cleanup.push(root);
+    const config = testConfig(root);
+    const store = new Store(config.storage.directory);
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    store.db
+      .prepare(
+        "INSERT INTO process_sessions(id,subject,profile,pid,executable,args_json,output_path,status,started_at,start_identity) VALUES(?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run(
+        "orphan",
+        "subject",
+        "test",
+        2_147_483_647,
+        process.execPath,
+        "{}",
+        path.join(root, "orphan.log"),
+        "running",
+        Date.now(),
+        "impossible",
+      );
+    const processes = new ProcessManager(config, store, policy);
+    await processes.reconcile();
+    const row = store.db.prepare("SELECT status FROM process_sessions WHERE id='orphan'").get() as {
+      status: string;
+    };
+    expect(row.status).toBe("interrupted");
+    store.close();
+  });
+
+  it("does not overwrite a cancelled search during its close race", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-search-cancel-"));
+    cleanup.push(root);
+    for (let index = 0; index < 100; index += 1) {
+      await writeFile(path.join(root, `file-${index}.txt`), `needle ${index}\n`, "utf8");
+    }
+    const config = testConfig(root);
+    config.dependencies.ripgrepExecutable =
+      "C:\\radlina-remote-mcp\\.runtime\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe";
+    const store = new Store(config.storage.directory);
+    const searches = new SearchManager(config, store);
+    const files = new FilesystemService([root], 1024 * 1024, path.join(root, ".trash"), false);
+    const started = (await searches.start("subject", "test", files.resolver, {
+      mode: "content",
+      path: root,
+      pattern: "needle",
+      literal: true,
+      maxResults: 10_000,
+    })) as { searchId: string };
+    searches.cancel(started.searchId, "subject");
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const status = searches.status(started.searchId, "subject") as { status: string };
+    expect(status.status).toBe("cancelled");
+    store.close();
+  });
+});

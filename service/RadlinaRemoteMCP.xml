@@ -1,0 +1,29 @@
+<service>
+  <id>RadlinaRemoteMCP</id>
+  <name>Radlina Remote MCP</name>
+  <description>Authenticated local-first MCP service for the Radlina workstation.</description>
+  <serviceaccount>
+    <domain>.</domain>
+    <user>Radlina</user>
+    <allowservicelogon>false</allowservicelogon>
+  </serviceaccount>
+  <executable>%BASE%\..\.runtime\node-v24.20.0-win-x64\node.exe</executable>
+  <arguments>--enable-source-maps dist\src\index.js</arguments>
+  <workingdirectory>%BASE%\..</workingdirectory>
+  <priority>Normal</priority>
+  <stoptimeout>15 sec</stoptimeout>
+  <stopparentprocessfirst>true</stopparentprocessfirst>
+  <startmode>Automatic</startmode>
+  <delayedAutoStart />
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <logpath>%BASE%\..\.state\service-logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <env name="NODE_ENV" value="production" />
+  <env name="RADLINA_CONFIG" value="%BASE%\..\config\local.yaml" />
+</service>
