@@ -32,6 +32,7 @@ The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid b
 ## Deployment
 
 - Windows service: `scripts\operations\install-service.ps1` from an elevated PowerShell terminal. WinSW prompts locally for the low-privilege `Radlina` Windows account; no password belongs in configuration or chat.
+- Service start/stop/restart/status: `scripts\operations\service-control.ps1 -Action <Start|Stop|Restart|Status>`.
 - Private tailnet ingress: `scripts\operations\configure-tailscale.ps1 -Mode Serve`.
 - ChatGPT-compatible public HTTPS ingress: `scripts\operations\configure-tailscale.ps1 -Mode Funnel`.
 - ChatGPT connector instructions: `docs\operations\CHATGPT-CONNECT.md`.

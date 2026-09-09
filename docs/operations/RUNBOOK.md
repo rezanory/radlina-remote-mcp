@@ -21,6 +21,13 @@ Run service installation from an elevated PowerShell terminal:
 
 At the local WinSW prompt, use `.\Radlina` and enter the Windows password only into that prompt. The service binds only to `127.0.0.1:7337`. The firewall rule blocks direct inbound connections to the pinned Node runtime.
 
+```powershell
+.\scripts\operations\service-control.ps1 -Action Status
+.\scripts\operations\service-control.ps1 -Action Restart
+```
+
+`Status` is read-only and confirms both SCM state and the loopback `401` authentication gate. Start, Stop, and Restart require elevation.
+
 Updates create a consistent backup before changing dependencies or restarting:
 
 ```powershell
