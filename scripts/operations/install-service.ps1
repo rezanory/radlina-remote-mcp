@@ -12,14 +12,19 @@ if (-not (Test-Path -LiteralPath $localConfig)) {
 }
 
 $nodeRoot = Join-Path $projectRoot '.runtime\node-v24.20.0-win-x64'
-& (Join-Path $nodeRoot 'npm.cmd') ci --ignore-scripts
-if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
-& (Join-Path $nodeRoot 'npm.cmd') run build
-if ($LASTEXITCODE -ne 0) { throw 'build failed' }
-& (Join-Path $nodeRoot 'npm.cmd') test
-if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
-& (Join-Path $nodeRoot 'npm.cmd') run security:audit
-if ($LASTEXITCODE -ne 0) { throw 'dependency audit failed' }
+Push-Location -LiteralPath $projectRoot
+try {
+  & (Join-Path $nodeRoot 'npm.cmd') ci --ignore-scripts
+  if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }
+  & (Join-Path $nodeRoot 'npm.cmd') run build
+  if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+  & (Join-Path $nodeRoot 'npm.cmd') test
+  if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
+  & (Join-Path $nodeRoot 'npm.cmd') run security:audit
+  if ($LASTEXITCODE -ne 0) { throw 'dependency audit failed' }
+} finally {
+  Pop-Location
+}
 
 $serviceDirectory = Join-Path $projectRoot 'service'
 $serviceExecutable = Join-Path $serviceDirectory 'RadlinaRemoteMCP.exe'
