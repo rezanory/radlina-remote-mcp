@@ -4,10 +4,10 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
     "id": "radlina-remote-mcp@0.1.0",
     "name": "radlina-remote-mcp",
     "version": "0.1.0",
-    "size": 66259,
-    "unpackedSize": 254982,
-    "shasum": "8001a0eac9307065884cf94caa8143ab24661914",
-    "integrity": "sha512-lz9uMYI+7OzXIDB7tOeyyeU/zK4ZfbrqtkELpRqdi+difJoda5prCuDl1eYXn4AmoF4LoYutAfxAi5ZiUpkyPg==",
+    "size": 139703,
+    "unpackedSize": 1188195,
+    "shasum": "adc5129130374133faa103dea118eff6928b8bc5",
+    "integrity": "sha512-H96q9yxZmKOoo7OwNOOBoYWfT3FD4BIGCEkLfNCI2mhI1dP0qb/NL3PifZLy8lx0bsJPQm1d58hbgfzW+kAKDA==",
     "filename": "radlina-remote-mcp-0.1.0.tgz",
     "files": [
       {
@@ -22,7 +22,7 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
       },
       {
         "path": "README.md",
-        "size": 2883,
+        "size": 2998,
         "mode": 420
       },
       {
@@ -72,7 +72,7 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
       },
       {
         "path": "docs/operations/RUNBOOK.md",
-        "size": 3175,
+        "size": 3446,
         "mode": 420
       },
       {
@@ -91,6 +91,11 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
         "mode": 420
       },
       {
+        "path": "evidence/PH-01/P001/benchmark.txt",
+        "size": 1330,
+        "mode": 420
+      },
+      {
         "path": "evidence/PH-01/P001/build.txt",
         "size": 64,
         "mode": 420
@@ -101,13 +106,43 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
         "mode": 420
       },
       {
+        "path": "evidence/PH-01/P001/dependency-audit.txt",
+        "size": 106,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/evidence-index.json",
+        "size": 775,
+        "mode": 420
+      },
+      {
         "path": "evidence/PH-01/P001/format-check.txt",
-        "size": 137,
+        "size": 259,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/license-inventory.txt",
+        "size": 127,
         "mode": 420
       },
       {
         "path": "evidence/PH-01/P001/lint.txt",
         "size": 51,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/package-dry-run.txt",
+        "size": 9048,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/sbom.txt",
+        "size": 138,
+        "mode": 420
+      },
+      {
+        "path": "evidence/PH-01/P001/secret-scan.txt",
+        "size": 22,
         "mode": 420
       },
       {
@@ -121,8 +156,28 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
         "mode": 420
       },
       {
+        "path": "evidence/PH-01/P001/validation-summary.json",
+        "size": 6882,
+        "mode": 420
+      },
+      {
         "path": "package.json",
         "size": 2072,
+        "mode": 420
+      },
+      {
+        "path": "reports/PH-01/licenses.json",
+        "size": 57019,
+        "mode": 420
+      },
+      {
+        "path": "reports/PH-01/P001_FINAL_ACCEPTANCE.md",
+        "size": 7587,
+        "mode": 420
+      },
+      {
+        "path": "reports/PH-01/sbom.cdx.json",
+        "size": 847606,
         "mode": 420
       },
       {
@@ -178,6 +233,11 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
       {
         "path": "scripts/operations/security-scan.ps1",
         "size": 992,
+        "mode": 420
+      },
+      {
+        "path": "scripts/operations/service-control.ps1",
+        "size": 2065,
         "mode": 420
       },
       {
@@ -391,7 +451,7 @@ npm warn gitignore-fallback No .npmignore file found, using .gitignore for file 
         "mode": 420
       }
     ],
-    "entryCount": 76,
+    "entryCount": 88,
     "bundled": []
   }
 ]
