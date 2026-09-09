@@ -6,6 +6,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+$hasGit = Test-Path -LiteralPath (Join-Path $projectRoot '.git')
+$sourceCommit = if ($hasGit) { (& git.exe -C $projectRoot rev-parse HEAD 2>$null) } else { $null }
+$sourceTree = if ($hasGit) { (& git.exe -C $projectRoot rev-parse 'HEAD^{tree}' 2>$null) } else { $null }
+$initialGitStatus = if ($hasGit) { @(& git.exe -C $projectRoot status --porcelain=v1) } else { @() }
 $evidenceRoot = Join-Path $projectRoot 'evidence\PH-01\P001'
 $reportRoot = Join-Path $projectRoot 'reports\PH-01'
 New-Item -ItemType Directory -Force -Path $evidenceRoot, $reportRoot | Out-Null
@@ -89,9 +93,9 @@ $summary = [ordered]@{
   generatedAt = (Get-Date).ToUniversalTime().ToString('o')
   sourceRoot = $projectRoot
   node = (& (Join-Path $nodeRoot 'node.exe') --version)
-  sourceCommit = if (Test-Path -LiteralPath (Join-Path $projectRoot '.git')) { (& git.exe -C $projectRoot rev-parse HEAD 2>$null) } else { $null }
-  sourceTree = if (Test-Path -LiteralPath (Join-Path $projectRoot '.git')) { (& git.exe -C $projectRoot rev-parse 'HEAD^{tree}' 2>$null) } else { $null }
-  initialGitStatus = if (Test-Path -LiteralPath (Join-Path $projectRoot '.git')) { @(& git.exe -C $projectRoot status --porcelain=v1) } else { @() }
+  sourceCommit = $sourceCommit
+  sourceTree = $sourceTree
+  initialGitStatus = $initialGitStatus
   gates = @($records)
   artifacts = @($artifacts)
 }
