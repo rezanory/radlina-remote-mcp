@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.state/
+.temp/
+.runtime/
+evidence/PH-01/P001/*.txt
+evidence/PH-01/P001/validation-summary.json
+reports/PH-01/*.json
