@@ -10,8 +10,15 @@ $stateDirectory = Join-Path $projectRoot '.state'
 New-Item -ItemType Directory -Force -Path $stateDirectory | Out-Null
 $backup = Join-Path $stateDirectory 'tailscale-before.json'
 if (-not (Test-Path -LiteralPath $backup)) {
-  & tailscale.exe serve get-config $backup --all
+  $existingConfig = & tailscale.exe serve get-config --all
   if ($LASTEXITCODE -ne 0) { throw 'could not snapshot the existing Tailscale serving configuration' }
+  $existingConfigText = ($existingConfig -join [Environment]::NewLine)
+  try {
+    [void]($existingConfigText | ConvertFrom-Json)
+  } catch {
+    throw 'Tailscale returned an invalid serving configuration snapshot'
+  }
+  [IO.File]::WriteAllText($backup, $existingConfigText, [Text.UTF8Encoding]::new($false))
 }
 $configBackup = Join-Path $stateDirectory 'config-before-tailscale.yaml'
 $localConfig = Join-Path $projectRoot 'config\local.yaml'
