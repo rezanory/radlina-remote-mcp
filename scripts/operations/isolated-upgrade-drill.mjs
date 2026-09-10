@@ -87,14 +87,9 @@ async function runBoot(configFile, base, expectHealthy) {
   let ready = false;
   for (let attempt = 0; attempt < 150; attempt += 1) {
     if (child.exitCode !== null) break;
-    try {
-      const response = await fetch(`${base}/mcp`, { signal: AbortSignal.timeout(500) });
-      if (response.status === 401) {
-        ready = true;
-        break;
-      }
-    } catch {
-      // The isolated server may still be initializing DPAPI, SQLite, or its release graph.
+    if (output.includes("[server] listening")) {
+      ready = true;
+      break;
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
@@ -102,6 +97,13 @@ async function runBoot(configFile, base, expectHealthy) {
     child.kill();
     await waitForExit(child, 5_000).catch(() => undefined);
     throw new Error(`isolated release did not become ready: ${output}`);
+  }
+  const authProbe = await fetch(`${base}/mcp`, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(5_000),
+  });
+  if (authProbe.status !== 401) {
+    throw new Error(`isolated auth boundary failed: ${authProbe.status}`);
   }
   await new Promise((resolve) => setTimeout(resolve, 200));
   child.kill("SIGTERM");
