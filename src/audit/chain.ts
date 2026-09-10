@@ -5,6 +5,7 @@ import path from "node:path";
 import type { AppConfig } from "../config/schema.js";
 import { protectBytes, unprotectBytes } from "../auth/dpapi.js";
 import type { Store } from "../persistence/store.js";
+import { canonicalJson } from "../utils/json.js";
 import { Redactor } from "./redaction.js";
 
 export type AuditEvent = {
@@ -26,17 +27,6 @@ type AuditRecord = AuditEvent & {
   prevHash: string;
   hash: string;
 };
-
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
-      a.localeCompare(b),
-    );
-    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
-  }
-  return JSON.stringify(value);
-}
 
 export class AuditChain {
   private key!: Buffer;
@@ -106,7 +96,7 @@ export class AuditChain {
       sequence,
       prevHash,
     };
-    const hash = createHmac("sha256", this.key).update(canonical(base)).digest("hex");
+    const hash = createHmac("sha256", this.key).update(canonicalJson(base)).digest("hex");
     const record: AuditRecord = { ...base, hash };
     await appendFile(this.activePath, `${JSON.stringify(record)}\n`, {
       encoding: "utf8",
@@ -133,7 +123,7 @@ export class AuditChain {
       for (const line of content.split(/\r?\n/u).filter(Boolean)) {
         const record = JSON.parse(line) as AuditRecord;
         const { hash, ...base } = record;
-        const expected = createHmac("sha256", this.key).update(canonical(base)).digest("hex");
+        const expected = createHmac("sha256", this.key).update(canonicalJson(base)).digest("hex");
         const equal =
           hash.length === expected.length &&
           timingSafeEqual(Buffer.from(hash), Buffer.from(expected));

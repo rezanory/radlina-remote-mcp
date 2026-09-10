@@ -59,6 +59,22 @@ describe("audit and idempotency", () => {
     store.close();
   });
 
+  it("keeps audit records verifiable when optional args are undefined", async () => {
+    const { audit, store } = await setup();
+    await audit.append({
+      correlationId: crypto.randomUUID(),
+      subject: "test",
+      deviceId: "device",
+      tool: "get_file_info",
+      args: { path: "C:\\workspace\\fixture.txt", profile: undefined },
+      decision: "allow",
+      durationMs: 1,
+      exitState: "success",
+    });
+    await expect(audit.verify(await audit.files())).resolves.toEqual({ valid: true, records: 1 });
+    store.close();
+  });
+
   it("detects tampering", async () => {
     const { audit, store } = await setup();
     await audit.append({
