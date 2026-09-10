@@ -1,0 +1,231 @@
+{
+  "schema": "radlina.closure-validation.v1",
+  "generatedAt": "2026-09-10T23:19:55.330Z",
+  "status": "PASS",
+  "source": {
+    "gitSha": "f2fa42a26fa8e15873c2b67a3ba8011c8bc6f011",
+    "gitTree": "226a0be8c75d185bb3511d389df36c7bf0eafb35",
+    "branch": "feat/v0.3-reliability-self-healing-v1"
+  },
+  "finalSource": {
+    "gitSha": "f2fa42a26fa8e15873c2b67a3ba8011c8bc6f011",
+    "gitTree": "226a0be8c75d185bb3511d389df36c7bf0eafb35",
+    "branch": "feat/v0.3-reliability-self-healing-v1"
+  },
+  "sourceWorktreeClean": true,
+  "node": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+  "gates": [
+    {
+      "name": "clean-install",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "ci",
+        "--ignore-scripts"
+      ],
+      "startedAt": "2026-09-10T23:15:11.541Z",
+      "durationMs": 111154,
+      "exitCode": 0,
+      "output": "01-clean-install.log",
+      "outputSha256": "a9d1426b7525e9171adca9b8522a9ceee7eed1e105cd67dd07da43b6af516369"
+    },
+    {
+      "name": "format",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "format:check"
+      ],
+      "startedAt": "2026-09-10T23:17:02.756Z",
+      "durationMs": 4098,
+      "exitCode": 0,
+      "output": "02-format.log",
+      "outputSha256": "37802b0ed6e6174245d97629ca88efbac18edea58f7ce835afa6b799413d74ba"
+    },
+    {
+      "name": "lint",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "lint"
+      ],
+      "startedAt": "2026-09-10T23:17:06.854Z",
+      "durationMs": 78676,
+      "exitCode": 0,
+      "output": "03-lint.log",
+      "outputSha256": "05a9c9b21e76a7955f41bfaedf1a26425f3424e3ab05d374d8b9a28ed0cff057"
+    },
+    {
+      "name": "typecheck",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "typecheck"
+      ],
+      "startedAt": "2026-09-10T23:18:25.530Z",
+      "durationMs": 6953,
+      "exitCode": 0,
+      "output": "04-typecheck.log",
+      "outputSha256": "6a98d091bd1f77d46cfa79a9e3abdc6d582d32599e35c5cd2367db4533a9c5e6"
+    },
+    {
+      "name": "unit",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test:unit"
+      ],
+      "startedAt": "2026-09-10T23:18:32.483Z",
+      "durationMs": 11488,
+      "exitCode": 0,
+      "output": "05-unit.log",
+      "outputSha256": "1631f20cba371b77f5c2ae1ef3a518572840920d213495741fce701cbbe0143c"
+    },
+    {
+      "name": "integration",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test:integration"
+      ],
+      "startedAt": "2026-09-10T23:18:43.971Z",
+      "durationMs": 25017,
+      "exitCode": 0,
+      "output": "06-integration.log",
+      "outputSha256": "dcfd4f8643682a28b33f7e5b2bf477f5f4acefb0fb3917561208863b8c25351b"
+    },
+    {
+      "name": "security",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test:security"
+      ],
+      "startedAt": "2026-09-10T23:19:08.988Z",
+      "durationMs": 4348,
+      "exitCode": 0,
+      "output": "07-security.log",
+      "outputSha256": "a952deeadff282b4d303e9a4548a77fec809ee2013e6bae72e19e6a5851b95e1"
+    },
+    {
+      "name": "resilience",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test:resilience"
+      ],
+      "startedAt": "2026-09-10T23:19:13.336Z",
+      "durationMs": 6453,
+      "exitCode": 0,
+      "output": "08-resilience.log",
+      "outputSha256": "f7956021eff6cbbaf2345639c3a0d0f45d349cf372ae7280a307592be1c0830b"
+    },
+    {
+      "name": "full",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "test"
+      ],
+      "startedAt": "2026-09-10T23:19:19.789Z",
+      "durationMs": 20559,
+      "exitCode": 0,
+      "output": "09-full.log",
+      "outputSha256": "b38e0f4905462ba3913a07e8408efe71922fdb112ef37b6f62329b81a21d63d9"
+    },
+    {
+      "name": "build",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build"
+      ],
+      "startedAt": "2026-09-10T23:19:40.348Z",
+      "durationMs": 7582,
+      "exitCode": 0,
+      "output": "10-build.log",
+      "outputSha256": "4d3cf143ea235029be5b9f91a16c3106c80889df9d56dda5a7c0bbb6fab599a1"
+    },
+    {
+      "name": "dependency-audit",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": [
+        "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "security:audit"
+      ],
+      "startedAt": "2026-09-10T23:19:47.930Z",
+      "durationMs": 5880,
+      "exitCode": 0,
+      "output": "11-dependency-audit.log",
+      "outputSha256": "0cdf6bfbb5aeb0c6840de3e1de613fa8a9780650b5857027fce63149a96864c2"
+    },
+    {
+      "name": "builder-syntax",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": ["--check", "scripts/operations/build-release.mjs"],
+      "startedAt": "2026-09-10T23:19:53.810Z",
+      "durationMs": 134,
+      "exitCode": 0,
+      "output": "12-builder-syntax.log",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "drill-syntax",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": ["--check", "scripts/operations/isolated-upgrade-drill.mjs"],
+      "startedAt": "2026-09-10T23:19:53.945Z",
+      "durationMs": 126,
+      "exitCode": 0,
+      "output": "13-drill-syntax.log",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "verifier-syntax",
+      "executable": "C:\\radlina-remote-mcp\\.runtime\\node-v24.20.0-win-x64\\node.exe",
+      "args": ["--check", "scripts/operations/verify-release.mjs"],
+      "startedAt": "2026-09-10T23:19:54.071Z",
+      "durationMs": 105,
+      "exitCode": 0,
+      "output": "14-verifier-syntax.log",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "secret-scan",
+      "executable": "powershell.exe",
+      "args": [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "C:\\radlina-remote-mcp-integration\\v0.3-reliability-self-healing-v1\\scripts\\operations\\security-scan.ps1"
+      ],
+      "startedAt": "2026-09-10T23:19:54.176Z",
+      "durationMs": 661,
+      "exitCode": 0,
+      "output": "15-secret-scan.log",
+      "outputSha256": "79ade98e392ab6e2aa8aa807018de302cca6e6f3d7e76a024c529b935bd9845c"
+    },
+    {
+      "name": "git-diff-check",
+      "executable": "git.exe",
+      "args": ["diff", "--check", "HEAD"],
+      "startedAt": "2026-09-10T23:19:54.836Z",
+      "durationMs": 99,
+      "exitCode": 0,
+      "output": "16-git-diff-check.log",
+      "outputSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "failed": []
+}
