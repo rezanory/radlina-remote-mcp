@@ -35,6 +35,12 @@ $ripgrepRoot = Join-Path $runtimeRoot 'ripgrep-15.2.0-x86_64-pc-windows-msvc'
 if (-not (Test-Path -LiteralPath (Join-Path $ripgrepRoot 'rg.exe'))) {
   Expand-Archive -LiteralPath $ripgrepZip -DestinationPath $runtimeRoot -Force
 }
+$ripgrepExecutable = Join-Path $ripgrepRoot 'rg.exe'
+$expectedRipgrepExecutable = '14231169855ec5205cf5a1b6f1db358ff4aed4247c86b69ce8aae647c77f6680'
+$actualRipgrepExecutable = (Get-FileHash -Algorithm SHA256 -LiteralPath $ripgrepExecutable).Hash.ToLowerInvariant()
+if ($actualRipgrepExecutable -ne $expectedRipgrepExecutable) {
+  throw "SHA-256 mismatch for extracted rg.exe. Expected $expectedRipgrepExecutable, got $actualRipgrepExecutable"
+}
 
 $winswRoot = Join-Path $runtimeRoot 'winsw-2.12.0'
 New-Item -ItemType Directory -Force -Path $winswRoot | Out-Null
@@ -42,5 +48,5 @@ $winsw = Join-Path $winswRoot 'WinSW-x64.exe'
 Get-VerifiedArtifact -Uri 'https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe' -Destination $winsw -Sha256 '05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da'
 
 $nodeVersion = & (Join-Path $nodeRoot 'node.exe') --version
-$ripgrepVersion = (& (Join-Path $ripgrepRoot 'rg.exe') --version | Select-Object -First 1)
+$ripgrepVersion = (& $ripgrepExecutable --version | Select-Object -First 1)
 Write-Output "runtime ready: Node $nodeVersion; $ripgrepVersion; WinSW 2.12.0"
