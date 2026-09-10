@@ -16,7 +16,7 @@ const exists = await stat(outputRoot)
   .then(() => true)
   .catch(() => false);
 if (exists) throw new Error(`evidence directory already exists: ${outputRoot}`);
-await mkdir(outputRoot, { recursive: false });
+await mkdir(outputRoot, { recursive: true });
 
 function sanitize(value) {
   return value
