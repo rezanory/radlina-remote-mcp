@@ -14,7 +14,17 @@ $candidates = @(
 $ripgrep = @($candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1)
 if ($ripgrep.Count -ne 1) { throw 'pinned ripgrep executable is missing' }
 $ripgrep = $ripgrep[0]
-$actualRipgrep = (Get-FileHash -Algorithm SHA256 -LiteralPath $ripgrep).Hash.ToLowerInvariant()
+$stream = [IO.File]::OpenRead($ripgrep)
+try {
+  $sha256 = [Security.Cryptography.SHA256]::Create()
+  try {
+    $actualRipgrep = ([BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+  } finally {
+    $sha256.Dispose()
+  }
+} finally {
+  $stream.Dispose()
+}
 if ($actualRipgrep -ne $expectedRipgrep) {
   throw "pinned ripgrep executable hash mismatch: $actualRipgrep"
 }
