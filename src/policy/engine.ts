@@ -39,6 +39,8 @@ const READ_ONLY_TOOLS = new Set([
   "validate_config",
   "simulate_policy",
   "recent_tool_calls",
+  "auth_health",
+  "recent_oauth_events",
   "active_sessions",
   "resource_stats",
   "readiness",

@@ -10,8 +10,9 @@ server:
   requestTimeoutMs: 30000
 auth:
   mode: internal
-  accessTokenTtlSeconds: 600
-  refreshTokenTtlSeconds: 86400
+  accessTokenTtlSeconds: 3600
+  refreshTokenTtlSeconds: 604800
+  refreshReplayGraceSeconds: 30
   pairingCodeTtlSeconds: 600
   allowedRedirectHosts:
     - chatgpt.com

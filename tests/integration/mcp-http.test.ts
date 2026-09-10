@@ -87,7 +87,7 @@ describe("Streamable HTTP MCP", () => {
       await client.connect(transport);
       expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(41);
+      expect(tools.tools).toHaveLength(43);
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       for (const required of [
         "admin_stage_release",

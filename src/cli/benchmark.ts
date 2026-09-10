@@ -150,6 +150,7 @@ async function main(): Promise<void> {
       mode: "internal",
       accessTokenTtlSeconds: 600,
       refreshTokenTtlSeconds: 86_400,
+      refreshReplayGraceSeconds: 30,
       pairingCodeTtlSeconds: 600,
       allowedRedirectHosts: ["127.0.0.1", "localhost"],
     },

@@ -46,7 +46,13 @@ export class Store {
       );
       CREATE TABLE IF NOT EXISTS oauth_refresh (
         token_hash TEXT PRIMARY KEY, client_id TEXT NOT NULL, scope TEXT NOT NULL,
-        resource TEXT NOT NULL, subject TEXT NOT NULL, expires_at INTEGER NOT NULL
+        resource TEXT NOT NULL, subject TEXT NOT NULL, expires_at INTEGER NOT NULL,
+        consumed_at INTEGER, replacement_protected TEXT, replacement_expires_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS oauth_events (
+        event_id TEXT PRIMARY KEY, created_at INTEGER NOT NULL, client_hash TEXT NOT NULL,
+        grant_type TEXT NOT NULL, status TEXT NOT NULL, latency_ms INTEGER NOT NULL,
+        error_code TEXT
       );
       CREATE TABLE IF NOT EXISTS pairing_codes (
         code_hash TEXT PRIMARY KEY, subject TEXT NOT NULL, expires_at INTEGER NOT NULL
@@ -67,6 +73,17 @@ export class Store {
         detail_json TEXT NOT NULL, created_at INTEGER NOT NULL
       );
     `);
+    const refreshColumns = new Set(
+      (this.db.prepare("PRAGMA table_info(oauth_refresh)").all() as Array<{ name: string }>).map(
+        (row) => row.name,
+      ),
+    );
+    if (!refreshColumns.has("consumed_at"))
+      this.db.exec("ALTER TABLE oauth_refresh ADD COLUMN consumed_at INTEGER");
+    if (!refreshColumns.has("replacement_protected"))
+      this.db.exec("ALTER TABLE oauth_refresh ADD COLUMN replacement_protected TEXT");
+    if (!refreshColumns.has("replacement_expires_at"))
+      this.db.exec("ALTER TABLE oauth_refresh ADD COLUMN replacement_expires_at INTEGER");
   }
 
   get(key: string): string | undefined {

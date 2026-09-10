@@ -15,8 +15,9 @@ export function testConfig(root: string): AppConfig {
     },
     auth: {
       mode: "internal",
-      accessTokenTtlSeconds: 600,
-      refreshTokenTtlSeconds: 86_400,
+      accessTokenTtlSeconds: 3600,
+      refreshTokenTtlSeconds: 7 * 86_400,
+      refreshReplayGraceSeconds: 30,
       pairingCodeTtlSeconds: 600,
       allowedRedirectHosts: ["127.0.0.1", "localhost", "chatgpt.com", "openai.com"],
     },

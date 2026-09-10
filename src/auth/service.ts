@@ -86,7 +86,34 @@ type RefreshRow = {
   resource: string;
   subject: string;
   expires_at: number;
+  consumed_at: number | null;
+  replacement_protected: string | null;
+  replacement_expires_at: number | null;
 };
+type GeneratedTokenSet = {
+  tokens: TokenSet;
+  refreshHash: string;
+  refreshExpiresAt: number;
+};
+type TokenSet = {
+  access_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+};
+type RefreshRotationResult =
+  { ok: true; tokens: TokenSet; replayed: boolean } | { ok: false; description: string };
+type OauthEventInput = {
+  clientHash: string;
+  grantType: string;
+  status: "success" | "error";
+  latencyMs: number;
+  errorCode: string | null;
+};
+
+const SERVER_VERSION = "0.2.1";
+const INVALID_REFRESH_DESCRIPTION = "refresh token is invalid, expired, replayed, or mismatched";
 
 function html(value: string): string {
   return value.replace(
@@ -98,6 +125,7 @@ function html(value: string): string {
 }
 
 function oauthError(response: Response, status: number, error: string, description: string): void {
+  response.locals["oauthErrorCode"] = error;
   response.status(status).json({ error, error_description: description });
 }
 
@@ -112,6 +140,7 @@ export class AuthService implements OAuthTokenVerifier {
   private keyId = "";
   private remoteJwks: ReturnType<typeof createRemoteJWKSet> | undefined;
   private oauthMetadataValue: OAuthMetadata | undefined;
+  private readonly refreshInFlight = new Map<string, Promise<RefreshRotationResult>>();
 
   readonly issuer: string;
   readonly resourceUrl: URL;
@@ -165,6 +194,10 @@ export class AuthService implements OAuthTokenVerifier {
         ...(localInsecure ? { dangerouslyAllowInsecureIssuerUrl: true } : {}),
       }),
     );
+    app.get("/auth-health", (_request, response) => {
+      response.setHeader("cache-control", "no-store");
+      response.json(this.health());
+    });
     if (this.config.auth.mode !== "internal") return;
     app.use(express.urlencoded({ extended: false, limit: "32kb" }));
     app.get("/jwks", (_request, response) => response.json({ keys: [this.publicJwk] }));
@@ -182,6 +215,35 @@ export class AuthService implements OAuthTokenVerifier {
 
   resourceMetadataUrl(): string {
     return getOAuthProtectedResourceMetadataUrl(this.resourceUrl);
+  }
+
+  health(): {
+    status: "healthy";
+    mode: AppConfig["auth"]["mode"];
+    signingReady: boolean;
+    tokenEndpointReady: boolean;
+    version: string;
+  } {
+    const signingReady =
+      this.config.auth.mode === "internal"
+        ? Boolean(this.privateKey && this.publicKey && this.publicJwk)
+        : Boolean(this.remoteJwks);
+    return {
+      status: "healthy",
+      mode: this.config.auth.mode,
+      signingReady,
+      tokenEndpointReady: Boolean(this.oauthMetadataValue?.token_endpoint),
+      version: SERVER_VERSION,
+    };
+  }
+
+  recentOauthEvents(limit = 50): unknown[] {
+    const bounded = Math.min(Math.max(Math.trunc(limit), 1), 200);
+    return this.store.db
+      .prepare(
+        "SELECT event_id,created_at,client_hash,grant_type,status,latency_ms,error_code FROM oauth_events ORDER BY created_at DESC,event_id DESC LIMIT ?",
+      )
+      .all(bounded);
   }
 
   async verifyAccessToken(token: string): Promise<AuthInfo> {
@@ -413,14 +475,33 @@ export class AuthService implements OAuthTokenVerifier {
 
   private async token(request: Request, response: Response): Promise<void> {
     this.cleanupOauth();
+    const started = performance.now();
     const body = request.body as Record<string, unknown>;
-    const grantType = stringValue(body["grant_type"]);
+    const requestedGrantType = stringValue(body["grant_type"], "unknown");
+    const grantType = ["authorization_code", "refresh_token"].includes(requestedGrantType)
+      ? requestedGrantType
+      : "unknown";
+    const clientId = stringValue(body["client_id"]);
+    const clientHash = clientId ? sha256(clientId).slice(0, 24) : "none";
+    response.once("finish", () => {
+      const errorCode =
+        typeof response.locals["oauthErrorCode"] === "string"
+          ? response.locals["oauthErrorCode"]
+          : null;
+      this.recordOauthEvent({
+        clientHash,
+        grantType,
+        status: response.statusCode >= 200 && response.statusCode < 400 ? "success" : "error",
+        latencyMs: Math.max(0, Math.round(performance.now() - started)),
+        errorCode,
+      });
+    });
     if (grantType === "authorization_code") {
       const rawCode = stringValue(body["code"]);
+      const codeHash = sha256(rawCode);
       const row = this.store.db
         .prepare("SELECT * FROM oauth_codes WHERE code_hash=?")
-        .get(sha256(rawCode)) as CodeRow | undefined;
-      this.store.db.prepare("DELETE FROM oauth_codes WHERE code_hash=?").run(sha256(rawCode));
+        .get(codeHash) as CodeRow | undefined;
       const verifier = stringValue(body["code_verifier"]);
       const challenge = Buffer.from(
         await crypto.subtle.digest("SHA-256", Buffer.from(verifier)),
@@ -428,7 +509,7 @@ export class AuthService implements OAuthTokenVerifier {
       if (
         !row ||
         row.expires_at <= Date.now() ||
-        row.client_id !== stringValue(body["client_id"]) ||
+        row.client_id !== clientId ||
         row.redirect_uri !== stringValue(body["redirect_uri"]) ||
         row.resource !== stringValue(body["resource"]) ||
         challenge !== row.challenge
@@ -441,33 +522,29 @@ export class AuthService implements OAuthTokenVerifier {
         );
         return;
       }
+      const consumed = this.store.db
+        .prepare("DELETE FROM oauth_codes WHERE code_hash=?")
+        .run(codeHash);
+      if (Number(consumed.changes) !== 1) {
+        oauthError(response, 400, "invalid_grant", "authorization code was already consumed");
+        return;
+      }
       response.setHeader("cache-control", "no-store");
       response.json(await this.issueTokens(row.client_id, row.subject, row.scope, row.resource));
       return;
     }
     if (grantType === "refresh_token") {
-      const raw = stringValue(body["refresh_token"]);
-      const hash = sha256(raw);
-      const row = this.store.db
-        .prepare("SELECT * FROM oauth_refresh WHERE token_hash=?")
-        .get(hash) as RefreshRow | undefined;
-      this.store.db.prepare("DELETE FROM oauth_refresh WHERE token_hash=?").run(hash);
-      if (
-        !row ||
-        row.expires_at <= Date.now() ||
-        row.client_id !== stringValue(body["client_id"]) ||
-        row.resource !== stringValue(body["resource"])
-      ) {
-        oauthError(
-          response,
-          400,
-          "invalid_grant",
-          "refresh token is invalid, expired, replayed, or for another resource",
-        );
+      const rotated = await this.rotateRefreshToken(
+        stringValue(body["refresh_token"]),
+        clientId,
+        stringValue(body["resource"]),
+      );
+      if (!rotated.ok) {
+        oauthError(response, 400, "invalid_grant", rotated.description);
         return;
       }
       response.setHeader("cache-control", "no-store");
-      response.json(await this.issueTokens(row.client_id, row.subject, row.scope, row.resource));
+      response.json(rotated.tokens);
       return;
     }
     oauthError(
@@ -483,7 +560,22 @@ export class AuthService implements OAuthTokenVerifier {
     subject: string,
     scope: string,
     resource: string,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<TokenSet> {
+    const generated = await this.generateTokenSet(clientId, subject, scope, resource);
+    this.store.db
+      .prepare(
+        "INSERT INTO oauth_refresh(token_hash,client_id,scope,resource,subject,expires_at) VALUES(?,?,?,?,?,?)",
+      )
+      .run(generated.refreshHash, clientId, scope, resource, subject, generated.refreshExpiresAt);
+    return generated.tokens;
+  }
+
+  private async generateTokenSet(
+    clientId: string,
+    subject: string,
+    scope: string,
+    resource: string,
+  ): Promise<GeneratedTokenSet> {
     if (!this.privateKey) throw new AppError("INTERNAL_ERROR", "internal signing key unavailable");
     const jti = randomUUID();
     const accessToken = await new SignJWT({ scope, client_id: clientId })
@@ -496,25 +588,184 @@ export class AuthService implements OAuthTokenVerifier {
       .setExpirationTime(`${this.config.auth.accessTokenTtlSeconds}s`)
       .sign(this.privateKey);
     const refreshToken = randomBytes(48).toString("base64url");
-    this.store.db
-      .prepare(
-        "INSERT INTO oauth_refresh(token_hash,client_id,scope,resource,subject,expires_at) VALUES(?,?,?,?,?,?)",
-      )
-      .run(
-        sha256(refreshToken),
-        clientId,
-        scope,
-        resource,
-        subject,
-        Date.now() + this.config.auth.refreshTokenTtlSeconds * 1000,
-      );
     return {
-      access_token: accessToken,
-      token_type: "Bearer",
-      expires_in: this.config.auth.accessTokenTtlSeconds,
-      refresh_token: refreshToken,
-      scope,
+      tokens: {
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: this.config.auth.accessTokenTtlSeconds,
+        refresh_token: refreshToken,
+        scope,
+      },
+      refreshHash: sha256(refreshToken),
+      refreshExpiresAt: Date.now() + this.config.auth.refreshTokenTtlSeconds * 1000,
     };
+  }
+
+  private async rotateRefreshToken(
+    rawToken: string,
+    clientId: string,
+    resource: string,
+  ): Promise<RefreshRotationResult> {
+    const tokenHash = sha256(rawToken);
+    const initial = this.refreshRow(tokenHash);
+    if (!this.refreshRequestValid(initial, clientId, resource, Date.now())) {
+      return { ok: false, description: INVALID_REFRESH_DESCRIPTION };
+    }
+
+    const existing = this.refreshInFlight.get(tokenHash);
+    if (existing) return await existing;
+
+    const rotation = this.rotateRefreshTokenOnce(tokenHash, clientId, resource);
+    this.refreshInFlight.set(tokenHash, rotation);
+    try {
+      return await rotation;
+    } finally {
+      if (this.refreshInFlight.get(tokenHash) === rotation) this.refreshInFlight.delete(tokenHash);
+    }
+  }
+
+  private async rotateRefreshTokenOnce(
+    tokenHash: string,
+    clientId: string,
+    resource: string,
+  ): Promise<RefreshRotationResult> {
+    const before = this.refreshRow(tokenHash);
+    const beforeNow = Date.now();
+    if (!this.refreshRequestValid(before, clientId, resource, beforeNow)) {
+      return { ok: false, description: INVALID_REFRESH_DESCRIPTION };
+    }
+    if (before?.consumed_at !== null) return await this.replayRotation(before, beforeNow);
+
+    const generated = await this.generateTokenSet(
+      before.client_id,
+      before.subject,
+      before.scope,
+      before.resource,
+    );
+    const protectedReceipt = await protectBytes(
+      Buffer.from(JSON.stringify(generated.tokens), "utf8"),
+    );
+    const consumedAt = Date.now();
+    const replayExpiresAt = consumedAt + this.config.auth.refreshReplayGraceSeconds * 1000;
+
+    this.store.db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.refreshRow(tokenHash);
+      if (!this.refreshRequestValid(current, clientId, resource, Date.now())) {
+        this.store.db.exec("COMMIT");
+        return { ok: false, description: INVALID_REFRESH_DESCRIPTION };
+      }
+      if (current.consumed_at !== null) {
+        this.store.db.exec("COMMIT");
+        return await this.replayRotation(current, Date.now());
+      }
+      const consumed = this.store.db
+        .prepare(
+          "UPDATE oauth_refresh SET consumed_at=?,replacement_protected=?,replacement_expires_at=? WHERE token_hash=? AND consumed_at IS NULL",
+        )
+        .run(consumedAt, protectedReceipt, replayExpiresAt, tokenHash);
+      if (Number(consumed.changes) !== 1) {
+        this.store.db.exec("ROLLBACK");
+        const winner = this.refreshRow(tokenHash);
+        return this.refreshRequestValid(winner, clientId, resource, Date.now()) &&
+          winner?.consumed_at !== null
+          ? await this.replayRotation(winner, Date.now())
+          : { ok: false, description: INVALID_REFRESH_DESCRIPTION };
+      }
+      this.store.db
+        .prepare(
+          "INSERT INTO oauth_refresh(token_hash,client_id,scope,resource,subject,expires_at) VALUES(?,?,?,?,?,?)",
+        )
+        .run(
+          generated.refreshHash,
+          current.client_id,
+          current.scope,
+          current.resource,
+          current.subject,
+          generated.refreshExpiresAt,
+        );
+      this.store.db.exec("COMMIT");
+      return { ok: true, tokens: generated.tokens, replayed: false };
+    } catch (error) {
+      try {
+        this.store.db.exec("ROLLBACK");
+      } catch {
+        // Preserve the original error if SQLite already ended the transaction.
+      }
+      throw error;
+    }
+  }
+
+  private refreshRow(tokenHash: string): RefreshRow | undefined {
+    return this.store.db
+      .prepare(
+        "SELECT client_id,scope,resource,subject,expires_at,consumed_at,replacement_protected,replacement_expires_at FROM oauth_refresh WHERE token_hash=?",
+      )
+      .get(tokenHash) as RefreshRow | undefined;
+  }
+
+  private refreshRequestValid(
+    row: RefreshRow | undefined,
+    clientId: string,
+    resource: string,
+    now: number,
+  ): row is RefreshRow {
+    return Boolean(
+      row && row.expires_at > now && row.client_id === clientId && row.resource === resource,
+    );
+  }
+
+  private async replayRotation(row: RefreshRow, now: number): Promise<RefreshRotationResult> {
+    if (
+      row.consumed_at === null ||
+      !row.replacement_protected ||
+      row.replacement_expires_at === null ||
+      row.replacement_expires_at <= now
+    ) {
+      return { ok: false, description: INVALID_REFRESH_DESCRIPTION };
+    }
+    const decoded = JSON.parse(
+      (await unprotectBytes(row.replacement_protected)).toString("utf8"),
+    ) as Partial<TokenSet>;
+    if (
+      typeof decoded.access_token !== "string" ||
+      decoded.token_type !== "Bearer" ||
+      typeof decoded.expires_in !== "number" ||
+      typeof decoded.refresh_token !== "string" ||
+      typeof decoded.scope !== "string"
+    ) {
+      throw new AppError("INTERNAL_ERROR", "OAuth refresh replay receipt is invalid");
+    }
+    return { ok: true, tokens: decoded as TokenSet, replayed: true };
+  }
+
+  private recordOauthEvent(event: OauthEventInput): void {
+    try {
+      this.store.db.exec("BEGIN IMMEDIATE");
+      this.store.db
+        .prepare(
+          "INSERT INTO oauth_events(event_id,created_at,client_hash,grant_type,status,latency_ms,error_code) VALUES(?,?,?,?,?,?,?)",
+        )
+        .run(
+          randomUUID(),
+          Date.now(),
+          event.clientHash.slice(0, 64),
+          event.grantType.slice(0, 64),
+          event.status,
+          Math.min(Math.max(Math.trunc(event.latencyMs), 0), 2_147_483_647),
+          event.errorCode?.slice(0, 64) ?? null,
+        );
+      this.store.db.exec(
+        "DELETE FROM oauth_events WHERE event_id NOT IN (SELECT event_id FROM oauth_events ORDER BY created_at DESC,event_id DESC LIMIT 5000)",
+      );
+      this.store.db.exec("COMMIT");
+    } catch {
+      try {
+        this.store.db.exec("ROLLBACK");
+      } catch {
+        // Telemetry is intentionally best effort and never affects token issuance.
+      }
+    }
   }
 
   private revoke(request: Request, response: Response): void {
@@ -560,6 +811,10 @@ export class AuthService implements OAuthTokenVerifier {
     const now = Date.now();
     this.store.db.prepare("DELETE FROM oauth_approvals WHERE expires_at<=?").run(now);
     this.store.db.prepare("DELETE FROM oauth_codes WHERE expires_at<=?").run(now);
-    this.store.db.prepare("DELETE FROM oauth_refresh WHERE expires_at<=?").run(now);
+    this.store.db
+      .prepare(
+        "DELETE FROM oauth_refresh WHERE (consumed_at IS NULL AND expires_at<=?) OR (consumed_at IS NOT NULL AND COALESCE(replacement_expires_at,consumed_at)<=?)",
+      )
+      .run(now, now);
   }
 }

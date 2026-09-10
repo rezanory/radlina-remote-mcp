@@ -82,7 +82,7 @@ const destructiveAnnotations = {
 };
 
 export function buildMcpServer(runtime: AppRuntime): McpServer {
-  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.0" });
+  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.1" });
 
   server.registerTool(
     "who_am_i",
@@ -179,7 +179,7 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     },
     (_args, context) =>
       execute(runtime, context, {}, { tool: "version", scope: "device:read" }, async () => ({
-        server: "0.2.0",
+        server: "0.2.1",
         node: process.version,
         protocol: "2026-07-28",
         activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
@@ -917,6 +917,34 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     ({ limit }, context) =>
       execute(runtime, context, { limit }, { tool: "recent_tool_calls", scope: "admin" }, () =>
         runtime.audit.recent(limit),
+      ),
+  );
+  server.registerTool(
+    "auth_health",
+    {
+      description: "Return minimal non-secret OAuth signing and token-endpoint readiness.",
+      inputSchema: z.object({}),
+      annotations: readAnnotations,
+    },
+    (_args, context) =>
+      execute(runtime, context, {}, { tool: "auth_health", scope: "device:read" }, async () =>
+        runtime.auth.health(),
+      ),
+  );
+  server.registerTool(
+    "recent_oauth_events",
+    {
+      description: "Return recent bounded OAuth outcome telemetry without token material.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(200).default(50) }),
+      annotations: readAnnotations,
+    },
+    ({ limit }, context) =>
+      execute(
+        runtime,
+        context,
+        { limit },
+        { tool: "recent_oauth_events", scope: "admin" },
+        async () => runtime.auth.recentOauthEvents(limit),
       ),
   );
   server.registerTool(

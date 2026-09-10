@@ -8,6 +8,18 @@ import { buildMcpServer } from "./mcp.js";
 import type { AppRuntime } from "./runtime.js";
 import { rateLimit } from "./transport/rate-limit.js";
 
+const AUTH_CONTROL_PATHS = [
+  "/.well-known/oauth-authorization-server",
+  "/.well-known/oauth-protected-resource",
+  "/.well-known/oauth-protected-resource/mcp",
+  "/register",
+  "/authorize",
+  "/token",
+  "/revoke",
+  "/jwks",
+  "/auth-health",
+];
+
 function concurrencyLimit(maximum: number) {
   let active = 0;
   return (_request: Request, response: Response, next: NextFunction): void => {
@@ -46,7 +58,11 @@ export function createHttpApp(runtime: AppRuntime): Express {
       crossOriginEmbedderPolicy: false,
     }),
   );
-  app.use(rateLimit(Math.max(config.policy.rateLimitPerMinute * 5, 300)));
+  app.use(
+    AUTH_CONTROL_PATHS,
+    rateLimit(Math.max(config.policy.rateLimitPerMinute * 5, 300)),
+    concurrencyLimit(Math.max(config.policy.maxConcurrentRequests, 8)),
+  );
   runtime.auth.install(app);
 
   const mcpHandler = createMcpHandler(() => buildMcpServer(runtime), { legacy: "reject" });

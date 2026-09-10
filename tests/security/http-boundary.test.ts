@@ -81,6 +81,20 @@ describe("HTTP security boundary", () => {
         statuses.push(response.status);
       }
       expect(statuses[2]).toBe(429);
+
+      const authHealth = await fetch(`${base}/auth-health`);
+      expect(authHealth.status).toBe(200);
+      expect(await authHealth.json()).toMatchObject({
+        status: "healthy",
+        signingReady: true,
+        tokenEndpointReady: true,
+      });
+      const independentRegistration = await fetch(`${base}/register`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ redirect_uris: ["http://127.0.0.1/independent"] }),
+      });
+      expect(independentRegistration.status).toBe(201);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       closeRuntime(runtime);
