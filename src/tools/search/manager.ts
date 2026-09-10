@@ -51,6 +51,23 @@ export class SearchManager {
       .run(Date.now());
   }
 
+  reconcileStale(): { interrupted: number } {
+    const rows = this.store.db
+      .prepare("SELECT id FROM search_sessions WHERE status='running'")
+      .all() as Array<{ id: string }>;
+    let interrupted = 0;
+    for (const row of rows) {
+      if (this.running.has(row.id)) continue;
+      const updated = this.store.db
+        .prepare(
+          "UPDATE search_sessions SET status='interrupted',ended_at=? WHERE id=? AND status='running'",
+        )
+        .run(Date.now(), row.id);
+      interrupted += Number(updated.changes);
+    }
+    return { interrupted };
+  }
+
   async start(
     subject: string,
     profile: string,
@@ -133,6 +150,7 @@ export class SearchManager {
       clearTimeout(timer);
       output.end();
       this.running.delete(id);
+      if (!this.store.isOpen()) return;
       this.store.db
         .prepare("UPDATE search_sessions SET status='error',ended_at=? WHERE id=?")
         .run(Date.now(), id);
@@ -141,6 +159,7 @@ export class SearchManager {
       clearTimeout(timer);
       output.end();
       this.running.delete(id);
+      if (!this.store.isOpen()) return;
       const status = code === 0 || code === 1 || count >= maxResults ? "complete" : "error";
       this.store.db
         .prepare(

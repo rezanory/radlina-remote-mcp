@@ -518,7 +518,7 @@ describe("internal OAuth resilience", () => {
       mode: "internal",
       signingReady: true,
       tokenEndpointReady: true,
-      version: "0.2.2",
+      version: "0.3.0-dev.1",
     });
   });
 });

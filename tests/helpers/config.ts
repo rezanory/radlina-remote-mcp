@@ -33,6 +33,13 @@ export function testConfig(root: string): AppConfig {
       maxSearchRuntimeMs: 15_000,
       maxSessions: 4,
     },
+    reliability: {
+      enabled: true,
+      probeIntervalMs: 30_000,
+      failureThreshold: 2,
+      auditVerifyIntervalMs: 30_000,
+      eventRetention: 500,
+    },
     dependencies: { ripgrepExecutable: process.execPath },
     profiles: {
       test: {

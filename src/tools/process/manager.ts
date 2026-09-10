@@ -40,18 +40,23 @@ export class ProcessManager {
     this.directory = path.join(config.storage.directory, "process");
   }
 
-  async reconcile(): Promise<void> {
+  async reconcile(): Promise<{ interrupted: number }> {
+    let interrupted = 0;
     const rows = this.store.db
       .prepare("SELECT * FROM process_sessions WHERE status='running'")
       .all() as ProcessRow[];
     for (const row of rows) {
       const identity = row.pid ? await this.processIdentity(row.pid) : undefined;
       if (!identity || identity !== row.start_identity) {
-        this.store.db
-          .prepare("UPDATE process_sessions SET status='interrupted',ended_at=? WHERE id=?")
+        const updated = this.store.db
+          .prepare(
+            "UPDATE process_sessions SET status='interrupted',ended_at=? WHERE id=? AND status='running'",
+          )
           .run(Date.now(), row.id);
+        interrupted += Number(updated.changes);
       }
     }
+    return { interrupted };
   }
 
   async start(
@@ -165,6 +170,7 @@ export class ProcessManager {
       clearTimeout(timer);
       this.children.delete(id);
       output.end(() => {
+        if (!this.store.isOpen()) return;
         this.store.db
           .prepare(
             "UPDATE process_sessions SET status=?,ended_at=?,exit_code=? WHERE id=? AND status='running'",

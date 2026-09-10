@@ -87,7 +87,7 @@ describe("Streamable HTTP MCP", () => {
       await client.connect(transport);
       expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(43);
+      expect(tools.tools).toHaveLength(45);
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       for (const required of [
         "admin_stage_release",
@@ -98,11 +98,36 @@ describe("Streamable HTTP MCP", () => {
         "admin_rollback_release",
         "admin_verify_post_restart",
         "admin_enable_trusted_owner",
+        "reliability_status",
+        "recent_reliability_events",
       ])
         expect(toolNames.has(required)).toBe(true);
       expect(tools.tools.every((tool) => tool.annotations?.openWorldHint === false)).toBe(true);
       const ping = await client.callTool({ name: "ping", arguments: {} });
       expect(ping.isError).not.toBe(true);
+      const health = await client.callTool({ name: "health", arguments: {} });
+      const healthContent = health.content.find((item) => item.type === "text");
+      if (!healthContent || healthContent.type !== "text")
+        throw new Error("health response text missing");
+      const healthEnvelope = JSON.parse(healthContent.text) as {
+        result: { status?: string; ready?: boolean; lastProbeAt?: string | null };
+      };
+      expect(healthEnvelope.result.status).toBe("healthy");
+      expect(healthEnvelope.result.ready).toBe(true);
+      expect(typeof healthEnvelope.result.lastProbeAt).toBe("string");
+
+      const reliability = await client.callTool({ name: "reliability_status", arguments: {} });
+      const reliabilityContent = reliability.content.find((item) => item.type === "text");
+      if (!reliabilityContent || reliabilityContent.type !== "text")
+        throw new Error("reliability response text missing");
+      const reliabilityEnvelope = JSON.parse(reliabilityContent.text) as {
+        result: { status?: string; ready?: boolean; checks?: Record<string, { ok?: boolean }> };
+      };
+      expect(reliabilityEnvelope.result.status).toBe("healthy");
+      expect(reliabilityEnvelope.result.ready).toBe(true);
+      expect(reliabilityEnvelope.result.checks?.["storage"]?.ok).toBe(true);
+      expect(reliabilityEnvelope.result.checks?.["auth"]?.ok).toBe(true);
+
       const capabilities = await client.callTool({ name: "get_capabilities", arguments: {} });
       const capabilityContent = capabilities.content.find((item) => item.type === "text");
       if (!capabilityContent || capabilityContent.type !== "text")
@@ -118,9 +143,24 @@ describe("Streamable HTTP MCP", () => {
         "authHealth",
         "oauthTelemetry",
         "sessionRebindSupport",
+        "reliabilitySupervisor",
+        "healthHistory",
       ]) {
         expect(capabilityEnvelope.result[flag]).toBe(true);
       }
+      const reliabilityEventsDenied = await client.callTool({
+        name: "recent_reliability_events",
+        arguments: { limit: 10 },
+      });
+      expect(reliabilityEventsDenied.isError).toBe(true);
+      expect(reliabilityEventsDenied.content).toEqual(
+        expect.arrayContaining([
+          // Vitest asymmetric matchers intentionally erase their generic value type.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expect.objectContaining({ text: expect.stringContaining("POLICY_DENIED") }),
+        ]),
+      );
+
       const adminDenied = await client.callTool({
         name: "admin_upgrade_status",
         arguments: {},

@@ -30,6 +30,12 @@ policy:
   maxProcessRuntimeMs: 900000
   maxSearchRuntimeMs: 120000
   maxSessions: 12
+reliability:
+  enabled: true
+  probeIntervalMs: 30000
+  failureThreshold: 3
+  auditVerifyIntervalMs: 300000
+  eventRetention: 2000
 dependencies:
   ripgrepExecutable: C:\\radlina-remote-mcp\\.runtime\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe
 profiles:

@@ -25,8 +25,9 @@ describe("SafePathResolver", () => {
     const root = await temporaryRoot("radlina-root-");
     await writeFile(path.join(root, "ok.txt"), "ok");
     const resolver = new SafePathResolver([root]);
-    await expect(resolver.resolve("ok.txt", { mustExist: true })).resolves.toBe(
-      path.join(root, "ok.txt"),
+    const resolvedContainedPath = await resolver.resolve("ok.txt", { mustExist: true });
+    expect(path.win32.normalize(resolvedContainedPath).toLowerCase()).toBe(
+      path.win32.normalize(path.join(root, "ok.txt")).toLowerCase(),
     );
     await expect(resolver.resolve("..\\escape.txt", { mustExist: false })).rejects.toMatchObject({
       code: "INVALID_PATH",

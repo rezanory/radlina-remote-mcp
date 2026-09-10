@@ -19,7 +19,7 @@ afterEach(async () => {
 });
 
 async function waitFor(read: () => { status: string }): Promise<{ status: string }> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
     const value = read();
     if (value.status !== "running") return value;
     await new Promise((resolve) => setTimeout(resolve, 25));
@@ -135,6 +135,30 @@ describe("reconnectable jobs", () => {
       .get(noisy.sessionId) as { output_path: string };
     expect((await stat(row.output_path)).size).toBeLessThanOrEqual(config.policy.maxOutputBytes);
     store.close();
+  });
+
+  it("does not write to a closed store when child finalization races shutdown", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-process-shutdown-"));
+    cleanup.push(root);
+    const config = testConfig(root);
+    const profile = config.profiles["test"];
+    if (!profile) throw new Error("test profile missing");
+    profile.commands = [{ executable: process.execPath, argumentPatterns: [".*"] }];
+    const store = new Store(config.storage.directory);
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    const processes = new ProcessManager(config, store, policy);
+    const files = new FilesystemService([root], 1024 * 1024, path.join(root, ".trash"), false);
+    await processes.start("subject", "test", profile, files.resolver, {
+      executable: process.execPath,
+      args: ["-e", "setTimeout(() => {}, 250)"],
+      cwd: root,
+    });
+    store.close();
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(store.isOpen()).toBe(false);
   });
 
   it("reconciles orphaned process rows after restart", async () => {

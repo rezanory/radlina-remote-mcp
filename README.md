@@ -29,6 +29,10 @@ The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid b
 
 `kill on` immediately denies every remote tool except minimal health/readiness tools. `readonly on` denies mutations and process execution.
 
+## Reliability supervisor
+
+The 0.3 development line derives health/readiness from real storage, OAuth, dependency, audit, and session probes and performs only bounded low-risk state reconciliation. See `docs/operations/RELIABILITY.md` for behavior, configuration, telemetry, and planned follow-up gates.
+
 ## Deployment
 
 - Windows service: `scripts\operations\install-service.ps1` from an elevated PowerShell terminal. WinSW uses `LocalSystem` so the explicitly authorized trusted-owner profile has capability parity without a service password. Authentication, scopes, kill/read-only controls, path validation, and audit remain mandatory.

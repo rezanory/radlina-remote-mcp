@@ -9,6 +9,7 @@ import type { AppConfig } from "./config/schema.js";
 import { Store } from "./persistence/store.js";
 import { PolicyEngine } from "./policy/engine.js";
 import { ToolRuntime } from "./policy/runtime.js";
+import { ReliabilitySupervisor } from "./reliability/supervisor.js";
 import { FilesystemService } from "./tools/filesystem/service.js";
 import { ProcessManager } from "./tools/process/manager.js";
 import { SearchManager } from "./tools/search/manager.js";
@@ -25,6 +26,7 @@ export type AppRuntime = {
   searches: SearchManager;
   processes: ProcessManager;
   upgrades: UpgradeManager;
+  reliability: ReliabilitySupervisor;
   startedAt: number;
 };
 
@@ -67,10 +69,12 @@ export async function createRuntime(
     configFile,
     UpgradeManager.productionRestart(configFile),
   );
+  const reliability = new ReliabilitySupervisor(config, store, audit, auth, searches, processes);
   if (options.reconcileSessions !== false) {
     searches.reconcile();
     await processes.reconcile();
   }
+  await reliability.start(options.reconcileSessions !== false);
   return {
     config,
     configFile,
@@ -83,10 +87,12 @@ export async function createRuntime(
     searches,
     processes,
     upgrades,
+    reliability,
     startedAt: Date.now(),
   };
 }
 
 export function closeRuntime(runtime: AppRuntime): void {
+  runtime.reliability.stop();
   runtime.store.close();
 }

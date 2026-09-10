@@ -8,6 +8,7 @@ import { validateConfig } from "./config/index.js";
 import { AppError } from "./errors.js";
 import type { Risk } from "./policy/engine.js";
 import type { AppRuntime } from "./runtime.js";
+import { MCP_PROTOCOL_VERSION, SERVER_VERSION } from "./version.js";
 
 type ToolContext = { http?: { authInfo?: AuthInfo }; signal?: AbortSignal };
 type ToolOptions = {
@@ -82,7 +83,7 @@ const destructiveAnnotations = {
 };
 
 export function buildMcpServer(runtime: AppRuntime): McpServer {
-  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.2" });
+  const server = new McpServer({ name: "radlina-remote-mcp", version: SERVER_VERSION });
 
   server.registerTool(
     "who_am_i",
@@ -138,7 +139,7 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
         {},
         { tool: "get_capabilities", scope: "device:read" },
         async () => ({
-          protocol: "2026-07-28",
+          protocol: MCP_PROTOCOL_VERSION,
           transport: "streamable-http",
           profiles: Object.keys(runtime.config.profiles),
           capabilities: [
@@ -149,6 +150,7 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
             "diagnostics",
             "upgrade",
             "trusted-owner",
+            "self-healing",
           ],
           limits: runtime.config.policy,
           trustedOwner:
@@ -160,6 +162,8 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
           authHealth: true,
           oauthTelemetry: runtime.config.auth.mode === "internal",
           sessionRebindSupport: true,
+          reliabilitySupervisor: true,
+          healthHistory: true,
           activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
         }),
       ),
@@ -172,10 +176,15 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
       annotations: readAnnotations,
     },
     (_args, context) =>
-      execute(runtime, context, {}, { tool: "health", scope: "device:read" }, async () => ({
-        status: "healthy",
-        uptimeSeconds: Math.floor((Date.now() - runtime.startedAt) / 1000),
-      })),
+      execute(runtime, context, {}, { tool: "health", scope: "device:read" }, async () => {
+        const reliability = runtime.reliability.snapshot();
+        return {
+          status: reliability.status,
+          ready: reliability.ready,
+          uptimeSeconds: Math.floor((Date.now() - runtime.startedAt) / 1000),
+          lastProbeAt: reliability.lastProbeAt,
+        };
+      }),
   );
   server.registerTool(
     "version",
@@ -186,9 +195,9 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     },
     (_args, context) =>
       execute(runtime, context, {}, { tool: "version", scope: "device:read" }, async () => ({
-        server: "0.2.2",
+        server: SERVER_VERSION,
         node: process.version,
-        protocol: "2026-07-28",
+        protocol: MCP_PROTOCOL_VERSION,
         activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
         trustedOwner:
           runtime.config.profiles[runtime.config.policy.defaultProfile]?.allowShell === true,
@@ -955,6 +964,39 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
       ),
   );
   server.registerTool(
+    "reliability_status",
+    {
+      description: "Return the latest self-healing supervisor snapshot and component checks.",
+      inputSchema: z.object({}),
+      annotations: readAnnotations,
+    },
+    (_args, context) =>
+      execute(
+        runtime,
+        context,
+        {},
+        { tool: "reliability_status", scope: "device:read" },
+        async () => runtime.reliability.snapshot(),
+      ),
+  );
+  server.registerTool(
+    "recent_reliability_events",
+    {
+      description: "Return recent bounded self-healing health and recovery events.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(200).default(50) }),
+      annotations: readAnnotations,
+    },
+    ({ limit }, context) =>
+      execute(
+        runtime,
+        context,
+        { limit },
+        { tool: "recent_reliability_events", scope: "admin" },
+        async () => runtime.reliability.recentEvents(limit),
+      ),
+  );
+
+  server.registerTool(
     "active_sessions",
     {
       description: "Return caller-owned active process and search sessions.",
@@ -996,14 +1038,21 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
       annotations: readAnnotations,
     },
     (_args, context) =>
-      execute(runtime, context, {}, { tool: "readiness", scope: "device:read" }, async () => ({
-        ready: true,
-        killSwitch:
-          runtime.store.get("control:killSwitch") ?? String(runtime.config.policy.killSwitch),
-        emergencyReadOnly:
+      execute(runtime, context, {}, { tool: "readiness", scope: "device:read" }, async () => {
+        const reliability = runtime.reliability.snapshot();
+        const killSwitch =
+          runtime.store.get("control:killSwitch") ?? String(runtime.config.policy.killSwitch);
+        const emergencyReadOnly =
           runtime.store.get("control:emergencyReadOnly") ??
-          String(runtime.config.policy.emergencyReadOnly),
-      })),
+          String(runtime.config.policy.emergencyReadOnly);
+        return {
+          ready: reliability.ready && killSwitch !== "true",
+          killSwitch,
+          emergencyReadOnly,
+          reliabilityStatus: reliability.status,
+          lastProbeAt: reliability.lastProbeAt,
+        };
+      }),
   );
   server.registerTool(
     "error_details",

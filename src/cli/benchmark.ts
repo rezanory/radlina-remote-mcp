@@ -166,6 +166,13 @@ async function main(): Promise<void> {
       maxSearchRuntimeMs: 15_000,
       maxSessions: 16,
     },
+    reliability: {
+      enabled: true,
+      probeIntervalMs: 30_000,
+      failureThreshold: 3,
+      auditVerifyIntervalMs: 300_000,
+      eventRetention: 2_000,
+    },
     dependencies: {
       ripgrepExecutable:
         "C:\\radlina-remote-mcp\\.runtime\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe",

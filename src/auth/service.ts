@@ -37,6 +37,7 @@ import type { AppConfig } from "../config/schema.js";
 import { AppError } from "../errors.js";
 import type { Store } from "../persistence/store.js";
 import { canonicalJson, sha256 } from "../utils/json.js";
+import { SERVER_VERSION } from "../version.js";
 import { protectBytes, unprotectBytes } from "./dpapi.js";
 
 const ALL_SCOPES = [
@@ -133,7 +134,6 @@ type AuthorizationGrant = {
   subject: string;
 };
 
-const SERVER_VERSION = "0.2.2";
 const INVALID_REFRESH_DESCRIPTION = "refresh token is invalid, expired, replayed, or mismatched";
 
 function html(value: string): string {
@@ -239,7 +239,7 @@ export class AuthService implements OAuthTokenVerifier {
   }
 
   health(): {
-    status: "healthy";
+    status: "healthy" | "unhealthy";
     mode: AppConfig["auth"]["mode"];
     signingReady: boolean;
     tokenEndpointReady: boolean;
@@ -250,11 +250,30 @@ export class AuthService implements OAuthTokenVerifier {
         ? Boolean(this.privateKey && this.publicKey && this.publicJwk)
         : Boolean(this.remoteJwks);
     return {
-      status: "healthy",
+      status:
+        signingReady && Boolean(this.oauthMetadataValue?.token_endpoint) ? "healthy" : "unhealthy",
       mode: this.config.auth.mode,
       signingReady,
       tokenEndpointReady: Boolean(this.oauthMetadataValue?.token_endpoint),
       version: SERVER_VERSION,
+    };
+  }
+
+  reconcileExpiredState(): { approvals: number; codes: number; refreshTokens: number } {
+    const now = Date.now();
+    const approvals = this.store.db
+      .prepare("DELETE FROM oauth_approvals WHERE expires_at<=?")
+      .run(now);
+    const codes = this.store.db.prepare("DELETE FROM oauth_codes WHERE expires_at<=?").run(now);
+    const refreshTokens = this.store.db
+      .prepare(
+        "DELETE FROM oauth_refresh WHERE (consumed_at IS NULL AND expires_at<=?) OR (consumed_at IS NOT NULL AND COALESCE(replacement_expires_at,consumed_at)<=?)",
+      )
+      .run(now, now);
+    return {
+      approvals: Number(approvals.changes),
+      codes: Number(codes.changes),
+      refreshTokens: Number(refreshTokens.changes),
     };
   }
 
@@ -980,13 +999,6 @@ export class AuthService implements OAuthTokenVerifier {
   }
 
   private cleanupOauth(): void {
-    const now = Date.now();
-    this.store.db.prepare("DELETE FROM oauth_approvals WHERE expires_at<=?").run(now);
-    this.store.db.prepare("DELETE FROM oauth_codes WHERE expires_at<=?").run(now);
-    this.store.db
-      .prepare(
-        "DELETE FROM oauth_refresh WHERE (consumed_at IS NULL AND expires_at<=?) OR (consumed_at IS NOT NULL AND COALESCE(replacement_expires_at,consumed_at)<=?)",
-      )
-      .run(now, now);
+    this.reconcileExpiredState();
   }
 }
