@@ -2,7 +2,7 @@ import { createRuntime, closeRuntime } from "../runtime.js";
 
 function usage(): never {
   console.error(
-    "usage: npm run control -- approve <request-id> | readonly <on|off> | kill <on|off> | verify-audit | idempotency <list|clear key> | status",
+    "usage: npm run control -- approve <request-id> | owner-trust <list|revoke enrollment-id> | readonly <on|off> | kill <on|off> | verify-audit | idempotency <list|clear key> | status",
   );
   process.exit(2);
 }
@@ -30,6 +30,22 @@ async function main(): Promise<void> {
       runtime.store.set("control:emergencyReadOnly", value);
       console.log(`emergency read-only: ${value}`);
       return;
+    }
+    if (command === "owner-trust") {
+      const action = process.argv[3];
+      if (action === "list") {
+        console.log(JSON.stringify(runtime.auth.ownerTrustEnrollments()));
+        return;
+      }
+      if (action === "revoke") {
+        const enrollmentId = process.argv[4];
+        if (!enrollmentId) usage();
+        if (!runtime.auth.revokeOwnerEnrollment(enrollmentId))
+          throw new Error("owner enrollment was not found or was already revoked");
+        console.log(`revoked owner enrollment ${enrollmentId}`);
+        return;
+      }
+      usage();
     }
     if (command === "kill") {
       const value = parseToggle(process.argv[3]);

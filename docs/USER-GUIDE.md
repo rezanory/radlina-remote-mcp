@@ -26,6 +26,19 @@ Restart the service only after validation passes.
 
 `admin` does not bypass path validation, bounded limits, session ownership, kill-switch, or emergency-read-only controls. Trusted-owner mode intentionally bypasses only the executable allowlist and expands the configured filesystem root to `C:\`.
 
+## Persistent owner authorization
+
+The internal issuer advertises `offline_access`, rotates seven-day refresh tokens, and accepts retry/concurrent replay of the same refresh token for only the configured short grace period. The first OAuth authorization for a registered client still requires local approval. That approval enrolls the exact client ID, redirect URI, MCP resource, subject, and approved scope set. Later authorization requests are automatic only for that same relationship and a subset of those scopes; a new client, redirect, resource, or scope escalation requires another local approval.
+
+List or revoke durable owner enrollments locally:
+
+```powershell
+& .\.runtime\node-v24.20.0-win-x64\node.exe .\dist\src\cli\control.js owner-trust list
+& .\.runtime\node-v24.20.0-win-x64\node.exe .\dist\src\cli\control.js owner-trust revoke <enrollment-id>
+```
+
+Revocation disables automatic authorization and removes outstanding refresh sessions, authorization codes, and approvals for that client. Access tokens remain bounded by their one-hour expiry and may also be revoked individually through the OAuth revocation endpoint. No raw authorization code, access token, or refresh token is stored in SQLite or OAuth telemetry.
+
 ## Reconnect and recovery
 
 Search and process identifiers are durable and owner-bound. Output/result cursors can be resumed after client reconnect. After a service restart, completed logs remain readable; live search rows become `interrupted`, and process rows are reconciled using PID, start time, and executable identity. Interactive stdin cannot be recovered across a service restart.

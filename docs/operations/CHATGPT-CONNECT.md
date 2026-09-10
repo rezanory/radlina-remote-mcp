@@ -11,6 +11,8 @@ Prerequisites: local validation green, service running as `LocalSystem` with the
    & C:\radlina-remote-mcp\.runtime\node-v24.20.0-win-x64\node.exe C:\radlina-remote-mcp\dist\src\cli\control.js approve <request-id>
    ```
 
+   This local approval is required for the first exact client/redirect/resource/scope relationship. Later requests from that active enrollment are authorized automatically for the same or narrower scopes. Use `control.js owner-trust list` and `control.js owner-trust revoke <enrollment-id>` to inspect or revoke it locally.
+
 5. Refresh the authorization page. It redirects to ChatGPT with the one-time authorization code.
 6. Test in order: `ping`, `who_am_i`, `list_directory`, then only the scopes and mutations intentionally approved.
 

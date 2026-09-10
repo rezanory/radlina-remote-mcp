@@ -58,6 +58,23 @@ describe("OAuth database migration", () => {
         "latency_ms",
         "error_code",
       ]);
+      expect(
+        (
+          store.db.prepare("PRAGMA table_info(oauth_owner_enrollments)").all() as Array<{
+            name: string;
+          }>
+        ).map((row) => row.name),
+      ).toEqual([
+        "enrollment_id",
+        "client_id",
+        "redirect_uri",
+        "resource",
+        "scope",
+        "subject",
+        "created_at",
+        "last_used_at",
+        "revoked_at",
+      ]);
     } finally {
       store.close();
     }

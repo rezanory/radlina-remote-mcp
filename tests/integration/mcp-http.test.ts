@@ -103,6 +103,24 @@ describe("Streamable HTTP MCP", () => {
       expect(tools.tools.every((tool) => tool.annotations?.openWorldHint === false)).toBe(true);
       const ping = await client.callTool({ name: "ping", arguments: {} });
       expect(ping.isError).not.toBe(true);
+      const capabilities = await client.callTool({ name: "get_capabilities", arguments: {} });
+      const capabilityContent = capabilities.content.find((item) => item.type === "text");
+      if (!capabilityContent || capabilityContent.type !== "text")
+        throw new Error("capability response text missing");
+      const capabilityEnvelope = JSON.parse(capabilityContent.text) as {
+        result: Record<string, unknown>;
+      };
+      for (const flag of [
+        "persistentOwnerTrust",
+        "offlineAccess",
+        "refreshRotation",
+        "refreshReplayGrace",
+        "authHealth",
+        "oauthTelemetry",
+        "sessionRebindSupport",
+      ]) {
+        expect(capabilityEnvelope.result[flag]).toBe(true);
+      }
       const adminDenied = await client.callTool({
         name: "admin_upgrade_status",
         arguments: {},

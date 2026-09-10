@@ -1,6 +1,6 @@
 # Radlina Remote MCP
 
-Self-hosted MCP server for `LAPTOP-13QINEIF`. It exposes a loopback-only Streamable HTTP endpoint, performs OAuth 2.1-style authorization with PKCE and local approval, applies per-tool scopes and workspace policies, persists sessions in SQLite, and writes a tamper-evident redacted audit chain.
+Self-hosted MCP server for `LAPTOP-13QINEIF`. It exposes a loopback-only Streamable HTTP endpoint, performs OAuth 2.1-style authorization with PKCE and one-time local owner enrollment, applies per-tool scopes and workspace policies, persists refresh and tool sessions in SQLite, and writes a tamper-evident redacted audit chain.
 
 ## Secure local build
 

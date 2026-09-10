@@ -77,6 +77,13 @@ Both modes keep the application on loopback and publish one canonical `*.ts.net`
 & .\.runtime\node-v24.20.0-win-x64\node.exe .\dist\src\cli\control.js verify-audit
 ```
 
+Inspect and revoke the exact durable OAuth owner enrollment without changing filesystem ownership or service identity:
+
+```powershell
+& .\.runtime\node-v24.20.0-win-x64\node.exe .\dist\src\cli\control.js owner-trust list
+& .\.runtime\node-v24.20.0-win-x64\node.exe .\dist\src\cli\control.js owner-trust revoke <enrollment-id>
+```
+
 After a crash, inspect unresolved at-most-once operations locally:
 
 ```powershell

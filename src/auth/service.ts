@@ -46,6 +46,7 @@ const ALL_SCOPES = [
   "process:read",
   "process:execute",
   "admin",
+  "offline_access",
 ] as const;
 
 const clientSchema = z.strictObject({
@@ -111,8 +112,28 @@ type OauthEventInput = {
   latencyMs: number;
   errorCode: string | null;
 };
+type OwnerEnrollmentRow = {
+  enrollment_id: string;
+  client_id: string;
+  redirect_uri: string;
+  resource: string;
+  scope: string;
+  subject: string;
+  created_at: number;
+  last_used_at: number;
+  revoked_at: number | null;
+};
+type AuthorizationGrant = {
+  clientId: string;
+  redirectUri: string;
+  challenge: string;
+  scope: string;
+  resource: string;
+  state: string | null;
+  subject: string;
+};
 
-const SERVER_VERSION = "0.2.1";
+const SERVER_VERSION = "0.2.2";
 const INVALID_REFRESH_DESCRIPTION = "refresh token is invalid, expired, replayed, or mismatched";
 
 function html(value: string): string {
@@ -246,6 +267,60 @@ export class AuthService implements OAuthTokenVerifier {
       .all(bounded);
   }
 
+  ownerTrustEnrollments(limit = 100): unknown[] {
+    const bounded = Math.min(Math.max(Math.trunc(limit), 1), 500);
+    const rows = this.store.db
+      .prepare(
+        "SELECT enrollment_id,client_id,redirect_uri,resource,scope,subject,created_at,last_used_at,revoked_at FROM oauth_owner_enrollments ORDER BY created_at DESC LIMIT ?",
+      )
+      .all(bounded) as OwnerEnrollmentRow[];
+    return rows.map((row) => ({
+      enrollmentId: row.enrollment_id,
+      clientHash: sha256(row.client_id).slice(0, 24),
+      redirectUri: row.redirect_uri,
+      resource: row.resource,
+      scopes: row.scope.split(" ").filter(Boolean),
+      subject: row.subject,
+      createdAt: row.created_at,
+      lastUsedAt: row.last_used_at,
+      active: row.revoked_at === null,
+      revokedAt: row.revoked_at,
+    }));
+  }
+
+  revokeOwnerEnrollment(enrollmentId: string): boolean {
+    const enrollment = this.store.db
+      .prepare(
+        "SELECT enrollment_id,client_id,redirect_uri,resource,scope,subject,created_at,last_used_at,revoked_at FROM oauth_owner_enrollments WHERE enrollment_id=?",
+      )
+      .get(enrollmentId) as OwnerEnrollmentRow | undefined;
+    if (!enrollment || enrollment.revoked_at !== null) return false;
+    this.store.db.exec("BEGIN IMMEDIATE");
+    try {
+      const revoked = this.store.db
+        .prepare(
+          "UPDATE oauth_owner_enrollments SET revoked_at=? WHERE enrollment_id=? AND revoked_at IS NULL",
+        )
+        .run(Date.now(), enrollmentId);
+      if (Number(revoked.changes) !== 1) {
+        this.store.db.exec("ROLLBACK");
+        return false;
+      }
+      this.store.db
+        .prepare("DELETE FROM oauth_refresh WHERE client_id=? AND resource=?")
+        .run(enrollment.client_id, enrollment.resource);
+      this.store.db.prepare("DELETE FROM oauth_codes WHERE client_id=?").run(enrollment.client_id);
+      this.store.db
+        .prepare("DELETE FROM oauth_approvals WHERE client_id=?")
+        .run(enrollment.client_id);
+      this.store.db.exec("COMMIT");
+      return true;
+    } catch (error) {
+      this.store.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   async verifyAccessToken(token: string): Promise<AuthInfo> {
     try {
       const expectedIssuer =
@@ -375,26 +450,19 @@ export class AuthService implements OAuthTokenVerifier {
         this.renderApproval(response, approval.id, approval.client_id, approval.scope, false);
         return;
       }
-      this.store.db.prepare("DELETE FROM oauth_approvals WHERE id=?").run(approval.id);
-      const rawCode = randomBytes(32).toString("base64url");
-      this.store.db
-        .prepare(
-          "INSERT INTO oauth_codes(code_hash,client_id,redirect_uri,challenge,scope,resource,subject,expires_at) VALUES(?,?,?,?,?,?,?,?)",
-        )
-        .run(
-          sha256(rawCode),
-          approval.client_id,
-          approval.redirect_uri,
-          approval.challenge,
-          approval.scope,
-          approval.resource,
-          approval.subject,
-          Date.now() + 120_000,
-        );
-      const redirect = new URL(approval.redirect_uri);
-      redirect.searchParams.set("code", rawCode);
-      if (approval.state) redirect.searchParams.set("state", approval.state);
-      response.redirect(302, redirect.href);
+      this.issueAuthorizationRedirect(
+        response,
+        {
+          clientId: approval.client_id,
+          redirectUri: approval.redirect_uri,
+          challenge: approval.challenge,
+          scope: approval.scope,
+          resource: approval.resource,
+          state: approval.state,
+          subject: approval.subject,
+        },
+        { approvalId: approval.id, enrollOwner: true },
+      );
       return;
     }
 
@@ -432,12 +500,30 @@ export class AuthService implements OAuthTokenVerifier {
       );
       return;
     }
-    const scopes = scope.split(" ").filter(Boolean);
+    const scopes = [...new Set(scope.split(" ").filter(Boolean))];
     if (
       scopes.length === 0 ||
       scopes.some((item) => !ALL_SCOPES.includes(item as (typeof ALL_SCOPES)[number]))
     ) {
       oauthError(response, 400, "invalid_scope", "one or more requested scopes are not supported");
+      return;
+    }
+    const normalizedScope = scopes.join(" ");
+    const enrollment = this.activeOwnerEnrollment(clientId, redirectUri, resource, scopes);
+    if (enrollment) {
+      this.issueAuthorizationRedirect(
+        response,
+        {
+          clientId,
+          redirectUri,
+          challenge,
+          scope: normalizedScope,
+          resource,
+          state,
+          subject: enrollment.subject,
+        },
+        { enrollmentId: enrollment.enrollment_id },
+      );
       return;
     }
     const id = randomUUID();
@@ -450,12 +536,98 @@ export class AuthService implements OAuthTokenVerifier {
         clientId,
         redirectUri,
         challenge,
-        scopes.join(" "),
+        normalizedScope,
         resource,
         state,
         Date.now() + 10 * 60_000,
       );
-    this.renderApproval(response, id, clientId, scopes.join(" "), false);
+    this.renderApproval(response, id, clientId, normalizedScope, false);
+  }
+
+  private activeOwnerEnrollment(
+    clientId: string,
+    redirectUri: string,
+    resource: string,
+    scopes: string[],
+  ): OwnerEnrollmentRow | undefined {
+    const enrollment = this.store.db
+      .prepare(
+        "SELECT enrollment_id,client_id,redirect_uri,resource,scope,subject,created_at,last_used_at,revoked_at FROM oauth_owner_enrollments WHERE client_id=? AND redirect_uri=? AND resource=? AND revoked_at IS NULL",
+      )
+      .get(clientId, redirectUri, resource) as OwnerEnrollmentRow | undefined;
+    if (!enrollment) return undefined;
+    const approvedScopes = new Set(enrollment.scope.split(" ").filter(Boolean));
+    return scopes.every((requested) => approvedScopes.has(requested)) ? enrollment : undefined;
+  }
+
+  private issueAuthorizationRedirect(
+    response: Response,
+    grant: AuthorizationGrant,
+    options: { approvalId?: string; enrollOwner?: boolean; enrollmentId?: string },
+  ): void {
+    const rawCode = randomBytes(32).toString("base64url");
+    const now = Date.now();
+    this.store.db.exec("BEGIN IMMEDIATE");
+    try {
+      if (options.approvalId) {
+        const consumed = this.store.db
+          .prepare("DELETE FROM oauth_approvals WHERE id=? AND approved=1")
+          .run(options.approvalId);
+        if (Number(consumed.changes) !== 1)
+          throw new AppError("CONFLICT", "approval request was already consumed");
+      }
+      if (options.enrollOwner) {
+        this.store.db
+          .prepare(
+            `INSERT INTO oauth_owner_enrollments(
+              enrollment_id,client_id,redirect_uri,resource,scope,subject,created_at,last_used_at,revoked_at
+            ) VALUES(?,?,?,?,?,?,?,?,NULL)
+            ON CONFLICT(client_id,redirect_uri,resource) DO UPDATE SET
+              scope=excluded.scope,subject=excluded.subject,last_used_at=excluded.last_used_at,revoked_at=NULL`,
+          )
+          .run(
+            randomUUID(),
+            grant.clientId,
+            grant.redirectUri,
+            grant.resource,
+            grant.scope,
+            grant.subject,
+            now,
+            now,
+          );
+      } else if (options.enrollmentId) {
+        const touched = this.store.db
+          .prepare(
+            "UPDATE oauth_owner_enrollments SET last_used_at=? WHERE enrollment_id=? AND revoked_at IS NULL",
+          )
+          .run(now, options.enrollmentId);
+        if (Number(touched.changes) !== 1)
+          throw new AppError("CONFLICT", "owner enrollment is no longer active");
+      }
+      this.store.db
+        .prepare(
+          "INSERT INTO oauth_codes(code_hash,client_id,redirect_uri,challenge,scope,resource,subject,expires_at) VALUES(?,?,?,?,?,?,?,?)",
+        )
+        .run(
+          sha256(rawCode),
+          grant.clientId,
+          grant.redirectUri,
+          grant.challenge,
+          grant.scope,
+          grant.resource,
+          grant.subject,
+          now + 120_000,
+        );
+      this.store.db.exec("COMMIT");
+    } catch (error) {
+      this.store.db.exec("ROLLBACK");
+      throw error;
+    }
+    const redirect = new URL(grant.redirectUri);
+    redirect.searchParams.set("code", rawCode);
+    if (grant.state) redirect.searchParams.set("state", grant.state);
+    response.setHeader("cache-control", "no-store");
+    response.redirect(302, redirect.href);
   }
 
   private renderApproval(

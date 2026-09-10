@@ -82,7 +82,7 @@ const destructiveAnnotations = {
 };
 
 export function buildMcpServer(runtime: AppRuntime): McpServer {
-  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.1" });
+  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.2" });
 
   server.registerTool(
     "who_am_i",
@@ -153,6 +153,13 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
           limits: runtime.config.policy,
           trustedOwner:
             runtime.config.profiles[runtime.config.policy.defaultProfile]?.allowShell === true,
+          persistentOwnerTrust: runtime.config.auth.mode === "internal",
+          offlineAccess: runtime.config.auth.mode === "internal",
+          refreshRotation: runtime.config.auth.mode === "internal",
+          refreshReplayGrace: runtime.config.auth.mode === "internal",
+          authHealth: true,
+          oauthTelemetry: runtime.config.auth.mode === "internal",
+          sessionRebindSupport: true,
           activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
         }),
       ),
@@ -179,7 +186,7 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     },
     (_args, context) =>
       execute(runtime, context, {}, { tool: "version", scope: "device:read" }, async () => ({
-        server: "0.2.1",
+        server: "0.2.2",
         node: process.version,
         protocol: "2026-07-28",
         activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",

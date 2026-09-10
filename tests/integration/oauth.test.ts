@@ -80,6 +80,7 @@ describe("internal OAuth resilience", () => {
 
   async function issue(
     requestedClientId?: string,
+    scope = "device:read filesystem:read",
   ): Promise<{ clientId: string; tokens: TokenSet }> {
     const clientId = requestedClientId ?? (await registerClient());
     const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
@@ -91,7 +92,7 @@ describe("internal OAuth resilience", () => {
       code_challenge: createHash("sha256").update(verifier).digest("base64url"),
       code_challenge_method: "S256",
       resource: auth.resourceUrl.href,
-      scope: "device:read filesystem:read",
+      scope,
       state: "state-1",
     }).toString();
     const approvalResponse = await fetch(authorize);
@@ -152,6 +153,156 @@ describe("internal OAuth resilience", () => {
     const rotated = await refresh(tokens.refresh_token, clientId);
     expect(rotated.response.status).toBe(200);
     expect(isTokenSet(rotated.body) && rotated.body.refresh_token).not.toBe(tokens.refresh_token);
+  });
+
+  it("advertises and preserves offline_access across refresh rotation", async () => {
+    expect(auth.oauthMetadata().scopes_supported).toContain("offline_access");
+    const { clientId, tokens } = await issue(
+      undefined,
+      "device:read filesystem:read offline_access",
+    );
+    expect(tokens.scope.split(" ")).toContain("offline_access");
+    const rotated = await refresh(tokens.refresh_token, clientId);
+    expect(rotated.response.status).toBe(200);
+    expect(isTokenSet(rotated.body) && rotated.body.scope.split(" ")).toContain("offline_access");
+  });
+
+  it("auto-authorizes an exact previously approved owner relationship", async () => {
+    const clientId = await registerClient();
+    await issue(clientId, "device:read filesystem:read offline_access");
+    const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+    const authorize = new URL(`${base}/authorize`);
+    authorize.search = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: "http://127.0.0.1/callback",
+      code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+      code_challenge_method: "S256",
+      resource: auth.resourceUrl.href,
+      scope: "device:read offline_access",
+      state: "persistent-state",
+    }).toString();
+    const redirect = await fetch(authorize, { redirect: "manual" });
+    expect(redirect.status).toBe(302);
+    const callback = new URL(redirect.headers.get("location") ?? "");
+    expect(callback.searchParams.get("state")).toBe("persistent-state");
+    const code = callback.searchParams.get("code");
+    expect(code).toBeTruthy();
+    const tokenResponse = await fetch(`${base}/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: code ?? "",
+        client_id: clientId,
+        redirect_uri: "http://127.0.0.1/callback",
+        code_verifier: verifier,
+        resource: auth.resourceUrl.href,
+      }),
+    });
+    expect(tokenResponse.status).toBe(200);
+    expect((await tokenResponse.json()) as TokenSet).toMatchObject({
+      scope: "device:read offline_access",
+    });
+  });
+
+  it("restores persistent owner trust after a service and store restart", async () => {
+    const restartRoot = await mkdtemp(path.join(os.tmpdir(), "radlina-owner-trust-restart-"));
+    const restartConfig = testConfig(restartRoot);
+    let restartStore = new Store(restartConfig.storage.directory);
+    let restartAuth = new AuthService(restartConfig, restartStore);
+    await restartAuth.initialize();
+    let running = await listen(restartAuth);
+    const originalBase = base;
+    const originalAuth = auth;
+    base = running.base;
+    auth = restartAuth;
+    try {
+      const clientId = await registerClient();
+      await issue(clientId, "device:read offline_access");
+      await closeServer(running.server);
+      restartStore.close();
+      restartStore = new Store(restartConfig.storage.directory);
+      restartAuth = new AuthService(restartConfig, restartStore);
+      await restartAuth.initialize();
+      running = await listen(restartAuth);
+      base = running.base;
+      auth = restartAuth;
+
+      const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+      const authorize = new URL(`${base}/authorize`);
+      authorize.search = new URLSearchParams({
+        response_type: "code",
+        client_id: clientId,
+        redirect_uri: "http://127.0.0.1/callback",
+        code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+        code_challenge_method: "S256",
+        resource: auth.resourceUrl.href,
+        scope: "device:read offline_access",
+      }).toString();
+      const redirect = await fetch(authorize, { redirect: "manual" });
+      expect(redirect.status).toBe(302);
+      expect(redirect.headers.get("cache-control")).toBe("no-store");
+    } finally {
+      await closeServer(running.server);
+      restartStore.close();
+      base = originalBase;
+      auth = originalAuth;
+      await rm(restartRoot, { recursive: true, force: true });
+    }
+  }, 40_000);
+
+  it("requires local approval for new clients and scope escalation", async () => {
+    const untrustedClient = await registerClient();
+    const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+    const request = async (clientId: string, scope: string): Promise<Response> => {
+      const authorize = new URL(`${base}/authorize`);
+      authorize.search = new URLSearchParams({
+        response_type: "code",
+        client_id: clientId,
+        redirect_uri: "http://127.0.0.1/callback",
+        code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+        code_challenge_method: "S256",
+        resource: auth.resourceUrl.href,
+        scope,
+      }).toString();
+      return await fetch(authorize, { redirect: "manual" });
+    };
+    const newClientResponse = await request(untrustedClient, "device:read offline_access");
+    expect(newClientResponse.status).toBe(200);
+    expect(await newClientResponse.text()).toContain("Request ID:");
+
+    const trustedClient = await registerClient();
+    await issue(trustedClient, "device:read offline_access");
+    const escalation = await request(trustedClient, "device:read filesystem:read offline_access");
+    expect(escalation.status).toBe(200);
+    expect(await escalation.text()).toContain("Request ID:");
+  });
+
+  it("revokes persistent owner trust and its refresh session", async () => {
+    const clientId = await registerClient();
+    const { tokens } = await issue(clientId, "device:read offline_access");
+    const enrollment = store.db
+      .prepare("SELECT enrollment_id FROM oauth_owner_enrollments WHERE client_id=?")
+      .get(clientId) as { enrollment_id: string };
+    expect(auth.revokeOwnerEnrollment(enrollment.enrollment_id)).toBe(true);
+    expect(auth.revokeOwnerEnrollment(enrollment.enrollment_id)).toBe(false);
+    expect((await refresh(tokens.refresh_token, clientId)).response.status).toBe(400);
+
+    const verifier = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~";
+    const authorize = new URL(`${base}/authorize`);
+    authorize.search = new URLSearchParams({
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: "http://127.0.0.1/callback",
+      code_challenge: createHash("sha256").update(verifier).digest("base64url"),
+      code_challenge_method: "S256",
+      resource: auth.resourceUrl.href,
+      scope: "device:read offline_access",
+    }).toString();
+    const approval = await fetch(authorize, { redirect: "manual" });
+    expect(approval.status).toBe(200);
+    expect(await approval.text()).toContain("Request ID:");
   });
 
   it("collapses two simultaneous refreshes into the exact same replacement", async () => {
@@ -367,7 +518,7 @@ describe("internal OAuth resilience", () => {
       mode: "internal",
       signingReady: true,
       tokenEndpointReady: true,
-      version: "0.2.1",
+      version: "0.2.2",
     });
   });
 });

@@ -54,6 +54,12 @@ export class Store {
         grant_type TEXT NOT NULL, status TEXT NOT NULL, latency_ms INTEGER NOT NULL,
         error_code TEXT
       );
+      CREATE TABLE IF NOT EXISTS oauth_owner_enrollments (
+        enrollment_id TEXT PRIMARY KEY, client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL,
+        resource TEXT NOT NULL, scope TEXT NOT NULL, subject TEXT NOT NULL,
+        created_at INTEGER NOT NULL, last_used_at INTEGER NOT NULL, revoked_at INTEGER,
+        UNIQUE(client_id, redirect_uri, resource)
+      );
       CREATE TABLE IF NOT EXISTS pairing_codes (
         code_hash TEXT PRIMARY KEY, subject TEXT NOT NULL, expires_at INTEGER NOT NULL
       );
