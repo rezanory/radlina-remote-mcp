@@ -48,11 +48,11 @@ if ($existing) { throw 'RadlinaRemoteMCP is already installed; use update-servic
 & (Join-Path $PSScriptRoot 'migrate-dpapi-protection.ps1')
 & (Join-Path $PSScriptRoot 'configure-service-acl.ps1')
 & (Join-Path $PSScriptRoot 'configure-firewall.ps1')
-Write-Output 'Installing with the built-in low-privilege NT AUTHORITY\LocalService identity; no password is required.'
+Write-Output 'Installing with WinSW default LocalSystem identity for trusted-owner capability parity; no password is required.'
 & $serviceExecutable install
 if ($LASTEXITCODE -ne 0) { throw 'WinSW service installation failed' }
 $installedService = Get-CimInstance Win32_Service -Filter "Name='RadlinaRemoteMCP'"
-if (-not $installedService -or $installedService.StartName -ne 'NT AUTHORITY\LocalService') {
+if (-not $installedService -or $installedService.StartName -ne 'LocalSystem') {
   throw "service identity verification failed: $($installedService.StartName)"
 }
 & $serviceExecutable start
@@ -60,4 +60,4 @@ if ($LASTEXITCODE -ne 0) { throw 'WinSW service start failed' }
 Start-Sleep -Seconds 2
 $service = Get-Service -Name 'RadlinaRemoteMCP' -ErrorAction Stop
 if ($service.Status -ne 'Running') { throw "service is not running; current status: $($service.Status)" }
-Write-Output 'RadlinaRemoteMCP service installed as LocalService and is running.'
+Write-Output 'RadlinaRemoteMCP service installed as LocalSystem and is running.'

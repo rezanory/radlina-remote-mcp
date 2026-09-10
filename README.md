@@ -31,13 +31,14 @@ The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid b
 
 ## Deployment
 
-- Windows service: `scripts\operations\install-service.ps1` from an elevated PowerShell terminal. WinSW uses the built-in low-privilege `NT AUTHORITY\LocalService` identity and does not require a service password.
+- Windows service: `scripts\operations\install-service.ps1` from an elevated PowerShell terminal. WinSW uses `LocalSystem` so the explicitly authorized trusted-owner profile has capability parity without a service password. Authentication, scopes, kill/read-only controls, path validation, and audit remain mandatory.
 - Service start/stop/restart/status: `scripts\operations\service-control.ps1 -Action <Start|Stop|Restart|Status>`.
 - Private tailnet ingress: `scripts\operations\configure-tailscale.ps1 -Mode Serve`.
 - ChatGPT-compatible public HTTPS ingress: `scripts\operations\configure-tailscale.ps1 -Mode Funnel`.
 - ChatGPT connector instructions: `docs\operations\CHATGPT-CONNECT.md`.
 - Backup/restore: `scripts\operations\backup.ps1` and `scripts\operations\restore.ps1`.
 - Rollback: `scripts\operations\rollback-service.ps1`, `scripts\operations\uninstall-service.ps1`, and `scripts\operations\restore-tailscale.ps1`.
+- In-service release lifecycle: `admin_stage_release`, `admin_verify_release`, `admin_upgrade_preflight`, `admin_activate_release`, `admin_upgrade_status`, `admin_rollback_release`, and `admin_verify_post_restart`. Release manifests bind the exact source SHA/tree, evidence hashes, entry point, and complete file set. Activation and rollback are locked, durable, self-restarting, and health-confirmed.
 
 Do not enable Funnel until the local validation pipeline is green. Funnel traffic is public internet traffic; OAuth and policy remain mandatory.
 

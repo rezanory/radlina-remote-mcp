@@ -25,7 +25,7 @@ if ($Action -eq 'Status') {
     status = if ($service) { [string]$service.Status } else { 'NotInstalled' }
     startType = if ($service) { [string]$service.StartType } else { $null }
     identity = if ($serviceRecord) { [string]$serviceRecord.StartName } else { $null }
-    identityIsLeastPrivilege = [bool]($serviceRecord -and $serviceRecord.StartName -eq 'NT AUTHORITY\LocalService')
+    identityIsTrustedOwner = [bool]($serviceRecord -and $serviceRecord.StartName -eq 'LocalSystem')
     loopback = $probe
   } | ConvertTo-Json -Depth 3
   return

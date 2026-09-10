@@ -1,6 +1,6 @@
 {
   "name": "radlina-remote-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Secure self-hosted Remote MCP server for a Windows workstation",
   "type": "module",
@@ -9,6 +9,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "release:build": "node scripts/operations/build-release.mjs",
+    "release:validate": "node scripts/operations/closure-validation.mjs",
+    "release:drill": "node scripts/operations/isolated-upgrade-drill.mjs",
+    "release:verify": "node scripts/operations/verify-release.mjs",
     "dev": "tsx watch src/index.ts",
     "start": "node --enable-source-maps dist/src/index.js",
     "lint": "eslint .",

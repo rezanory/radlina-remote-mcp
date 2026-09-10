@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -195,4 +196,107 @@ describe("reconnectable jobs", () => {
     expect(status.status).toBe("cancelled");
     store.close();
   });
+});
+
+describe("trusted-owner direct executable parity", () => {
+  const windowsTest = process.platform === "win32" ? it : it.skip;
+
+  windowsTest(
+    "executes Git, Node, Python, PowerShell, cmd, npm, and npx with commands empty",
+    async () => {
+      const root = await mkdtemp(path.join(os.tmpdir(), "radlina-owner-process-"));
+      cleanup.push(root);
+      const locate = (name: string): string =>
+        execFileSync("where.exe", [name], { encoding: "utf8", windowsHide: true })
+          .split(/\r?\n/u)
+          .find(Boolean)!;
+      const config = testConfig(root);
+      config.policy.maxSessions = 16;
+      const profile = config.profiles["test"]!;
+      profile.roots = ["C:\\"];
+      profile.commands = [];
+      profile.allowShell = true;
+      profile.envAllowlist = ["PATH", "SYSTEMROOT", "COMSPEC"];
+      const store = new Store(config.storage.directory);
+      try {
+        const policy = new PolicyEngine(config, {
+          killSwitch: () => false,
+          emergencyReadOnly: () => false,
+        });
+        const processes = new ProcessManager(config, store, policy);
+        const files = new FilesystemService(
+          profile.roots,
+          1024 * 1024,
+          path.join(root, ".trash"),
+          false,
+        );
+        const cases = [
+          {
+            name: "git",
+            executable: "C:\\Program Files\\Git\\cmd\\git.exe",
+            args: ["--version"],
+            marker: "git version",
+          },
+          {
+            name: "node",
+            executable: process.execPath,
+            args: ["--version"],
+            marker: process.version,
+          },
+          {
+            name: "python",
+            executable: locate("python.exe"),
+            args: ["--version"],
+            marker: "Python",
+          },
+          {
+            name: "powershell",
+            executable: locate("powershell.exe"),
+            args: ["-NoProfile", "-NonInteractive", "-Command", "Write-Output RADLINA_PS_PASS"],
+            marker: "RADLINA_PS_PASS",
+          },
+          {
+            name: "cmd",
+            executable: locate("cmd.exe"),
+            args: ["/d", "/s", "/c", "echo RADLINA_CMD_PASS"],
+            marker: "RADLINA_CMD_PASS",
+          },
+          {
+            name: "npm",
+            executable: locate("cmd.exe"),
+            args: ["/d", "/s", "/c", "call npm.cmd --version"],
+            marker: ".",
+          },
+          {
+            name: "npx",
+            executable: locate("cmd.exe"),
+            args: ["/d", "/s", "/c", "call npx.cmd --version"],
+            marker: ".",
+          },
+        ];
+        for (const selected of cases) {
+          const started = (await processes.start("subject", "test", profile, files.resolver, {
+            executable: selected.executable,
+            args: selected.args,
+            cwd: root,
+          })) as { sessionId: string };
+          await waitFor(
+            () =>
+              store.db
+                .prepare("SELECT status FROM process_sessions WHERE id=?")
+                .get(started.sessionId) as { status: string },
+          );
+          const result = (await processes.readOutput(started.sessionId, "subject")) as {
+            output: string;
+            exitCode: number | null;
+          };
+          expect(result.exitCode, `${selected.name}: ${result.output}`).toBe(0);
+          expect(result.output, selected.name).toContain(selected.marker);
+        }
+      } finally {
+        store.close();
+      }
+    },
+    30_000,
+  );
 });

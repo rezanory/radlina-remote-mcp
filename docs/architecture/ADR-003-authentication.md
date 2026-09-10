@@ -17,4 +17,4 @@ The internal issuer never accepts a password or pairing secret through chat. The
 - Every tool independently checks required scopes.
 - Access tokens are short-lived and bound to the canonical MCP resource URI.
 - Authorization codes, pairing codes, refresh tokens, and replay keys are stored only as hashes.
-- Signing and audit keys are encrypted with Windows DPAPI for the local machine and protected by a restricted project ACL so both LocalService and the local operator can use the same durable state.
+- Signing and audit keys are encrypted with Windows DPAPI for the local machine and protected by a restricted project ACL so LocalSystem and the local operator can use the same durable state.

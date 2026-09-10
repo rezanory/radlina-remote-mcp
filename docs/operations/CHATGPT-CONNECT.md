@@ -1,6 +1,6 @@
 # ChatGPT connection
 
-Prerequisites: local validation green, service running as `NT AUTHORITY\LocalService`, Tailscale Funnel enabled, `config/local.yaml` updated to the exact Funnel HTTPS origin, and the service restarted.
+Prerequisites: local validation green, service running as `LocalSystem` with the restricted owner/Admin/SYSTEM ACL, Tailscale Funnel enabled, `config/local.yaml` updated to the exact Funnel HTTPS origin, and the service restarted.
 
 1. Run `tailscale funnel status` and copy the exact `https://...ts.net` origin. Do not use an IP address.
 2. In ChatGPT, open Settings, then Apps/Connectors, enable developer mode if required, and add a custom MCP connector with `<origin>/mcp`.

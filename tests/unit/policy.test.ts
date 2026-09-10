@@ -36,4 +36,35 @@ describe("PolicyEngine", () => {
     const admin = { ...auth, scopes: ["admin"] };
     expect(readonly.decide(admin, "write_file", "filesystem:write").allowed).toBe(false);
   });
+
+  it("treats allowShell as trusted-owner direct executable access", () => {
+    const config = testConfig("C:\\workspace");
+    config.profiles["test"]!.allowShell = true;
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    expect(
+      policy.commandAllowed(config.profiles["test"]!, "C:\\Tools\\anything.exe", ["--ok"]).allowed,
+    ).toBe(true);
+    expect(
+      policy.commandAllowed(config.profiles["test"]!, "C:\\Tools\\anything.exe", ["bad\0arg"])
+        .allowed,
+    ).toBe(false);
+    expect(
+      policy.commandAllowed(config.profiles["test"]!, "C:\\Tools\\anything.exe", ["x".repeat(4097)])
+        .allowed,
+    ).toBe(false);
+  });
+
+  it("keeps explicit executable allowlisting when trusted-owner shell mode is disabled", () => {
+    const config = testConfig("C:\\workspace");
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    expect(
+      policy.commandAllowed(config.profiles["test"]!, "C:\\Tools\\anything.exe", []).allowed,
+    ).toBe(false);
+  });
 });

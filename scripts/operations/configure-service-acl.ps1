@@ -15,37 +15,26 @@ New-Item -ItemType Directory -Force -Path $stateDirectory, $workspaceDirectory |
 
 $administratorSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')
 $systemSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-18')
-$localServiceSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-19')
 $authenticatedUsersSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-11')
 $builtinUsersSid = [Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')
 $inheritance = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
 $none = [Security.AccessControl.PropagationFlags]::None
 $allow = [Security.AccessControl.AccessControlType]::Allow
 
+$existingRootAcl = Get-Acl -LiteralPath $projectRoot
+$ownerSid = $existingRootAcl.Owner |
+  ForEach-Object { ([Security.Principal.NTAccount]$_).Translate([Security.Principal.SecurityIdentifier]) }
 $rootAcl = [Security.AccessControl.DirectorySecurity]::new()
-$rootAcl.SetOwner($identity.User)
+$rootAcl.SetOwner($ownerSid)
 $rootAcl.SetAccessRuleProtection($true, $false)
 foreach ($entry in @(
-    @($identity.User, [Security.AccessControl.FileSystemRights]::FullControl),
+    @($ownerSid, [Security.AccessControl.FileSystemRights]::FullControl),
     @($administratorSid, [Security.AccessControl.FileSystemRights]::FullControl),
-    @($systemSid, [Security.AccessControl.FileSystemRights]::FullControl),
-    @($localServiceSid, [Security.AccessControl.FileSystemRights]::ReadAndExecute)
+    @($systemSid, [Security.AccessControl.FileSystemRights]::FullControl)
   )) {
   [void]$rootAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($entry[0], $entry[1], $inheritance, $none, $allow))
 }
 Set-Acl -LiteralPath $projectRoot -AclObject $rootAcl
-
-foreach ($writableDirectory in @($stateDirectory, $workspaceDirectory)) {
-  $acl = Get-Acl -LiteralPath $writableDirectory
-  $acl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
-      $localServiceSid,
-      [Security.AccessControl.FileSystemRights]::Modify,
-      $inheritance,
-      $none,
-      $allow
-    ))
-  Set-Acl -LiteralPath $writableDirectory -AclObject $acl
-}
 
 $rootCheck = Get-Acl -LiteralPath $projectRoot
 $forbidden = @($rootCheck.Access | Where-Object {
@@ -55,13 +44,12 @@ $forbidden = @($rootCheck.Access | Where-Object {
 if ($rootCheck.AreAccessRulesProtected -ne $true -or $forbidden.Count -gt 0) {
   throw 'project ACL verification failed closed'
 }
-$localServiceRootRules = @($rootCheck.Access | Where-Object {
-    $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]) -eq $localServiceSid
+$systemRules = @($rootCheck.Access | Where-Object {
+    $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]) -eq $systemSid
   })
-$writeRights = [Security.AccessControl.FileSystemRights]'Write, Delete, ChangePermissions, TakeOwnership'
-if ($localServiceRootRules.Count -ne 1 -or
-    ($localServiceRootRules[0].FileSystemRights -band $writeRights) -ne 0) {
-  throw 'LocalService has unexpected write access to the project root'
+if ($systemRules.Count -ne 1 -or
+    ($systemRules[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::FullControl) -ne [Security.AccessControl.FileSystemRights]::FullControl) {
+  throw 'LocalSystem does not have full control of the Radlina project root'
 }
 
-Write-Output 'Project ACL hardened; LocalService can modify only .state and workspace.'
+Write-Output 'Project ACL hardened; owner, Administrators and LocalSystem retain FullControl.'

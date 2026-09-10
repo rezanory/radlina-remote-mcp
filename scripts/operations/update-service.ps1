@@ -26,6 +26,14 @@ try {
 }
 & (Join-Path $PSScriptRoot 'migrate-dpapi-protection.ps1')
 & (Join-Path $PSScriptRoot 'configure-service-acl.ps1')
+$sc = (Get-Command sc.exe -ErrorAction Stop).Source
+& $sc config RadlinaRemoteMCP obj= LocalSystem
+if ($LASTEXITCODE -ne 0) { throw 'service identity migration to LocalSystem failed' }
 & $serviceExecutable start
 if ($LASTEXITCODE -ne 0) { throw 'service restart failed' }
-Write-Output 'RadlinaRemoteMCP service updated and running.'
+Start-Sleep -Seconds 2
+$installedService = Get-CimInstance Win32_Service -Filter "Name='RadlinaRemoteMCP'"
+if (-not $installedService -or $installedService.StartName -ne 'LocalSystem' -or $installedService.State -ne 'Running') {
+  throw "service verification failed: identity=$($installedService.StartName) state=$($installedService.State)"
+}
+Write-Output 'RadlinaRemoteMCP service updated as LocalSystem and is running.'

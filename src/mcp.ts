@@ -3,6 +3,7 @@ import os from "node:os";
 import { McpServer, type AuthInfo, type CallToolResult } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 
+import { persistTrustedOwnerConfig } from "./admin/trusted-owner.js";
 import { validateConfig } from "./config/index.js";
 import { AppError } from "./errors.js";
 import type { Risk } from "./policy/engine.js";
@@ -22,6 +23,8 @@ const profileInput = z.string().min(1).max(100).optional();
 const idempotencyInput = z.string().uuid();
 const pathInput = z.string().min(1).max(32_768);
 const sessionIdInput = z.string().uuid();
+const releaseManifestInput = z.string().regex(/^[0-9a-f]{64}$/i);
+const releaseIdentityInput = z.union([releaseManifestInput, z.literal("ROOT")]);
 
 function subject(context: ToolContext): string {
   const candidate = context.http?.authInfo?.extra?.["sub"];
@@ -79,7 +82,7 @@ const destructiveAnnotations = {
 };
 
 export function buildMcpServer(runtime: AppRuntime): McpServer {
-  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.1.0" });
+  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.0" });
 
   server.registerTool(
     "who_am_i",
@@ -138,8 +141,19 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
           protocol: "2026-07-28",
           transport: "streamable-http",
           profiles: Object.keys(runtime.config.profiles),
-          capabilities: ["device", "filesystem", "search", "process", "diagnostics"],
+          capabilities: [
+            "device",
+            "filesystem",
+            "search",
+            "process",
+            "diagnostics",
+            "upgrade",
+            "trusted-owner",
+          ],
           limits: runtime.config.policy,
+          trustedOwner:
+            runtime.config.profiles[runtime.config.policy.defaultProfile]?.allowShell === true,
+          activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
         }),
       ),
   );
@@ -165,9 +179,12 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     },
     (_args, context) =>
       execute(runtime, context, {}, { tool: "version", scope: "device:read" }, async () => ({
-        server: "0.1.0",
+        server: "0.2.0",
         node: process.version,
         protocol: "2026-07-28",
+        activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
+        trustedOwner:
+          runtime.config.profiles[runtime.config.policy.defaultProfile]?.allowShell === true,
       })),
   );
 
@@ -672,6 +689,167 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
           idempotencyKey,
         },
         () => runtime.processes.terminate(sessionId, subject(context), force),
+      ),
+  );
+
+  server.registerTool(
+    "admin_stage_release",
+    {
+      description: "Stage one manifest-bound release into the durable local release store.",
+      inputSchema: z.object({
+        sourceRoot: pathInput,
+        expectedManifest: releaseManifestInput,
+        idempotencyKey: idempotencyInput,
+      }),
+      annotations: writeAnnotations,
+    },
+    ({ sourceRoot, expectedManifest, idempotencyKey }, context) => {
+      const selected = selectedProfile(runtime);
+      return execute(
+        runtime,
+        context,
+        { sourceRoot, expectedManifest },
+        {
+          tool: "admin_stage_release",
+          scope: "admin",
+          profile: selected.name,
+          risk: "critical",
+          idempotencyKey,
+        },
+        async () => {
+          const resolved = await selected.filesystem.resolver.resolve(sourceRoot, {
+            mustExist: true,
+          });
+          return runtime.upgrades.stage(resolved, expectedManifest);
+        },
+      );
+    },
+  );
+
+  server.registerTool(
+    "admin_verify_release",
+    {
+      description: "Verify one staged release against its exact manifest and file hashes.",
+      inputSchema: z.object({ manifest: releaseManifestInput }),
+      annotations: readAnnotations,
+    },
+    ({ manifest }, context) =>
+      execute(
+        runtime,
+        context,
+        { manifest },
+        { tool: "admin_verify_release", scope: "admin" },
+        () => runtime.upgrades.verify(manifest),
+      ),
+  );
+
+  server.registerTool(
+    "admin_upgrade_preflight",
+    {
+      description: "Run fail-closed preflight for a staged release before activation.",
+      inputSchema: z.object({ manifest: releaseManifestInput }),
+      annotations: readAnnotations,
+    },
+    ({ manifest }, context) =>
+      execute(
+        runtime,
+        context,
+        { manifest },
+        { tool: "admin_upgrade_preflight", scope: "admin" },
+        () => runtime.upgrades.preflight(manifest),
+      ),
+  );
+
+  server.registerTool(
+    "admin_activate_release",
+    {
+      description: "Activate one verified release and schedule WinSW self-restart.",
+      inputSchema: z.object({ manifest: releaseManifestInput, idempotencyKey: idempotencyInput }),
+      annotations: writeAnnotations,
+    },
+    ({ manifest, idempotencyKey }, context) =>
+      execute(
+        runtime,
+        context,
+        { manifest },
+        { tool: "admin_activate_release", scope: "admin", risk: "critical", idempotencyKey },
+        () => runtime.upgrades.activate(manifest),
+      ),
+  );
+
+  server.registerTool(
+    "admin_upgrade_status",
+    {
+      description: "Return durable upgrade journal and active release identity.",
+      inputSchema: z.object({}),
+      annotations: readAnnotations,
+    },
+    (_args, context) =>
+      execute(runtime, context, {}, { tool: "admin_upgrade_status", scope: "admin" }, () =>
+        runtime.upgrades.status(),
+      ),
+  );
+
+  server.registerTool(
+    "admin_rollback_release",
+    {
+      description: "Rollback to the previous verified release and schedule WinSW self-restart.",
+      inputSchema: z.object({ idempotencyKey: idempotencyInput }),
+      annotations: destructiveAnnotations,
+    },
+    ({ idempotencyKey }, context) =>
+      execute(
+        runtime,
+        context,
+        {},
+        { tool: "admin_rollback_release", scope: "admin", risk: "critical", idempotencyKey },
+        () => runtime.upgrades.rollback(),
+      ),
+  );
+
+  server.registerTool(
+    "admin_verify_post_restart",
+    {
+      description:
+        "Verify the running process and durable pointer match an expected healthy release.",
+      inputSchema: z.object({ expectedManifest: releaseIdentityInput }),
+      annotations: readAnnotations,
+    },
+    ({ expectedManifest }, context) =>
+      execute(
+        runtime,
+        context,
+        { expectedManifest },
+        { tool: "admin_verify_post_restart", scope: "admin" },
+        () => runtime.upgrades.verifyPostRestart(expectedManifest),
+      ),
+  );
+
+  server.registerTool(
+    "admin_enable_trusted_owner",
+    {
+      description:
+        "Persist full-control trusted-owner mode for the default profile; restart required.",
+      inputSchema: z.object({ idempotencyKey: idempotencyInput }),
+      annotations: writeAnnotations,
+    },
+    ({ idempotencyKey }, context) =>
+      execute(
+        runtime,
+        context,
+        {},
+        {
+          tool: "admin_enable_trusted_owner",
+          scope: "admin",
+          risk: "critical",
+          idempotencyKey,
+          auditArgs: { mode: "trusted-owner", persist: true },
+        },
+        async () => {
+          const result = await persistTrustedOwnerConfig(runtime.configFile, runtime.config);
+          runtime.upgrades.scheduleRestart();
+          return result;
+        },
       ),
   );
 

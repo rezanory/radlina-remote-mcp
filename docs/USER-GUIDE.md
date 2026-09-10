@@ -4,7 +4,7 @@
 
 Edit only `config\local.yaml`. Each profile has explicit absolute Windows roots, an executable allowlist, optional environment-variable names, and a recoverable-trash switch. The shipped example exposes only `C:\radlina-remote-mcp`, allows no commands, does not invoke a shell, and disables trash.
 
-An executable rule matches the normalized absolute executable path. Every argument must match at least one configured regular expression. Do not allow generic shells (`cmd.exe`, `powershell.exe`, `pwsh.exe`) with broad patterns. Prefer one narrow executable and anchored patterns such as `^status$`.
+When `allowShell` is false, an executable rule matches the normalized absolute executable path and every argument must match an allowed regular expression. When the machine owner explicitly enables trusted-owner mode, `allowShell: true` means direct executable access even if `commands` is empty. Process creation still uses `shell:false`; NUL/oversized arguments, unapproved environment variables, missing scopes, kill/read-only state, and audit failures remain denied. Only enable this mode on the owner-controlled workstation.
 
 Validate after every edit:
 
@@ -24,7 +24,7 @@ Restart the service only after validation passes.
 - `process:execute`: allowlisted process start/input/graceful termination.
 - `admin`: sensitive diagnostics, effective configuration, trash, and force termination.
 
-`admin` does not bypass path, command, size, runtime, output, session, kill-switch, or emergency-read-only controls.
+`admin` does not bypass path validation, bounded limits, session ownership, kill-switch, or emergency-read-only controls. Trusted-owner mode intentionally bypasses only the executable allowlist and expands the configured filesystem root to `C:\`.
 
 ## Reconnect and recovery
 

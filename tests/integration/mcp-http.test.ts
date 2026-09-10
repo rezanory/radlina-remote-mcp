@@ -87,10 +87,33 @@ describe("Streamable HTTP MCP", () => {
       await client.connect(transport);
       expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(33);
+      expect(tools.tools).toHaveLength(41);
+      const toolNames = new Set(tools.tools.map((tool) => tool.name));
+      for (const required of [
+        "admin_stage_release",
+        "admin_verify_release",
+        "admin_upgrade_preflight",
+        "admin_activate_release",
+        "admin_upgrade_status",
+        "admin_rollback_release",
+        "admin_verify_post_restart",
+        "admin_enable_trusted_owner",
+      ])
+        expect(toolNames.has(required)).toBe(true);
       expect(tools.tools.every((tool) => tool.annotations?.openWorldHint === false)).toBe(true);
       const ping = await client.callTool({ name: "ping", arguments: {} });
       expect(ping.isError).not.toBe(true);
+      const adminDenied = await client.callTool({
+        name: "admin_upgrade_status",
+        arguments: {},
+      });
+      expect(adminDenied.isError).toBe(true);
+      expect(adminDenied.content).toEqual(
+        expect.arrayContaining([
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          expect.objectContaining({ text: expect.stringContaining("POLICY_DENIED") }),
+        ]),
+      );
       const denied = await client.callTool({
         name: "write_file",
         arguments: {
@@ -127,5 +150,5 @@ describe("Streamable HTTP MCP", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       closeRuntime(runtime);
     }
-  });
+  }, 60_000);
 });

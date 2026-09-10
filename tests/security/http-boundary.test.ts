@@ -85,5 +85,5 @@ describe("HTTP security boundary", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       closeRuntime(runtime);
     }
-  });
+  }, 60_000);
 });

@@ -1,9 +1,10 @@
 import path from "node:path";
 import { stat } from "node:fs/promises";
 
+import { UpgradeManager } from "./admin/upgrade.js";
 import { AuditChain } from "./audit/chain.js";
 import { AuthService } from "./auth/service.js";
-import { loadConfig } from "./config/index.js";
+import { configPath, loadConfig } from "./config/index.js";
 import type { AppConfig } from "./config/schema.js";
 import { Store } from "./persistence/store.js";
 import { PolicyEngine } from "./policy/engine.js";
@@ -14,6 +15,7 @@ import { SearchManager } from "./tools/search/manager.js";
 
 export type AppRuntime = {
   config: AppConfig;
+  configFile: string;
   store: Store;
   audit: AuditChain;
   auth: AuthService;
@@ -22,6 +24,7 @@ export type AppRuntime = {
   filesystems: Map<string, FilesystemService>;
   searches: SearchManager;
   processes: ProcessManager;
+  upgrades: UpgradeManager;
   startedAt: number;
 };
 
@@ -30,6 +33,7 @@ export async function createRuntime(
   options: { reconcileSessions?: boolean } = {},
 ): Promise<AppRuntime> {
   const config = await loadConfig(explicitConfigPath);
+  const configFile = explicitConfigPath ?? configPath();
   const ripgrep = await stat(config.dependencies.ripgrepExecutable);
   if (!ripgrep.isFile()) throw new Error("configured ripgrep executable is not a regular file");
   const store = new Store(config.storage.directory);
@@ -58,12 +62,18 @@ export async function createRuntime(
   }
   const searches = new SearchManager(config, store);
   const processes = new ProcessManager(config, store, policy);
+  const upgrades = new UpgradeManager(
+    config,
+    configFile,
+    UpgradeManager.productionRestart(configFile),
+  );
   if (options.reconcileSessions !== false) {
     searches.reconcile();
     await processes.reconcile();
   }
   return {
     config,
+    configFile,
     store,
     audit,
     auth,
@@ -72,6 +82,7 @@ export async function createRuntime(
     filesystems,
     searches,
     processes,
+    upgrades,
     startedAt: Date.now(),
   };
 }

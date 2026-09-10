@@ -31,6 +31,10 @@ const READ_ONLY_TOOLS = new Set([
   "cancel_search",
   "list_processes",
   "read_process_output",
+  "admin_verify_release",
+  "admin_upgrade_preflight",
+  "admin_upgrade_status",
+  "admin_verify_post_restart",
   "get_effective_config",
   "validate_config",
   "simulate_policy",
@@ -90,14 +94,17 @@ export class PolicyEngine {
     executable: string,
     args: string[],
   ): { allowed: boolean; reason: string } {
+    if (args.some((arg) => arg.length > 4096 || arg.includes("\0")))
+      return { allowed: false, reason: "invalid argument" };
     const normalized = path.win32.normalize(executable).toLowerCase();
+    if (profile.allowShell) {
+      return { allowed: true, reason: "trusted-owner shell mode permits direct executable access" };
+    }
     const rule = profile.commands.find(
       (item) => path.win32.normalize(item.executable).toLowerCase() === normalized,
     );
     if (!rule) return { allowed: false, reason: "executable is not in the profile allowlist" };
     const patterns = rule.argumentPatterns.map((pattern) => new RegExp(pattern, "u"));
-    if (args.some((arg) => arg.length > 4096 || arg.includes("\0")))
-      return { allowed: false, reason: "invalid argument" };
     if (patterns.length > 0 && args.some((arg) => !patterns.some((pattern) => pattern.test(arg)))) {
       return { allowed: false, reason: "one or more arguments are outside the allowlist" };
     }

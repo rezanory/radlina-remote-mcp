@@ -99,7 +99,7 @@ export class ProcessManager {
         env,
         shell: false,
         windowsHide: true,
-        detached: true,
+        detached: false,
         stdio: ["pipe", "pipe", "pipe"],
       });
     } catch (error) {
@@ -158,23 +158,23 @@ export class ProcessManager {
     child.stderr?.on("data", recordOutput);
     const timer = setTimeout(() => stopTrackedProcess("timed-out"), timeout);
     timer.unref();
-    child.on("error", () => {
+    let finalized = false;
+    const finalize = (statusValue: string, code: number | null): void => {
+      if (finalized) return;
+      finalized = true;
       clearTimeout(timer);
-      output.end();
       this.children.delete(id);
-      this.store.db
-        .prepare("UPDATE process_sessions SET status=?,ended_at=? WHERE id=? AND status='running'")
-        .run(stopReason ?? "error", Date.now(), id);
-    });
+      output.end(() => {
+        this.store.db
+          .prepare(
+            "UPDATE process_sessions SET status=?,ended_at=?,exit_code=? WHERE id=? AND status='running'",
+          )
+          .run(statusValue, Date.now(), code, id);
+      });
+    };
+    child.on("error", () => finalize(stopReason ?? "error", null));
     child.on("close", (code) => {
-      clearTimeout(timer);
-      output.end();
-      this.children.delete(id);
-      this.store.db
-        .prepare(
-          "UPDATE process_sessions SET status=?,ended_at=?,exit_code=? WHERE id=? AND status='running'",
-        )
-        .run(stopReason ?? "complete", Date.now(), code, id);
+      finalize(stopReason ?? "complete", code);
     });
     child.unref();
     const identity = await this.waitForIdentity(pid, child);

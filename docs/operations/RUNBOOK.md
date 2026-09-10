@@ -19,7 +19,7 @@ Run service installation from an elevated PowerShell terminal:
 .\scripts\operations\install-service.ps1
 ```
 
-The installer uses `NT AUTHORITY\LocalService` without a password, hardens the project ACL, and grants that identity write access only to `.state` and `workspace`. The service binds only to `127.0.0.1:7337`. The firewall rule blocks direct inbound connections to the pinned Node runtime.
+The installer uses `LocalSystem` without a password and hardens the project ACL to the preserved owner, Administrators, and LocalSystem. This identity is required for the explicitly authorized trusted-owner profile. The service still binds only to `127.0.0.1:7337`; bearer authentication, scopes, path validation, kill/read-only controls, idempotency, and audit remain server-side requirements. The firewall rule blocks direct inbound connections to the pinned Node runtime.
 
 ```powershell
 .\scripts\operations\service-control.ps1 -Action Status
@@ -33,6 +33,8 @@ Updates create a consistent backup before changing dependencies or restarting:
 ```powershell
 .\scripts\operations\update-service.ps1
 ```
+
+For manifest-bound in-service upgrades, stage a unique candidate, verify it, run preflight, and activate it with a fresh idempotency key. Confirm the exact manifest with `admin_verify_post_restart` after reconnect. `admin_rollback_release` supports a prior immutable release or the explicit `ROOT` runtime. A pending release that fails to confirm health is automatically rolled back on the next service boot. Never clear an unknown-outcome idempotency claim until the local pointer, journal, and filesystem result have been reconciled.
 
 ## Backup, restore, and rollback
 

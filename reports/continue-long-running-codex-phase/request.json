@@ -1,0 +1,24 @@
+{
+  "skill": "continue-long-running-codex-phase",
+  "project": "radlina-remote-mcp",
+  "objective": "Complete the production/controller-full-control-v1 phase through exact release packaging, validation, non-force publication, production deployment, Radlina-only rollback/re-promotion acceptance, benchmark evidence, and a fail-closed production closure receipt.",
+  "source_fingerprint": "71f64fdcc804ef80b2603bf9c7c18cd2bca694f0c522a251240ce52f867ebfd7",
+  "constraints": [
+    "Use C:/radlina-remote-mcp-integration/controller-full-control-v1 as the only authoritative source writer.",
+    "Preserve peer worktrees and the live production fallback until all pre-promotion gates pass.",
+    "Do not use git reset --hard, git clean, force push, blind rebase, main merge, ownership mutation, or ACL mutation outside the approved service boundary.",
+    "Do not declare PASS or 100 percent while any mandatory identity, evidence, validation, rollback, smoke, benchmark, or publication gate is unknown or failed.",
+    "Preserve auth, admin authorization, audit chaining, kill switch, emergency read-only, path validation, and durable idempotency while enabling trusted-owner direct executable access."
+  ],
+  "profile_inputs": {
+    "prompt_pack": "C:/Users/Radlina/.codex/attachments/066366b1-1b39-47d7-a14a-7e933f9972ba/pasted-text.txt",
+    "reports_path": "reports/continue-long-running-codex-phase/",
+    "repository_state": "branch production/controller-full-control-v1 at deba1724ac82a329cafc27b67c073f61aaeb80ab with reconciled partial 0.2.0 changes; canonical dirty-tree fingerprint is source_fingerprint",
+    "accepted_baseline": "C:/radlina-remote-mcp-baselines/baseline-production-precutover-20260910T0958Z/BASELINE.json",
+    "continuation_report_path": "C:/radlina-remote-mcp/workspace/radlina-canary-bootstrap/PRODUCTION_CLOSURE_FINAL.json"
+  },
+  "evidence": {
+    "directory": "reports/continue-long-running-codex-phase/",
+    "immutable_baseline": true
+  }
+}
