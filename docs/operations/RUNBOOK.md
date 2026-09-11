@@ -26,7 +26,7 @@ The installer uses `LocalSystem` without a password and hardens the project ACL 
 .\scripts\operations\service-control.ps1 -Action Restart
 ```
 
-`Status` is read-only and confirms both SCM state and the loopback `401` authentication gate. Start, Stop, and Restart require elevation.
+`Status` is read-only and confirms SCM state plus independent loopback, configured public ingress, and Tailscale readiness. Both MCP probes require the unauthenticated `401` authentication boundary; Tailscale status is reduced to backend state, online state, relay, and health issue count. Start, Stop, and Restart require elevation.
 
 Updates create a consistent backup before changing dependencies or restarting:
 

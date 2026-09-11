@@ -9,6 +9,9 @@ Radlina 0.3 introduces an in-process reliability supervisor. The supervisor is d
 - The configured ripgrep dependency exists as a regular file.
 - The tamper-evident audit chain verifies on startup and at the configured bounded interval.
 - Running process/search session counts remain within policy limits.
+- After HTTP bind, the loopback MCP authentication boundary is reachable and returns the expected unauthenticated `401`.
+- When `server.publicUrl` is non-loopback, the public MCP URL is probed independently; `LOCAL_READY` and `PUBLIC_READY` are never conflated.
+- For `*.ts.net` public URLs, Tailscale `BackendState`, `Self.Online`, relay, and health issue count are sampled without persisting node keys or other credential material.
 
 ## Safe automatic reconciliation
 
@@ -30,7 +33,9 @@ Any failed current probe sets supervisor `ready=false`. The MCP `readiness` resu
 
 ## Telemetry
 
-`reliability_status` returns the latest supervisor snapshot.
+`reliability_status` returns the latest supervisor snapshot, including `localReady`, `publicReady`, `tailscaleReady`, last public success/failure timestamps, probe latency, consecutive failures, and sanitized Tailscale state.
+
+`health`, `readiness`, CLI diagnostics, and service status expose the same split readiness model so a healthy loopback process cannot mask a broken public path.
 
 `recent_reliability_events` returns bounded persistent transition/recovery events and requires `admin` scope.
 
@@ -51,8 +56,7 @@ The probe timer is unreferenced and is stopped by `closeRuntime` in tests and co
 
 ## Planned 0.3 follow-up gates
 
-1. External transport reachability history and bounded circuit-breaker state.
-2. Windows-service watchdog with explicit restart budget and cooldown.
-3. Restart/rebind chaos tests and Tailscale interruption drills.
-4. SLO windows, availability counters, and production soak evidence.
-5. Recovery escalation policy that distinguishes safe automatic action from operator approval.
+1. Windows-service/Tailscale automatic restart policy with an explicit restart budget, cooldown, and operator-visible escalation; the current watchdog is observation/fail-closed only.
+2. Restart/rebind chaos tests and sustained Tailscale interruption drills.
+3. SLO windows, availability counters, and production soak evidence.
+4. Recovery escalation policy that distinguishes safe automatic action from operator approval.

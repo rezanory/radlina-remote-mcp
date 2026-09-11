@@ -31,7 +31,7 @@ The local MCP URL is `http://127.0.0.1:7337/mcp`. MCP requests without a valid b
 
 ## Reliability supervisor
 
-The 0.3 development line derives health/readiness from real storage, OAuth, dependency, audit, and session probes and performs only bounded low-risk state reconciliation. See `docs/operations/RELIABILITY.md` for behavior, configuration, telemetry, and planned follow-up gates.
+The 0.3 development line derives health/readiness from real storage, OAuth, dependency, audit, session, loopback-ingress, public-ingress, and Tailscale probes and performs only bounded low-risk state reconciliation. `LOCAL_READY`, `PUBLIC_READY`, and `TAILSCALE_READY` are reported independently so a healthy Node process cannot mask an unreachable public connector path. See `docs/operations/RELIABILITY.md` for behavior, configuration, telemetry, and planned follow-up gates.
 
 ## Deployment
 

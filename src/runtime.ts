@@ -94,5 +94,6 @@ export async function createRuntime(
 
 export function closeRuntime(runtime: AppRuntime): void {
   runtime.reliability.stop();
+  runtime.processes.shutdown();
   runtime.store.close();
 }

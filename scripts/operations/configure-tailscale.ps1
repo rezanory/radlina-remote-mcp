@@ -49,6 +49,11 @@ if ($Mode -eq 'Serve') {
 }
 if ($LASTEXITCODE -ne 0) { throw "Tailscale $Mode configuration failed" }
 $tailscaleStatus = (& tailscale.exe status --json | ConvertFrom-Json)
+if ($LASTEXITCODE -ne 0) { throw 'Tailscale status probe failed after serving configuration' }
+$healthIssueCount = @($tailscaleStatus.Health).Count
+if ([string]$tailscaleStatus.BackendState -ne 'Running' -or -not [bool]$tailscaleStatus.Self.Online -or $healthIssueCount -ne 0) {
+  throw "Tailscale is not ready after serving configuration: backend=$($tailscaleStatus.BackendState);online=$($tailscaleStatus.Self.Online);healthIssues=$healthIssueCount"
+}
 $dnsName = ([string]$tailscaleStatus.Self.DNSName).TrimEnd('.')
 if (-not $dnsName) { throw 'Tailscale did not report a MagicDNS name' }
 $portSuffix = if ($HttpsPort -eq 443) { '' } else { ":$HttpsPort" }

@@ -7,9 +7,19 @@ import type { AppConfig } from "../config/schema.js";
 import type { Store } from "../persistence/store.js";
 import type { ProcessManager } from "../tools/process/manager.js";
 import type { SearchManager } from "../tools/search/manager.js";
+import { IngressWatchdog, type EndpointTelemetry, type IngressSnapshot } from "./ingress.js";
 
 type ReliabilityStatus = "healthy" | "degraded" | "unhealthy";
-type CheckName = "storage" | "auth" | "ripgrep" | "audit" | "sessions" | "supervisor";
+type CheckName =
+  | "storage"
+  | "auth"
+  | "ripgrep"
+  | "audit"
+  | "sessions"
+  | "localIngress"
+  | "publicIngress"
+  | "tailscale"
+  | "supervisor";
 
 type CheckResult = {
   ok: boolean;
@@ -21,12 +31,16 @@ type CheckResult = {
 export type ReliabilitySnapshot = {
   status: ReliabilityStatus;
   ready: boolean;
+  localReady: boolean | null;
+  publicReady: boolean | null;
+  tailscaleReady: boolean | null;
   lastProbeAt: string | null;
   lastProbeReason: string | null;
   consecutiveFailures: number;
   recoveryCount: number;
   lastRecoveryAt: string | null;
   checks: Partial<Record<CheckName, CheckResult>>;
+  ingress: IngressSnapshot;
 };
 
 type ReliabilityEventRow = {
@@ -45,16 +59,8 @@ export class ReliabilitySupervisor {
   private lastRecoveryAt: string | null = null;
   private lastAuditCheckAt = 0;
   private cachedAuditCheck: CheckResult | undefined;
-  private snapshotValue: ReliabilitySnapshot = {
-    status: "unhealthy",
-    ready: false,
-    lastProbeAt: null,
-    lastProbeReason: null,
-    consecutiveFailures: 0,
-    recoveryCount: 0,
-    lastRecoveryAt: null,
-    checks: {},
-  };
+  private readonly ingress: IngressWatchdog;
+  private snapshotValue: ReliabilitySnapshot;
 
   constructor(
     private readonly config: AppConfig,
@@ -63,7 +69,24 @@ export class ReliabilitySupervisor {
     private readonly auth: AuthService,
     private readonly searches: SearchManager,
     private readonly processes: ProcessManager,
-  ) {}
+  ) {
+    this.ingress = new IngressWatchdog(config);
+    const ingress = this.ingress.snapshot();
+    this.snapshotValue = {
+      status: "unhealthy",
+      ready: false,
+      localReady: ingress.localReady,
+      publicReady: ingress.publicReady,
+      tailscaleReady: ingress.tailscaleReady,
+      lastProbeAt: null,
+      lastProbeReason: null,
+      consecutiveFailures: 0,
+      recoveryCount: 0,
+      lastRecoveryAt: null,
+      checks: {},
+      ingress,
+    };
+  }
 
   async start(recoverOnStartup = true): Promise<void> {
     await this.probe("startup", recoverOnStartup);
@@ -77,6 +100,10 @@ export class ReliabilitySupervisor {
   stop(): void {
     if (this.timer) clearInterval(this.timer);
     this.timer = undefined;
+  }
+
+  enableIngressChecks(): void {
+    this.ingress.enable();
   }
 
   snapshot(): ReliabilitySnapshot {
@@ -119,9 +146,13 @@ export class ReliabilitySupervisor {
       0,
       256,
     );
+    const ingress = this.ingress.snapshot();
     this.snapshotValue = {
       status: "unhealthy",
       ready: false,
+      localReady: ingress.localReady,
+      publicReady: ingress.publicReady,
+      tailscaleReady: ingress.tailscaleReady,
       lastProbeAt: now,
       lastProbeReason: reason.slice(0, 64),
       consecutiveFailures: this.consecutiveFailures,
@@ -130,6 +161,7 @@ export class ReliabilitySupervisor {
       checks: {
         supervisor: { ok: false, detail, checkedAt: now, durationMs: 0 },
       },
+      ingress,
     };
     this.recordEvent("supervisor-failure", "unhealthy", {
       reason: reason.slice(0, 64),
@@ -186,6 +218,14 @@ export class ReliabilitySupervisor {
       return `processes=${processRow.count};searches=${searchRow.count}`;
     });
 
+    let ingress = this.ingress.snapshot();
+    if (this.ingress.isEnabled()) {
+      ingress = await this.ingress.probe();
+      checks.localIngress = this.ingressCheck(ingress.local);
+      if (ingress.public.required) checks.publicIngress = this.ingressCheck(ingress.public);
+      if (ingress.tailscale.required) checks.tailscale = this.ingressCheck(ingress.tailscale);
+    }
+
     const allHealthy = Object.values(checks).every((check) => check?.ok === true);
     if (allHealthy) this.consecutiveFailures = 0;
     else this.consecutiveFailures += 1;
@@ -199,12 +239,16 @@ export class ReliabilitySupervisor {
     this.snapshotValue = {
       status,
       ready: allHealthy,
+      localReady: ingress.localReady,
+      publicReady: ingress.publicReady,
+      tailscaleReady: ingress.tailscaleReady,
       lastProbeAt: now,
       lastProbeReason: reason.slice(0, 64),
       consecutiveFailures: this.consecutiveFailures,
       recoveryCount: this.recoveryCount,
       lastRecoveryAt: this.lastRecoveryAt,
       checks,
+      ingress,
     };
 
     if (!allHealthy || previousStatus !== status) {
@@ -215,6 +259,13 @@ export class ReliabilitySupervisor {
         failedChecks: Object.entries(checks)
           .filter(([, value]) => value?.ok === false)
           .map(([name]) => name),
+        ingress: {
+          localReady: ingress.localReady,
+          publicReady: ingress.publicReady,
+          tailscaleReady: ingress.tailscaleReady,
+          publicConsecutiveFailures: ingress.public.consecutiveFailures,
+          tailscaleConsecutiveFailures: ingress.tailscale.consecutiveFailures,
+        },
       });
     }
     if (recovery.total > 0) {
@@ -243,6 +294,15 @@ export class ReliabilitySupervisor {
       oauthExpired,
       interruptedProcesses: processRecovery.interrupted,
       interruptedSearches: searchRecovery.interrupted,
+    };
+  }
+
+  private ingressCheck(telemetry: EndpointTelemetry): CheckResult {
+    return {
+      ok: telemetry.ready === true,
+      detail: telemetry.detail.slice(0, 256),
+      checkedAt: telemetry.lastAttemptAt ?? new Date().toISOString(),
+      durationMs: telemetry.latencyMs ?? 0,
     };
   }
 

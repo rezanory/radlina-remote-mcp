@@ -21,6 +21,23 @@ async function postBindReadiness(
   if (response.status !== 401) {
     throw new Error(`AUTH_BOUNDARY_SELF_PROBE_FAILED_${response.status}`);
   }
+
+  runtime.reliability.enableIngressChecks();
+  let readiness = await runtime.reliability.probe("post-bind-ingress", false);
+  const ingressReady = (): boolean =>
+    readiness.ready &&
+    readiness.localReady === true &&
+    readiness.publicReady === true &&
+    readiness.tailscaleReady === true;
+  for (let attempt = 1; attempt < 3 && !ingressReady(); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, attempt * 750));
+    readiness = await runtime.reliability.probe(`post-bind-ingress-retry-${attempt}`, false);
+  }
+  if (!ingressReady()) {
+    throw new Error(
+      `INGRESS_READINESS_FAILED_local=${String(readiness.localReady)};public=${String(readiness.publicReady)};tailscale=${String(readiness.tailscaleReady)}`,
+    );
+  }
 }
 
 export async function runApp(): Promise<void> {

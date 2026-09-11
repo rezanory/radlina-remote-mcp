@@ -27,12 +27,14 @@ async function main(): Promise<void> {
       );
       localEndpoint = { reachable: true, status: response.status };
     } catch {
-      // The service may intentionally be stopped during offline diagnostics.
+      // A stopped or unreachable service is reported below through readiness telemetry.
     }
+    runtime.reliability.enableIngressChecks();
+    const reliability = await runtime.reliability.probe("diagnose-ingress", false);
     console.log(
       JSON.stringify(
         {
-          healthy: audit.valid,
+          healthy: audit.valid && reliability.ready,
           node: process.version,
           ripgrep: ripgrep.split(/\r?\n/u)[0],
           config: {
@@ -52,12 +54,21 @@ async function main(): Promise<void> {
           },
           audit,
           localEndpoint,
+          readiness: {
+            status: reliability.status,
+            ready: reliability.ready,
+            localReady: reliability.localReady,
+            publicReady: reliability.publicReady,
+            tailscaleReady: reliability.tailscaleReady,
+            lastProbeAt: reliability.lastProbeAt,
+          },
+          ingress: reliability.ingress,
         },
         undefined,
         2,
       ),
     );
-    if (!audit.valid) process.exitCode = 1;
+    if (!audit.valid || !reliability.ready) process.exitCode = 1;
   } finally {
     closeRuntime(runtime);
   }

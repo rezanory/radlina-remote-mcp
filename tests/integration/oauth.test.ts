@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { AuthService } from "../../src/auth/service.js";
 import { Store } from "../../src/persistence/store.js";
+import { SERVER_VERSION } from "../../src/version.js";
 import { testConfig } from "../helpers/config.js";
 
 type TokenSet = {
@@ -518,7 +519,7 @@ describe("internal OAuth resilience", () => {
       mode: "internal",
       signingReady: true,
       tokenEndpointReady: true,
-      version: "0.3.0-dev.1",
+      version: SERVER_VERSION,
     });
   });
 });

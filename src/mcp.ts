@@ -181,6 +181,9 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
         return {
           status: reliability.status,
           ready: reliability.ready,
+          localReady: reliability.localReady,
+          publicReady: reliability.publicReady,
+          tailscaleReady: reliability.tailscaleReady,
           uptimeSeconds: Math.floor((Date.now() - runtime.startedAt) / 1000),
           lastProbeAt: reliability.lastProbeAt,
         };
@@ -1047,6 +1050,9 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
           String(runtime.config.policy.emergencyReadOnly);
         return {
           ready: reliability.ready && killSwitch !== "true",
+          localReady: reliability.localReady,
+          publicReady: reliability.publicReady,
+          tailscaleReady: reliability.tailscaleReady,
           killSwitch,
           emergencyReadOnly,
           reliabilityStatus: reliability.status,

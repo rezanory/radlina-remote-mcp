@@ -9,6 +9,7 @@ import { AppError } from "../../errors.js";
 import type { Store } from "../../persistence/store.js";
 import type { PolicyEngine } from "../../policy/engine.js";
 import { decodeCursor, encodeCursor, sha256 } from "../../utils/json.js";
+import { resolveWindowsExecutable } from "../../utils/windows-executable.js";
 import type { SafePathResolver } from "../filesystem/safe-path.js";
 
 const execFile = promisify(execFileCallback);
@@ -30,7 +31,9 @@ type ProcessRow = {
 
 export class ProcessManager {
   private readonly children = new Map<string, ChildProcess>();
+  private readonly timers = new Map<string, NodeJS.Timeout>();
   private readonly directory: string;
+  private shuttingDown = false;
 
   constructor(
     private readonly config: AppConfig,
@@ -72,15 +75,20 @@ export class ProcessManager {
       timeoutMs?: number;
     },
   ): Promise<unknown> {
+    if (this.shuttingDown) throw new AppError("CONFLICT", "process manager is shutting down");
     const active = this.store.db
       .prepare("SELECT COUNT(*) AS count FROM process_sessions WHERE status='running'")
       .get() as { count: number };
     if (active.count >= this.config.policy.maxSessions)
       throw new AppError("LIMIT_EXCEEDED", "process session limit reached");
-    const executable = path.win32.resolve(input.executable);
+    const executable = await resolveWindowsExecutable(input.executable);
+    if (!executable) {
+      throw new AppError("NOT_FOUND", "executable was not found on PATH or at the specified path", {
+        executable: input.executable.slice(0, 512),
+      });
+    }
     const commandDecision = this.policy.commandAllowed(profile, executable, input.args);
     if (!commandDecision.allowed) throw new AppError("POLICY_DENIED", commandDecision.reason);
-    await stat(executable);
     const cwd = await resolver.resolve(input.cwd, { mustExist: true });
     const env: NodeJS.ProcessEnv = {};
     for (const name of profile.envAllowlist)
@@ -163,14 +171,16 @@ export class ProcessManager {
     child.stderr?.on("data", recordOutput);
     const timer = setTimeout(() => stopTrackedProcess("timed-out"), timeout);
     timer.unref();
+    this.timers.set(id, timer);
     let finalized = false;
     const finalize = (statusValue: string, code: number | null): void => {
       if (finalized) return;
       finalized = true;
       clearTimeout(timer);
+      this.timers.delete(id);
       this.children.delete(id);
       output.end(() => {
-        if (!this.store.isOpen()) return;
+        if (this.shuttingDown || !this.store.isOpen()) return;
         this.store.db
           .prepare(
             "UPDATE process_sessions SET status=?,ended_at=?,exit_code=? WHERE id=? AND status='running'",
@@ -254,7 +264,18 @@ export class ProcessManager {
     if (row.status !== "running" || !row.pid)
       return { sessionId: id, status: row.status, terminated: false };
     const identity = await this.processIdentity(row.pid);
-    if (!identity || identity !== row.start_identity) {
+    if (!identity) {
+      if (!(await this.processExists(row.pid))) {
+        this.store.db
+          .prepare(
+            "UPDATE process_sessions SET status='terminated',ended_at=? WHERE id=? AND status='running'",
+          )
+          .run(Date.now(), id);
+        return { sessionId: id, terminated: true, forced: force, alreadyExited: true };
+      }
+      throw new AppError("CONFLICT", "PID identity could not be verified; refusing termination");
+    }
+    if (identity !== row.start_identity) {
       this.store.db
         .prepare("UPDATE process_sessions SET status='identity-mismatch',ended_at=? WHERE id=?")
         .run(Date.now(), id);
@@ -265,11 +286,39 @@ export class ProcessManager {
     }
     const args = ["/PID", String(row.pid), "/T"];
     if (force) args.push("/F");
-    await execFile("taskkill.exe", args, { windowsHide: true, timeout: 10_000 });
+    try {
+      await execFile("taskkill.exe", args, { windowsHide: true, timeout: 10_000 });
+    } catch (error) {
+      const after = await this.processIdentity(row.pid);
+      if (!after && !(await this.processExists(row.pid))) {
+        this.store.db
+          .prepare(
+            "UPDATE process_sessions SET status='terminated',ended_at=? WHERE id=? AND status='running'",
+          )
+          .run(Date.now(), id);
+        return { sessionId: id, terminated: true, forced: force, alreadyExited: true };
+      }
+      if (after && after !== row.start_identity) {
+        throw new AppError(
+          "CONFLICT",
+          "PID identity changed while termination was in progress; refusing further action",
+        );
+      }
+      const code = (error as NodeJS.ErrnoException).code;
+      throw new AppError(
+        "CONFLICT",
+        "process termination failed while the target was still running",
+        {
+          ...(code === undefined ? {} : { code: String(code).slice(0, 64) }),
+        },
+      );
+    }
     this.store.db
-      .prepare("UPDATE process_sessions SET status='terminated',ended_at=? WHERE id=?")
+      .prepare(
+        "UPDATE process_sessions SET status='terminated',ended_at=? WHERE id=? AND status='running'",
+      )
       .run(Date.now(), id);
-    return { sessionId: id, terminated: true, forced: force };
+    return { sessionId: id, terminated: true, forced: force, alreadyExited: false };
   }
 
   async listProcesses(limit = 100): Promise<unknown> {
@@ -295,6 +344,13 @@ export class ProcessManager {
       .all(subject);
   }
 
+  shutdown(): void {
+    if (this.shuttingDown) return;
+    this.shuttingDown = true;
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    this.timers.clear();
+  }
+
   private row(id: string, subject: string): ProcessRow {
     const row = this.store.db
       .prepare("SELECT * FROM process_sessions WHERE id=? AND subject=?")
@@ -312,6 +368,16 @@ export class ProcessManager {
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
     return undefined;
+  }
+
+  private async processExists(pid: number): Promise<boolean> {
+    if (!Number.isInteger(pid) || pid <= 0) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "EPERM";
+    }
   }
 
   private async processIdentity(pid: number): Promise<string | undefined> {
