@@ -81,4 +81,27 @@ describe("public ingress watchdog", () => {
       consecutiveFailures: 1,
     });
   });
+
+  it("keeps local ingress ready when public startup returns 502 and records later recovery", async () => {
+    const config = testConfig("C:\\radlina-startup-ingress-test");
+    config.server.publicUrl = "https://device.example.test";
+    let publicStatus = 502;
+    const watchdog = new IngressWatchdog(config, {
+      fetch: async (input) =>
+        new Response(null, {
+          status: String(input).includes("device.example.test") ? publicStatus : 401,
+        }),
+    });
+
+    watchdog.enable();
+    const startup = await watchdog.probe();
+    expect(startup).toMatchObject({ localReady: true, publicReady: false });
+    expect(startup.public).toMatchObject({ statusCode: 502, consecutiveFailures: 1 });
+
+    publicStatus = 401;
+    const recovered = await watchdog.probe();
+    expect(recovered).toMatchObject({ localReady: true, publicReady: true });
+    expect(recovered.public).toMatchObject({ statusCode: 401, consecutiveFailures: 0 });
+    expect(recovered.public.lastSuccessAt).toBeTruthy();
+  });
 });

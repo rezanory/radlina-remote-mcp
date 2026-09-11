@@ -132,7 +132,7 @@ describe("UpgradeManager", () => {
     expect(restarts.count).toBe(3);
   });
 
-  it("automatically rolls back an unconfirmed B release to healthy A", async () => {
+  it("automatically rolls back an unconfirmed B release to healthy A without cascading", async () => {
     const { root, manager } = await fixture("auto-rollback");
     const a = await makeRelease(root, "release-a", "export async function runApp(){}\n");
     const b = await makeRelease(
@@ -146,12 +146,42 @@ describe("UpgradeManager", () => {
     await manager.activate(b.manifest);
     expect(await prepareReleaseBoot()).toMatchObject({ manifest: b.manifest, pending: true });
     const recovered = await prepareReleaseBoot();
-    expect(recovered).toMatchObject({ manifest: a.manifest, pending: true });
-    await confirmReleaseHealthy();
+    expect(recovered).toMatchObject({ manifest: a.manifest, pending: false });
     expect(await readActiveRelease()).toMatchObject({
       manifest: a.manifest,
       pending: false,
+      attempts: 0,
       transition: "AUTO_ROLLBACK",
+    });
+    expect(await prepareReleaseBoot()).toMatchObject({ manifest: a.manifest, pending: false });
+    await expect(manager.verifyPostRestart(a.manifest)).resolves.toMatchObject({
+      status: "PASS",
+      manifest: a.manifest,
+    });
+  });
+
+  it("restores ROOT as a stable baseline after an unconfirmed first release", async () => {
+    const { root, manager } = await fixture("auto-rollback-root");
+    const broken = await makeRelease(
+      root,
+      "release-broken",
+      "export async function runApp(){throw new Error('boom')}\n",
+    );
+    await manager.stage(broken.source, broken.manifest);
+    await manager.activate(broken.manifest);
+    expect(await prepareReleaseBoot()).toMatchObject({ manifest: broken.manifest, pending: true });
+    expect(await prepareReleaseBoot()).toMatchObject({ manifest: ROOT_RELEASE, pending: false });
+    expect(await readActiveRelease()).toMatchObject({
+      manifest: ROOT_RELEASE,
+      previousManifest: ROOT_RELEASE,
+      pending: false,
+      attempts: 0,
+      transition: "AUTO_ROLLBACK",
+    });
+    expect(await prepareReleaseBoot()).toMatchObject({ manifest: ROOT_RELEASE, pending: false });
+    await expect(manager.verifyPostRestart(ROOT_RELEASE)).resolves.toMatchObject({
+      status: "PASS",
+      manifest: ROOT_RELEASE,
     });
   });
 

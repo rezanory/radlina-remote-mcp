@@ -172,26 +172,26 @@ export async function prepareReleaseBoot(): Promise<{
   }
 
   if (active.pending && active.attempts >= 1) {
-    if (active.manifest === ROOT_RELEASE && active.previousManifest === ROOT_RELEASE) {
-      throw new Error("ROOT_RECOVERY_FAILED");
-    }
     const failedManifest = active.manifest;
     const recovered = await resolveReleaseIdentity(active.previousManifest);
+    const recoveredAt = new Date().toISOString();
     active = {
       schema: ACTIVE_RELEASE_SCHEMA,
       manifest: recovered.manifest,
       entry: recovered.entry,
       previousManifest: ROOT_RELEASE,
-      pending: true,
-      attempts: 1,
+      pending: false,
+      attempts: 0,
       transition: "AUTO_ROLLBACK",
-      activatedAt: new Date().toISOString(),
+      activatedAt: recoveredAt,
+      confirmedAt: recoveredAt,
     };
     await writeActiveRelease(active);
     await writeUpgradeJournal({
       status: "AUTO_ROLLBACK_BOOT",
       failedManifest,
       activeManifest: active.manifest,
+      restoredConfirmedBaseline: true,
     });
   } else if (active.pending) {
     active = { ...active, attempts: active.attempts + 1 };

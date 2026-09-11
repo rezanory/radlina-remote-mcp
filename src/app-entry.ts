@@ -2,8 +2,10 @@ import { confirmReleaseHealthy } from "./admin/release-state.js";
 import { createHttpApp } from "./http.js";
 import { closeRuntime, createRuntime } from "./runtime.js";
 
-async function postBindReadiness(
-  runtime: Awaited<ReturnType<typeof createRuntime>>,
+type Runtime = Awaited<ReturnType<typeof createRuntime>>;
+
+export async function postBindReadiness(
+  runtime: Runtime,
   host: string,
   port: number,
 ): Promise<void> {
@@ -21,23 +23,29 @@ async function postBindReadiness(
   if (response.status !== 401) {
     throw new Error(`AUTH_BOUNDARY_SELF_PROBE_FAILED_${response.status}`);
   }
+}
 
+function observeIngress(runtime: Runtime): void {
   runtime.reliability.enableIngressChecks();
-  let readiness = await runtime.reliability.probe("post-bind-ingress", false);
-  const ingressReady = (): boolean =>
-    readiness.ready &&
-    readiness.localReady === true &&
-    readiness.publicReady === true &&
-    readiness.tailscaleReady === true;
-  for (let attempt = 1; attempt < 3 && !ingressReady(); attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, attempt * 750));
-    readiness = await runtime.reliability.probe(`post-bind-ingress-retry-${attempt}`, false);
-  }
-  if (!ingressReady()) {
-    throw new Error(
-      `INGRESS_READINESS_FAILED_local=${String(readiness.localReady)};public=${String(readiness.publicReady)};tailscale=${String(readiness.tailscaleReady)}`,
-    );
-  }
+  void runtime.reliability
+    .probe("post-bind-ingress", false)
+    .then((readiness) => {
+      if (
+        readiness.localReady !== true ||
+        readiness.publicReady !== true ||
+        readiness.tailscaleReady !== true
+      ) {
+        console.error(
+          `[reliability] ingress degraded local=${String(readiness.localReady)};public=${String(readiness.publicReady)};tailscale=${String(readiness.tailscaleReady)}`,
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      console.error(
+        "[reliability] ingress observation failed",
+        error instanceof Error ? error.message : "unknown error",
+      );
+    });
 }
 
 export async function runApp(): Promise<void> {
@@ -53,6 +61,7 @@ export async function runApp(): Promise<void> {
   try {
     await postBindReadiness(runtime, config.server.host, config.server.port);
     await confirmReleaseHealthy();
+    observeIngress(runtime);
     console.error(`[server] listening on ${config.server.host}:${config.server.port}/mcp`);
   } catch (error) {
     console.error(
