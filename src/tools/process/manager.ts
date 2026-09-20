@@ -33,13 +33,17 @@ function quoteCommandArgument(value: string): string {
   // Command shims (.cmd/.bat) must be launched through cmd.exe on Windows.
   // Keep each argument one token so paths with spaces (and ordinary user
   // arguments) cannot be split by the command interpreter.
-  return `"${value.replaceAll('"', '\\\"')}"`;
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function spawnSpec(executable: string, args: string[]): { file: string; args: string[] } {
   const extension = path.win32.extname(executable).toLowerCase();
   if (process.platform === "win32" && (extension === ".cmd" || extension === ".bat")) {
-    const command = [quoteCommandArgument(executable), ...args.map(quoteCommandArgument)].join(" ");
+    const command = [
+      "call",
+      quoteCommandArgument(executable),
+      ...args.map(quoteCommandArgument),
+    ].join(" ");
     return {
       file: process.env["ComSpec"] ?? "cmd.exe",
       args: ["/d", "/s", "/c", command],
