@@ -217,8 +217,8 @@ export function armPendingHealthGate(
   // Cold boots may need to reconcile a large persisted session/audit store and
   // probe local/public ingress before readiness can be confirmed. Keep the
   // fail-safe gate bounded, but long enough to avoid rolling back a healthy
-  // release solely because startup crossed the old 30-second window.
-  timeoutMs = 180_000,
+  // release solely because a cold boot crossed the previous short windows.
+  timeoutMs = 300_000,
 ): NodeJS.Timeout {
   const timer = setTimeout(() => {
     void readActiveRelease()
