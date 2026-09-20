@@ -135,6 +135,7 @@ export class ProcessManager {
         cwd,
         env,
         shell: false,
+        windowsVerbatimArguments: path.win32.basename(command.file).toLowerCase() === "cmd.exe",
         windowsHide: true,
         detached: false,
         stdio: ["pipe", "pipe", "pipe"],
