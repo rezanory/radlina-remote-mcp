@@ -24,7 +24,10 @@ function executableNames(input: string, pathExtValue: string): string[] {
     .map((value) => value.trim())
     .filter(Boolean)
     .map((value) => (value.startsWith(".") ? value : `.${value}`));
-  return [input, ...extensions.map((extension) => `${input}${extension}`)];
+  // Windows does not execute extensionless command shims (for example the
+  // `npm` POSIX shim) through CreateProcess. Prefer PATHEXT candidates and
+  // keep the extensionless path only as a final compatibility fallback.
+  return [...extensions.map((extension) => `${input}${extension}`), input];
 }
 
 async function regularFile(candidate: string): Promise<boolean> {
@@ -50,9 +53,11 @@ export async function resolveWindowsExecutable(
   const candidates: string[] = [];
 
   if (path.win32.isAbsolute(selected)) {
-    candidates.push(path.win32.normalize(selected));
+    const normalized = path.win32.normalize(selected);
+    candidates.push(...executableNames(normalized, pathExtValue));
   } else if (hasSeparator) {
-    candidates.push(path.win32.resolve(cwd, selected));
+    const resolved = path.win32.resolve(cwd, selected);
+    candidates.push(...executableNames(resolved, pathExtValue));
   } else {
     const names = executableNames(selected, pathExtValue);
     for (const rawDirectory of pathValue.split(";")) {
