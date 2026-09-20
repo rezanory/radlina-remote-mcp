@@ -29,6 +29,25 @@ type ProcessRow = {
   start_identity: string;
 };
 
+function quoteCommandArgument(value: string): string {
+  // Command shims (.cmd/.bat) must be launched through cmd.exe on Windows.
+  // Keep each argument one token so paths with spaces (and ordinary user
+  // arguments) cannot be split by the command interpreter.
+  return `"${value.replaceAll('"', '\\\"')}"`;
+}
+
+function spawnSpec(executable: string, args: string[]): { file: string; args: string[] } {
+  const extension = path.win32.extname(executable).toLowerCase();
+  if (process.platform === "win32" && (extension === ".cmd" || extension === ".bat")) {
+    const command = [quoteCommandArgument(executable), ...args.map(quoteCommandArgument)].join(" ");
+    return {
+      file: process.env["ComSpec"] ?? "cmd.exe",
+      args: ["/d", "/s", "/c", command],
+    };
+  }
+  return { file: executable, args };
+}
+
 export class ProcessManager {
   private readonly children = new Map<string, ChildProcess>();
   private readonly timers = new Map<string, NodeJS.Timeout>();
@@ -106,8 +125,9 @@ export class ProcessManager {
     const outputHandle = await open(outputPath, "wx", 0o600);
     const output = outputHandle.createWriteStream({ autoClose: true });
     let child: ChildProcess;
+    const command = spawnSpec(executable, input.args);
     try {
-      child = spawn(executable, input.args, {
+      child = spawn(command.file, command.args, {
         cwd,
         env,
         shell: false,
