@@ -43,7 +43,7 @@ export async function runApp(): Promise<void> {
       error instanceof Error ? error.message : "unknown error",
     );
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    closeRuntime(runtime);
+    await closeRuntime(runtime);
     throw error;
   }
   let stopping = false;
@@ -52,8 +52,17 @@ export async function runApp(): Promise<void> {
     stopping = true;
     console.error(`[server] shutting down after ${signal}`);
     server.close(() => {
-      closeRuntime(runtime);
-      process.exitCode = 0;
+      void closeRuntime(runtime)
+        .then(() => {
+          process.exitCode = 0;
+        })
+        .catch((error: unknown) => {
+          console.error(
+            "[server] graceful shutdown failed",
+            error instanceof Error ? error.message : "unknown error",
+          );
+          process.exitCode = 1;
+        });
     });
     setTimeout(() => {
       console.error("[server] forced shutdown after grace period");

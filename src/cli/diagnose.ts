@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     );
     if (!audit.valid) process.exitCode = 1;
   } finally {
-    closeRuntime(runtime);
+    await closeRuntime(runtime);
   }
 }
 

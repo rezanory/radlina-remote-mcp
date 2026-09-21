@@ -4,11 +4,15 @@ import { stat } from "node:fs/promises";
 import { UpgradeManager } from "./admin/upgrade.js";
 import { AuditChain } from "./audit/chain.js";
 import { AuthService } from "./auth/service.js";
+import { createBuiltinComponents } from "./components/builtin.js";
+import { CapabilityRegistry } from "./components/registry.js";
 import { configPath, loadConfig } from "./config/index.js";
 import type { AppConfig } from "./config/schema.js";
+import { OperatorManager } from "./operator/manager.js";
 import { Store } from "./persistence/store.js";
 import { PolicyEngine } from "./policy/engine.js";
 import { ToolRuntime } from "./policy/runtime.js";
+import { ReliabilitySupervisor } from "./reliability/supervisor.js";
 import { FilesystemService } from "./tools/filesystem/service.js";
 import { ProcessManager } from "./tools/process/manager.js";
 import { SearchManager } from "./tools/search/manager.js";
@@ -25,6 +29,9 @@ export type AppRuntime = {
   searches: SearchManager;
   processes: ProcessManager;
   upgrades: UpgradeManager;
+  components: CapabilityRegistry;
+  operator: OperatorManager;
+  reliability: ReliabilitySupervisor;
   startedAt: number;
 };
 
@@ -32,6 +39,7 @@ export async function createRuntime(
   explicitConfigPath?: string,
   options: { reconcileSessions?: boolean } = {},
 ): Promise<AppRuntime> {
+  const startedAt = Date.now();
   const config = await loadConfig(explicitConfigPath);
   const configFile = explicitConfigPath ?? configPath();
   const ripgrep = await stat(config.dependencies.ripgrepExecutable);
@@ -67,10 +75,29 @@ export async function createRuntime(
     configFile,
     UpgradeManager.productionRestart(configFile),
   );
+  const components = new CapabilityRegistry();
+  for (const component of createBuiltinComponents({
+    config,
+    filesystems,
+    processes,
+    startedAt,
+  })) {
+    components.register(component);
+  }
+  components.register({
+    id: "radlina.operator",
+    version: "2.0.0",
+    description: "Durable deterministic Smart Operator orchestration engine.",
+    capabilities: [],
+  });
+  const operator = new OperatorManager(store, policy, components);
+  const reliability = new ReliabilitySupervisor(config, store, audit, auth, searches, processes);
   if (options.reconcileSessions !== false) {
     searches.reconcile();
     await processes.reconcile();
+    operator.reconcile();
   }
+  await reliability.start(options.reconcileSessions !== false);
   return {
     config,
     configFile,
@@ -83,10 +110,16 @@ export async function createRuntime(
     searches,
     processes,
     upgrades,
-    startedAt: Date.now(),
+    components,
+    operator,
+    reliability,
+    startedAt,
   };
 }
 
-export function closeRuntime(runtime: AppRuntime): void {
+export async function closeRuntime(runtime: AppRuntime): Promise<void> {
+  runtime.reliability.stop();
+  await runtime.operator.shutdown();
+  await Promise.all([runtime.searches.shutdown(), runtime.processes.shutdown()]);
   runtime.store.close();
 }

@@ -2,6 +2,14 @@
 
 Self-hosted MCP server for `LAPTOP-13QINEIF`. It exposes a loopback-only Streamable HTTP endpoint, performs OAuth 2.1-style authorization with PKCE and one-time local owner enrollment, applies per-tool scopes and workspace policies, persists refresh and tool sessions in SQLite, and writes a tamper-evident redacted audit chain.
 
+## V2 Smart Operator development line
+
+This branch is the independent Radlina V2 line derived from immutable Golden V1 SHA `75a13f06d66c0979260b574c546119f4dc8e80b7`. V1 is not modified in place.
+
+V2 M01 adds a component/capability registry and a durable deterministic Smart Operator. Initial operator capabilities are `device.health`, `filesystem.info`, and verified `process.exec`. Plans are policy-preflighted, persisted before execution, audited through the existing MCP tool boundary, and automatically retried only when the capability explicitly declares idempotency. Structured operator inputs/results/errors are DPAPI-protected at rest and input integrity is verified before execution. Unknown non-idempotent outcomes fail closed after interruption.
+
+Use `list_components`, `list_capabilities`, `operator_submit`, `operator_status`, `operator_recent`, `operator_resume`, and `operator_cancel` through MCP. See `docs/architecture/ADR-004-v2-component-smart-operator.md` for the architecture and dependency review.
+
 ## Secure local build
 
 Run in PowerShell:

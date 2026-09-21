@@ -59,6 +59,21 @@ export const configSchema = z
       maxSearchRuntimeMs: positiveInt.max(3600 * 1000).default(120_000),
       maxSessions: positiveInt.max(256).default(12),
     }),
+    reliability: z
+      .strictObject({
+        enabled: z.boolean().default(true),
+        probeIntervalMs: positiveInt.min(5_000).max(300_000).default(30_000),
+        failureThreshold: positiveInt.min(1).max(10).default(3),
+        auditVerifyIntervalMs: positiveInt.min(30_000).max(3_600_000).default(300_000),
+        eventRetention: positiveInt.min(100).max(10_000).default(2_000),
+      })
+      .default({
+        enabled: true,
+        probeIntervalMs: 30_000,
+        failureThreshold: 3,
+        auditVerifyIntervalMs: 300_000,
+        eventRetention: 2_000,
+      }),
     dependencies: z.strictObject({
       ripgrepExecutable: absoluteWindowsPath,
     }),

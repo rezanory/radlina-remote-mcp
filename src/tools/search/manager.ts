@@ -36,6 +36,7 @@ type SessionRow = {
 
 export class SearchManager {
   private readonly running = new Map<string, ChildProcess>();
+  private readonly settlements = new Map<string, Promise<void>>();
   private readonly directory: string;
 
   constructor(
@@ -49,6 +50,37 @@ export class SearchManager {
     this.store.db
       .prepare("UPDATE search_sessions SET status='interrupted',ended_at=? WHERE status='running'")
       .run(Date.now());
+  }
+
+  reconcileStale(): { interrupted: number } {
+    const rows = this.store.db
+      .prepare("SELECT id FROM search_sessions WHERE status='running'")
+      .all() as Array<{ id: string }>;
+    let interrupted = 0;
+    for (const row of rows) {
+      if (this.running.has(row.id)) continue;
+      const updated = this.store.db
+        .prepare(
+          "UPDATE search_sessions SET status='interrupted',ended_at=? WHERE id=? AND status='running'",
+        )
+        .run(Date.now(), row.id);
+      interrupted += Number(updated.changes);
+    }
+    return { interrupted };
+  }
+
+  async shutdown(): Promise<void> {
+    const active = [...this.running.entries()];
+    const now = Date.now();
+    for (const [id, child] of active) {
+      this.store.db
+        .prepare(
+          "UPDATE search_sessions SET status='interrupted',ended_at=? WHERE id=? AND status='running'",
+        )
+        .run(now, id);
+      if (!child.killed) child.kill("SIGTERM");
+    }
+    await Promise.all([...this.settlements.values()]);
   }
 
   async start(
@@ -129,26 +161,37 @@ export class SearchManager {
     });
     const timer = setTimeout(() => child.kill("SIGTERM"), this.config.policy.maxSearchRuntimeMs);
     timer.unref();
-    child.on("error", () => {
-      clearTimeout(timer);
-      output.end();
-      this.running.delete(id);
-      this.store.db
-        .prepare("UPDATE search_sessions SET status='error',ended_at=? WHERE id=?")
-        .run(Date.now(), id);
+    let settleSearch: () => void = () => undefined;
+    const settlement = new Promise<void>((resolve) => {
+      settleSearch = resolve;
     });
-    child.on("close", (code) => {
+    this.settlements.set(id, settlement);
+    let finalized = false;
+    const finalize = (status: string, code: number | null): void => {
+      if (finalized) return;
+      finalized = true;
       clearTimeout(timer);
-      output.end();
+      lines.close();
       this.running.delete(id);
+      output.end(() => {
+        try {
+          this.store.db
+            .prepare(
+              "UPDATE search_sessions SET status=?,ended_at=?,exit_code=? WHERE id=? AND status='running'",
+            )
+            .run(status, Date.now(), code, id);
+          if (stderr) this.store.set(`search:${id}:stderr`, stderr.slice(0, 512));
+          this.store.set(`search:${id}:count`, String(count));
+        } finally {
+          this.settlements.delete(id);
+          settleSearch();
+        }
+      });
+    };
+    child.on("error", () => finalize("error", null));
+    child.on("close", (code) => {
       const status = code === 0 || code === 1 || count >= maxResults ? "complete" : "error";
-      this.store.db
-        .prepare(
-          "UPDATE search_sessions SET status=?,ended_at=?,exit_code=? WHERE id=? AND status='running'",
-        )
-        .run(status, Date.now(), code, id);
-      if (stderr) this.store.set(`search:${id}:stderr`, stderr.slice(0, 512));
-      this.store.set(`search:${id}:count`, String(count));
+      finalize(status, code);
     });
     return {
       searchId: id,

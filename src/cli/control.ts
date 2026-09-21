@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     }
     usage();
   } finally {
-    closeRuntime(runtime);
+    await closeRuntime(runtime);
   }
 }
 

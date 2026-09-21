@@ -166,6 +166,13 @@ async function main(): Promise<void> {
       maxSearchRuntimeMs: 15_000,
       maxSessions: 16,
     },
+    reliability: {
+      enabled: true,
+      probeIntervalMs: 30_000,
+      failureThreshold: 2,
+      auditVerifyIntervalMs: 30_000,
+      eventRetention: 500,
+    },
     dependencies: {
       ripgrepExecutable:
         "C:\\radlina-remote-mcp\\.runtime\\ripgrep-15.2.0-x86_64-pc-windows-msvc\\rg.exe",
@@ -312,7 +319,7 @@ async function main(): Promise<void> {
   } finally {
     await client.close();
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    closeRuntime(runtime);
+    await closeRuntime(runtime);
     await rm(root, { recursive: true, force: true });
   }
 }

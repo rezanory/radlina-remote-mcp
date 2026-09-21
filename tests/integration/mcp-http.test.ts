@@ -87,9 +87,16 @@ describe("Streamable HTTP MCP", () => {
       await client.connect(transport);
       expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
       const tools = await client.listTools();
-      expect(tools.tools).toHaveLength(43);
+      expect(tools.tools).toHaveLength(50);
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
       for (const required of [
+        "list_components",
+        "list_capabilities",
+        "operator_submit",
+        "operator_status",
+        "operator_recent",
+        "operator_resume",
+        "operator_cancel",
         "admin_stage_release",
         "admin_verify_release",
         "admin_upgrade_preflight",
@@ -166,7 +173,7 @@ describe("Streamable HTTP MCP", () => {
       await reconnectClient?.close();
       await client.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      closeRuntime(runtime);
+      await closeRuntime(runtime);
     }
   }, 60_000);
 });

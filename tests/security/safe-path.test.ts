@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -26,7 +26,7 @@ describe("SafePathResolver", () => {
     await writeFile(path.join(root, "ok.txt"), "ok");
     const resolver = new SafePathResolver([root]);
     await expect(resolver.resolve("ok.txt", { mustExist: true })).resolves.toBe(
-      path.join(root, "ok.txt"),
+      await realpath(path.join(root, "ok.txt")),
     );
     await expect(resolver.resolve("..\\escape.txt", { mustExist: false })).rejects.toMatchObject({
       code: "INVALID_PATH",

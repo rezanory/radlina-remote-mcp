@@ -25,3 +25,14 @@ Hashes and download origins are pinned in `third_party/runtime-manifest.json`.
 - `microsoft/markitdown`: optional future document extraction after core acceptance.
 
 No hosted Desktop Commander relay code, Supergateway server, FastMCP server, Cloudflare provider, or MarkItDown code is incorporated in this build.
+
+## V2 Smart Operator architecture review
+
+The following projects were reviewed for V2 workflow/orchestration design and are not runtime dependencies or copied source:
+
+- `temporalio/sdk-typescript` and Temporal durable execution documentation: durability/retry reference; not adopted for V2 M01.
+- `statelyai/xstate` v5: state-machine/actor architecture reference; not adopted for V2 M01.
+- `taskforcesh/bullmq`: distributed Redis-backed queue reference; not adopted because M01 does not require Redis.
+- Official Model Context Protocol Tasks extension and TypeScript SDK roadmap: interoperability reference; Radlina keeps its own durable SQLite boundary until the Tasks extension used by the official SDK is suitable for production adoption.
+
+V2 M01 adds no new npm runtime dependency.

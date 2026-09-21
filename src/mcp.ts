@@ -8,6 +8,7 @@ import { validateConfig } from "./config/index.js";
 import { AppError } from "./errors.js";
 import type { Risk } from "./policy/engine.js";
 import type { AppRuntime } from "./runtime.js";
+import { PRODUCT_GENERATION, SERVER_VERSION } from "./version.js";
 
 type ToolContext = { http?: { authInfo?: AuthInfo }; signal?: AbortSignal };
 type ToolOptions = {
@@ -25,6 +26,17 @@ const pathInput = z.string().min(1).max(32_768);
 const sessionIdInput = z.string().uuid();
 const releaseManifestInput = z.string().regex(/^[0-9a-f]{64}$/i);
 const releaseIdentityInput = z.union([releaseManifestInput, z.literal("ROOT")]);
+const operatorJobIdInput = z.string().uuid();
+const operatorStepInput = z.object({
+  id: z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z][A-Za-z0-9._-]{0,63}$/u),
+  capability: z.string().min(1).max(100),
+  input: z.record(z.string(), z.unknown()).default({}),
+  maxAttempts: z.number().int().min(1).max(3).default(1),
+});
 
 function subject(context: ToolContext): string {
   const candidate = context.http?.authInfo?.extra?.["sub"];
@@ -82,7 +94,7 @@ const destructiveAnnotations = {
 };
 
 export function buildMcpServer(runtime: AppRuntime): McpServer {
-  const server = new McpServer({ name: "radlina-remote-mcp", version: "0.2.2" });
+  const server = new McpServer({ name: "radlina-remote-mcp", version: SERVER_VERSION });
 
   server.registerTool(
     "who_am_i",
@@ -149,7 +161,11 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
             "diagnostics",
             "upgrade",
             "trusted-owner",
+            "components",
+            "operator",
           ],
+          generation: PRODUCT_GENERATION,
+          componentCount: runtime.components.listComponents().length,
           limits: runtime.config.policy,
           trustedOwner:
             runtime.config.profiles[runtime.config.policy.defaultProfile]?.allowShell === true,
@@ -186,13 +202,166 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     },
     (_args, context) =>
       execute(runtime, context, {}, { tool: "version", scope: "device:read" }, async () => ({
-        server: "0.2.2",
+        server: SERVER_VERSION,
+        generation: PRODUCT_GENERATION,
         node: process.version,
         protocol: "2026-07-28",
         activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
         trustedOwner:
           runtime.config.profiles[runtime.config.policy.defaultProfile]?.allowShell === true,
       })),
+  );
+
+  server.registerTool(
+    "list_components",
+    {
+      description: "List installed Radlina components and the capability IDs they provide.",
+      inputSchema: z.object({}),
+      annotations: readAnnotations,
+    },
+    (_args, context) =>
+      execute(
+        runtime,
+        context,
+        {},
+        { tool: "list_components", scope: "device:read" },
+        async () => ({
+          components: runtime.components.listComponents(),
+        }),
+      ),
+  );
+  server.registerTool(
+    "list_capabilities",
+    {
+      description: "List executable component capabilities and their policy metadata.",
+      inputSchema: z.object({}),
+      annotations: readAnnotations,
+    },
+    (_args, context) =>
+      execute(
+        runtime,
+        context,
+        {},
+        { tool: "list_capabilities", scope: "device:read" },
+        async () => ({
+          capabilities: runtime.components.listCapabilities(),
+        }),
+      ),
+  );
+  server.registerTool(
+    "operator_submit",
+    {
+      description:
+        "Submit a deterministic, policy-preflighted operator plan for durable step-by-step execution.",
+      inputSchema: z.object({
+        title: z.string().min(1).max(128),
+        profile: profileInput,
+        steps: z.array(operatorStepInput).min(1).max(16),
+        idempotencyKey: idempotencyInput,
+      }),
+      annotations: writeAnnotations,
+    },
+    ({ title, profile, steps, idempotencyKey }, context) => {
+      const selected = selectedProfile(runtime, profile);
+      const plan = { title, steps };
+      return execute(
+        runtime,
+        context,
+        { title, profile: selected.name, steps },
+        {
+          tool: "operator_submit",
+          scope: "admin",
+          profile: selected.name,
+          risk: "high",
+          idempotencyKey,
+          auditArgs: {
+            title,
+            profile: selected.name,
+            steps: steps.map((step) => ({
+              id: step.id,
+              capability: step.capability,
+              maxAttempts: step.maxAttempts,
+              input: "[redacted]",
+            })),
+          },
+        },
+        async () =>
+          runtime.operator.submit(context.http?.authInfo, subject(context), selected.name, plan),
+      );
+    },
+  );
+  server.registerTool(
+    "operator_status",
+    {
+      description: "Return the durable state and step receipts for one caller-owned operator job.",
+      inputSchema: z.object({ jobId: operatorJobIdInput }),
+      annotations: readAnnotations,
+    },
+    ({ jobId }, context) =>
+      execute(runtime, context, { jobId }, { tool: "operator_status", scope: "admin" }, async () =>
+        runtime.operator.status(subject(context), jobId),
+      ),
+  );
+  server.registerTool(
+    "operator_recent",
+    {
+      description: "List recent caller-owned operator jobs with durable step receipts.",
+      inputSchema: z.object({ limit: z.number().int().min(1).max(100).default(20) }),
+      annotations: readAnnotations,
+    },
+    ({ limit }, context) =>
+      execute(
+        runtime,
+        context,
+        { limit },
+        { tool: "operator_recent", scope: "admin" },
+        async () => ({
+          jobs: await runtime.operator.recent(subject(context), limit),
+        }),
+      ),
+  );
+  server.registerTool(
+    "operator_resume",
+    {
+      description:
+        "Resume a failed/interrupted operator job only when every replayed step is explicitly idempotent.",
+      inputSchema: z.object({ jobId: operatorJobIdInput, idempotencyKey: idempotencyInput }),
+      annotations: writeAnnotations,
+    },
+    ({ jobId, idempotencyKey }, context) =>
+      execute(
+        runtime,
+        context,
+        { jobId },
+        {
+          tool: "operator_resume",
+          scope: "admin",
+          risk: "high",
+          idempotencyKey,
+        },
+        async () => runtime.operator.resume(context.http?.authInfo, subject(context), jobId),
+      ),
+  );
+  server.registerTool(
+    "operator_cancel",
+    {
+      description: "Request cancellation of one caller-owned operator job.",
+      inputSchema: z.object({ jobId: operatorJobIdInput, idempotencyKey: idempotencyInput }),
+      annotations: destructiveAnnotations,
+    },
+    ({ jobId, idempotencyKey }, context) =>
+      execute(
+        runtime,
+        context,
+        { jobId },
+        {
+          tool: "operator_cancel",
+          scope: "admin",
+          risk: "high",
+          idempotencyKey,
+        },
+        async () => runtime.operator.cancel(subject(context), jobId),
+      ),
   );
 
   server.registerTool(

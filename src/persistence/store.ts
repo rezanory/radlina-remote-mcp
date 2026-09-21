@@ -9,6 +9,7 @@ type IdempotencyClaimRow = { key: string; subject: string; tool: string; args_ha
 
 export class Store {
   readonly db: DatabaseSync;
+  private open = true;
 
   constructor(directory: string) {
     mkdirSync(directory, { recursive: true });
@@ -74,10 +75,32 @@ export class Store {
         query_json TEXT NOT NULL, result_path TEXT NOT NULL, status TEXT NOT NULL,
         started_at INTEGER NOT NULL, ended_at INTEGER, exit_code INTEGER
       );
+      CREATE TABLE IF NOT EXISTS reliability_events (
+        event_id TEXT PRIMARY KEY, created_at INTEGER NOT NULL, kind TEXT NOT NULL,
+        status TEXT NOT NULL, details_json TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS errors (
         correlation_id TEXT PRIMARY KEY, code TEXT NOT NULL, message TEXT NOT NULL,
         detail_json TEXT NOT NULL, created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS operator_jobs (
+        id TEXT PRIMARY KEY, subject TEXT NOT NULL, profile TEXT NOT NULL, title TEXT NOT NULL,
+        status TEXT NOT NULL, cancel_requested INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+        started_at INTEGER, ended_at INTEGER
+      );
+      CREATE TABLE IF NOT EXISTS operator_steps (
+        job_id TEXT NOT NULL, step_id TEXT NOT NULL, ordinal INTEGER NOT NULL,
+        capability TEXT NOT NULL, input_protected TEXT NOT NULL, input_sha256 TEXT NOT NULL,
+        status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, max_attempts INTEGER NOT NULL,
+        result_protected TEXT, error_protected TEXT, started_at INTEGER, ended_at INTEGER,
+        PRIMARY KEY(job_id, step_id), UNIQUE(job_id, ordinal),
+        FOREIGN KEY(job_id) REFERENCES operator_jobs(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS operator_jobs_subject_created
+        ON operator_jobs(subject, created_at DESC);
+      CREATE INDEX IF NOT EXISTS operator_steps_job_ordinal
+        ON operator_steps(job_id, ordinal);
     `);
     const refreshColumns = new Set(
       (this.db.prepare("PRAGMA table_info(oauth_refresh)").all() as Array<{ name: string }>).map(
@@ -174,7 +197,13 @@ export class Store {
     return Number(result.changes) === 1;
   }
 
+  isOpen(): boolean {
+    return this.open;
+  }
+
   close(): void {
+    if (!this.open) return;
+    this.open = false;
     this.db.close();
   }
 }

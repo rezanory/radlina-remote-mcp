@@ -97,7 +97,7 @@ describe("HTTP security boundary", () => {
       expect(independentRegistration.status).toBe(201);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
-      closeRuntime(runtime);
+      await closeRuntime(runtime);
     }
   }, 60_000);
 });
