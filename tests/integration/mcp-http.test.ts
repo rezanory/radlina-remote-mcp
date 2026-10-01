@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { AddressInfo } from "node:net";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
@@ -16,6 +17,17 @@ import { issueToken } from "../helpers/oauth.js";
 
 const cleanup: string[] = [];
 const execFile = promisify(execFileCallback);
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const inspectorLauncher = path.join(
+  projectRoot,
+  "node_modules",
+  "@modelcontextprotocol",
+  "inspector",
+  "clients",
+  "launcher",
+  "build",
+  "index.js",
+);
 
 afterEach(async () => {
   for (const directory of cleanup.splice(0)) await rm(directory, { recursive: true, force: true });
@@ -60,7 +72,7 @@ describe("Streamable HTTP MCP", () => {
       const inspector = await execFile(
         process.execPath,
         [
-          "node_modules/@modelcontextprotocol/inspector/clients/launcher/build/index.js",
+          inspectorLauncher,
           "--cli",
           "--config",
           inspectorConfig,
@@ -73,7 +85,7 @@ describe("Streamable HTTP MCP", () => {
           "json",
         ],
         {
-          cwd: "C:\\radlina-remote-mcp",
+          cwd: projectRoot,
           timeout: 20_000,
           maxBuffer: 2 * 1024 * 1024,
           windowsHide: true,

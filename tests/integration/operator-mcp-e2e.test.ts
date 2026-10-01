@@ -29,8 +29,13 @@ function envelope(result: Awaited<ReturnType<Client["callTool"]>>): Record<strin
   return parsed.result as Record<string, unknown>;
 }
 
+function operatorPollDelay(attempt: number): number {
+  // Keep E2E polling inside the real 60 req/min token-bucket budget even when jobs are slow.
+  return Math.min(1_000, 50 * 2 ** Math.min(attempt, 5));
+}
+
 async function waitForOperator(client: Client, jobId: string): Promise<Record<string, unknown>> {
-  for (let attempt = 0; attempt < 600; attempt += 1) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
     const response = await client.callTool({
       name: "operator_status",
       arguments: { jobId },
@@ -38,7 +43,7 @@ async function waitForOperator(client: Client, jobId: string): Promise<Record<st
     expect(response.isError).not.toBe(true);
     const result = envelope(response);
     if (!["queued", "running"].includes(String(result["status"]))) return result;
-    await new Promise((resolve) => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, operatorPollDelay(attempt)));
   }
   throw new Error("operator MCP job did not reach a terminal state");
 }
@@ -197,12 +202,12 @@ describe("V2 Smart Operator live MCP E2E", () => {
       );
       const slowJobId = String(slow["jobId"]);
 
-      for (let attempt = 0; attempt < 200; attempt += 1) {
+      for (let attempt = 0; attempt < 30; attempt += 1) {
         const snapshot = envelope(
           await client.callTool({ name: "operator_status", arguments: { jobId: slowJobId } }),
         );
         if (snapshot["status"] === "running") break;
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, operatorPollDelay(attempt)));
       }
 
       const cancelled = await client.callTool({
