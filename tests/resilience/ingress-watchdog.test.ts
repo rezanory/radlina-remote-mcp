@@ -4,6 +4,31 @@ import { IngressWatchdog } from "../../src/reliability/ingress.js";
 import { testConfig } from "../helpers/config.js";
 
 describe("public ingress watchdog", () => {
+  it("retries transient public failures before declaring the public ingress down", async () => {
+    const config = testConfig("C:\\radlina-ingress-retry-test");
+    config.server.publicUrl = "https://device.example.test";
+    let publicAttempts = 0;
+    const watchdog = new IngressWatchdog(config, {
+      fetch: async (input) => {
+        if (String(input).includes("device.example.test")) {
+          publicAttempts += 1;
+          if (publicAttempts < 3) {
+            throw new Error("simulated transient public ingress failure");
+          }
+        }
+        return new Response(null, { status: 401 });
+      },
+    });
+
+    watchdog.enable();
+    const snapshot = await watchdog.probe();
+
+    expect(snapshot).toMatchObject({ localReady: true, publicReady: true });
+    expect(snapshot.public.consecutiveFailures).toBe(0);
+    expect(snapshot.public.detail).toContain("after 3 attempts");
+    expect(publicAttempts).toBe(3);
+  });
+
   it("tracks LOCAL_READY and PUBLIC_READY independently with bounded failure telemetry", async () => {
     const config = testConfig("C:\\radlina-ingress-test");
     config.server.publicUrl = "https://device.example.test";

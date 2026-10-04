@@ -166,39 +166,55 @@ export class IngressWatchdog {
     const state = target === "local" ? this.localState : this.publicState;
     const attemptedAt = new Date().toISOString();
     const started = performance.now();
-    try {
-      const response = await this.fetcher(url, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: "{}",
-        redirect: "manual",
-        signal: AbortSignal.timeout(5_000),
-      });
-      const latencyMs = Math.max(0, Math.round(performance.now() - started));
-      const ready = response.status === 401;
-      state.ready = ready;
-      state.lastAttemptAt = attemptedAt;
-      state.latencyMs = latencyMs;
-      state.statusCode = response.status;
-      state.detail = ready
-        ? "auth boundary reachable (401)"
-        : `unexpected HTTP status ${response.status}`;
-      if (ready) {
-        state.lastSuccessAt = attemptedAt;
-        state.consecutiveFailures = 0;
-      } else {
-        state.lastFailureAt = attemptedAt;
-        state.consecutiveFailures += 1;
+    const maxAttempts = target === "public" ? 3 : 1;
+    let lastStatusCode: number | null = null;
+    let lastDetail = "probe failed";
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const response = await this.fetcher(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: "{}",
+          redirect: "manual",
+          signal: AbortSignal.timeout(5_000),
+        });
+        lastStatusCode = response.status;
+
+        if (response.status === 401) {
+          state.ready = true;
+          state.lastAttemptAt = attemptedAt;
+          state.lastSuccessAt = attemptedAt;
+          state.latencyMs = Math.max(0, Math.round(performance.now() - started));
+          state.statusCode = response.status;
+          state.detail =
+            attempt === 1
+              ? "auth boundary reachable (401)"
+              : `auth boundary reachable (401) after ${attempt} attempts`;
+          state.consecutiveFailures = 0;
+          return;
+        }
+
+        lastDetail = `unexpected HTTP status ${response.status}`;
+      } catch (error) {
+        lastStatusCode = null;
+        lastDetail = boundedDetail(error);
       }
-    } catch (error) {
-      state.ready = false;
-      state.lastAttemptAt = attemptedAt;
-      state.lastFailureAt = attemptedAt;
-      state.latencyMs = Math.max(0, Math.round(performance.now() - started));
-      state.statusCode = null;
-      state.detail = boundedDetail(error);
-      state.consecutiveFailures += 1;
+
+      if (attempt < maxAttempts) {
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, 150);
+        });
+      }
     }
+
+    state.ready = false;
+    state.lastAttemptAt = attemptedAt;
+    state.lastFailureAt = attemptedAt;
+    state.latencyMs = Math.max(0, Math.round(performance.now() - started));
+    state.statusCode = lastStatusCode;
+    state.detail = maxAttempts === 1 ? lastDetail : `${lastDetail}; attempts=${maxAttempts}`;
+    state.consecutiveFailures += 1;
   }
 
   private async probeTailscale(): Promise<void> {
