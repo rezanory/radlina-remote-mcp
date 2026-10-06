@@ -65,7 +65,11 @@ export function createHttpApp(runtime: AppRuntime): Express {
   );
   runtime.auth.install(app);
 
-  const mcpHandler = createMcpHandler(() => buildMcpServer(runtime), { legacy: "reject" });
+  let mcpHandler: ReturnType<typeof createMcpHandler>;
+  mcpHandler = createMcpHandler(
+    () => buildMcpServer(runtime, () => mcpHandler.notify.toolsChanged()),
+    { legacy: "reject" },
+  );
   const nodeHandler = toNodeHandler(mcpHandler);
   const bearer = requireBearerAuth({
     verifier: runtime.auth,

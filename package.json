@@ -1,6 +1,6 @@
 {
   "name": "radlina-remote-mcp",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.2",
   "private": true,
   "description": "Secure self-hosted Remote MCP server for a Windows workstation",
   "type": "module",

@@ -93,7 +93,10 @@ const destructiveAnnotations = {
   openWorldHint: false,
 };
 
-export function buildMcpServer(runtime: AppRuntime): McpServer {
+export function buildMcpServer(
+  runtime: AppRuntime,
+  notifyToolsChanged?: () => void,
+): McpServer {
   const server = new McpServer({ name: "radlina-remote-mcp", version: SERVER_VERSION });
 
   server.registerTool(
@@ -143,8 +146,9 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
       inputSchema: z.object({}),
       annotations: readAnnotations,
     },
-    (_args, context) =>
-      execute(
+    (_args, context) => {
+      notifyToolsChanged?.();
+      return execute(
         runtime,
         context,
         {},
@@ -178,7 +182,8 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
           sessionRebindSupport: true,
           activeReleaseManifest: process.env["RADLINA_ACTIVE_RELEASE_MANIFEST"] ?? "ROOT",
         }),
-      ),
+      );
+    },
   );
   server.registerTool(
     "health",
