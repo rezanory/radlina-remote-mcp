@@ -1,0 +1,5 @@
+# Canonical governance artifacts are hash-addressed; preserve LF bytes across platforms.
+.gitattributes text eol=lf
+governance/radlinaremote-workflow/** text eol=lf
+VERSIONING.md text eol=lf
+docs/LOCAL_LAYOUT.md text eol=lf

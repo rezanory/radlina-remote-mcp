@@ -1,0 +1,25 @@
+{
+  "schema_version": "radlina.remote-mcp.project-adoption/v1",
+  "project": "rezanory/radlina-remote-mcp",
+  "adopted_at": "2026-10-07",
+  "csew": {
+    "version": "3.1.5",
+    "path": "rezanory/chat_assistant/governance/csew/v3.1.5",
+    "workflow_sha256": "fe48231026cdcd8ed75def9d2c6fa17fd20eb772f8db8faad663d2a05b7d6818",
+    "manifest_sha256": "341d9a3080400b5145cd57915954adf547e536d196215b9598be99f3e0662015",
+    "adoption_is_explicit": true
+  },
+  "project_workflow": {
+    "id": "RADLINA-REMOTE-MCP-WORKFLOW",
+    "short_name": "RRMW",
+    "version": "1.0.0"
+  },
+  "product_baseline": {
+    "version": "2.0.0-alpha.2",
+    "branch": "generation/v2-smart-operator",
+    "commit": "df9d005c49e8f4ceb25105a81e33236f44543e54",
+    "tree": "10bd0e7a0022987550b96795cdd1e9013e9975e2",
+    "active_release_manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "verdict": "REAL_PRODUCTION_READY"
+  }
+}

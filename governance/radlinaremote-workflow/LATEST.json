@@ -1,0 +1,14 @@
+{
+  "schema_version": "rrmw.latest/v1",
+  "document_id": "RADLINA-REMOTE-MCP-WORKFLOW",
+  "version": "1.0.0",
+  "path": "governance/radlinaremote-workflow/v1.0.0",
+  "workflow_file": "RADLINA_REMOTE_MCP_WORKFLOW_v1.0.0.md",
+  "workflow_sha256": "4d37836a3d2c2158471b45aa066e2a38c1d07359071996cf8b0c1912f5b14f04",
+  "manifest_file": "RADLINA_REMOTE_MCP_WORKFLOW_v1.0.0.manifest.json",
+  "manifest_sha256": "b9f70a697bf977d499afb785282861a2ac0b882ff9c8ce4543dae8d51bee4f90",
+  "adopted_csew_version": "3.1.5",
+  "adopted_csew_workflow_sha256": "fe48231026cdcd8ed75def9d2c6fa17fd20eb772f8db8faad663d2a05b7d6818",
+  "product_baseline_version": "2.0.0-alpha.2",
+  "product_baseline_commit": "df9d005c49e8f4ceb25105a81e33236f44543e54"
+}

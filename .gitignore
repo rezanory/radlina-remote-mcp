@@ -19,3 +19,4 @@ config/local.yaml
 !.env.example
 evidence/PH-01/P001/*.raw
 reports/PH-01/npm-audit.json
+.local/
