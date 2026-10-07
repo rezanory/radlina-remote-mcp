@@ -1,0 +1,82 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-W08-WORKFLOW-RUNTIME-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "component": {
+    "id": "W08",
+    "name": "workflow.runtime"
+  },
+  "source_baseline": {
+    "canonical_commit": "5ba1a796d1353c3579eb42576bfeae3bbe683df0",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "validated_branch": "generation/v3-w08-workflow-runtime",
+  "validated_sha": "7cdc7d391bc67d6ed968a80cf935427c729874fa",
+  "github_actions": {
+    "run_id": 37704637205,
+    "job_id": 113075971360,
+    "runner": "windows-latest",
+    "node": "24.20.0",
+    "conclusion": "success"
+  },
+  "gates": {
+    "typecheck": "PASS",
+    "affected_unit": {
+      "status": "PASS",
+      "test_files": 4,
+      "tests": 24,
+      "failures": 0
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "runtime_acceptance": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "workflowExecutionId": "wf-w08",
+    "dispatchedNodes": 3,
+    "cycles": 3,
+    "workflowStatus": "completed",
+    "nodeStates": [
+      [
+        "health-a",
+        "completed",
+        1
+      ],
+      [
+        "health-b",
+        "completed",
+        1
+      ],
+      [
+        "join",
+        "completed",
+        1
+      ]
+    ],
+    "durableReceipts": 3,
+    "durableReceiptEvents": 3,
+    "telemetry": {
+      "node.completed": 3,
+      "node.dispatched": 3,
+      "node.dispatched.device.windows-main": 3,
+      "workflow.completed": 1,
+      "workflow.submitted": 1
+    }
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 20,
+    "implementation_percent": 71.43,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    "O01 operator.smart-adapter",
+    "X02 agent-provider.runtime"
+  ],
+  "blockers": [],
+  "canonical_end_marker": "END V3 W08 WORKFLOW RUNTIME ACCEPTANCE 20261008"
+}
