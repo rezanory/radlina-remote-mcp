@@ -16,11 +16,7 @@ import {
   MacOSKeychainSecretProtector,
   createMacOSPlatformAdapter,
 } from "../../src/v3/device/macos-agent.js";
-import type {
-  FilesystemPort,
-  ProcessPort,
-  SearchPort,
-} from "../../src/v3/platform/contracts.js";
+import type { FilesystemPort, ProcessPort, SearchPort } from "../../src/v3/platform/contracts.js";
 import { V3ExecutionPolicyGuard } from "../../src/v3/security/policy.js";
 import { testConfig } from "../../tests/helpers/config.js";
 
@@ -111,9 +107,7 @@ try {
     cancel: async () => undefined,
   };
 
-  const keychain = new MacOSKeychainSecretProtector(
-    `com.radlina.remote-mcp.p08.${process.pid}`,
-  );
+  const keychain = new MacOSKeychainSecretProtector(`com.radlina.remote-mcp.p08.${process.pid}`);
   const adapter = createMacOSPlatformAdapter({
     filesystem,
     process: processPort,
