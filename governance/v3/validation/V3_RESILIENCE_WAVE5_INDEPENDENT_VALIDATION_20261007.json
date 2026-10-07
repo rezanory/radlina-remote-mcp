@@ -1,0 +1,50 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-RESILIENCE-WAVE5-INDEPENDENT-VALIDATION-20261007",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "integration/v3-resilience-wave5",
+    "commit": "1eab24e4d998a71cad587800741ddc32a5717ded",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-resilience-wave5-validation-r3",
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "head": "1eab24e4d998a71cad587800741ddc32a5717ded",
+    "authoring_changes_allowed": false
+  },
+  "results": {
+    "exact_head": "PASS",
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files_passed": 26,
+      "tests_passed": 133,
+      "tests_failed": 0
+    },
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runner": "PASS",
+    "diff_check_against_previous_canonical": "PASS",
+    "runtime_acceptance": {
+      "status": "PASS",
+      "acceptance_field": "PASS",
+      "recovery_unknown_outcome": "interrupted-unknown-outcome",
+      "unsafe_non_idempotent_retry_blocked": true,
+      "trigger_deduplicated": true,
+      "routed_device_id": "macbook-main",
+      "exact_device_failover_blocked": true,
+      "real_git_worktree": true,
+      "plugin_child_process_isolated": true,
+      "plugin_filesystem_read_allowed": false
+    }
+  },
+  "correction_history": [
+    "Initial candidate failed Prettier on worktree runtime and runner.",
+    "Second candidate used CRLF blobs through GitHub Contents API and failed git diff --check.",
+    "Final candidate 1eab24e4 normalized both files to LF; formatting, diff and runtime acceptance all PASS."
+  ],
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 RESILIENCE WAVE5 INDEPENDENT VALIDATION 20261007"
+}
