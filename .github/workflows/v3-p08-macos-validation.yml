@@ -1,0 +1,42 @@
+name: V3 P08 macOS Validation
+
+on:
+  push:
+    branches:
+      - generation/v3-p08-macos-agent
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24.20.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: P08 unit tests
+        run: npx vitest run tests/unit/v3/macos-agent.test.ts
+
+      - name: Lint P08 scope
+        run: npx eslint src/v3/device/macos-agent.ts tests/unit/v3/macos-agent.test.ts
+
+      - name: Format check
+        run: npx prettier --check src/v3/device/macos-agent.ts tests/unit/v3/macos-agent.test.ts scripts/acceptance/v3-p08-macos-agent.ts
+
+      - name: Real macOS runtime acceptance
+        run: npx tsx scripts/acceptance/v3-p08-macos-agent.ts
