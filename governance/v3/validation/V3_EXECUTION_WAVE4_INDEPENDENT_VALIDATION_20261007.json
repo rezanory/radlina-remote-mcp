@@ -1,0 +1,41 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-EXECUTION-WAVE4-INDEPENDENT-VALIDATION-20261007",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "integration/v3-execution-wave4",
+    "commit": "cc5eb18c87fd56a78d57fb96d399e56c67329178",
+    "tree": "7b52c2d61c0fe5c86cf94bb6d8a536454cf40c44",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-execution-wave4-validation",
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "head": "cc5eb18c87fd56a78d57fb96d399e56c67329178",
+    "authoring_changes_allowed": false
+  },
+  "results": {
+    "exact_head": "PASS",
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files_passed": 20,
+      "tests_passed": 105,
+      "tests_failed": 0
+    },
+    "lint_changed_src_tests": "PASS",
+    "prettier_changed_scope_and_runner": "PASS",
+    "diff_check_against_previous_canonical": "PASS",
+    "runtime_acceptance": {
+      "status": "PASS",
+      "acceptance_field": "PASS",
+      "artifact_id": "sha256:5b634244a3c37e9da7fc7d9c085b20251fb404639bfe7831f255f1fb86d24cdf",
+      "transfer_receipt_hash": "4d497a265f0e099cca2ad6f072ef6747e9d2999ce8f1693da4db71346ad45466"
+    }
+  },
+  "runner_lint_disposition": "N/A: scripts/acceptance is outside tsconfig project-service scope; no tsconfig broadening was made solely to satisfy lint. Runner formatting and real execution both PASS.",
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 EXECUTION WAVE4 INDEPENDENT VALIDATION 20261007"
+}

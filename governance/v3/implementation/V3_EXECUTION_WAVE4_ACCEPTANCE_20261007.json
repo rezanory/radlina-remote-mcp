@@ -1,0 +1,127 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-EXECUTION-WAVE4-ACCEPTANCE-20261007",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "34344aecb5159a43dfe9b80d2e08c58093668120",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "W04",
+      "component": "workflow.scheduler",
+      "commit": "dff91648f189bb7e9d48eeb271d9fd3e8c652e1c",
+      "tree": "f829246cabbbebfbe4ab7dd8502bfff9f66e8dff",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "W06",
+      "component": "workflow.observability",
+      "commit": "1029a257b918ffaaecedd7d753aa609a2d8e88fe",
+      "tree": "96129b4316e7d8e33fa95a84266b00c3de530773",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "P05",
+      "component": "capability.runtime",
+      "commit": "6e0bfe8d8ac1e798188978e3ec768916cd38bafe",
+      "tree": "a45a5b76cad2fd38b8d4060ea2aaf505ddf3c354",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "A02",
+      "component": "artifact.bus",
+      "commit": "e1acf78e3a9e78509c96c6c31bee8e47655a476b",
+      "tree": "8fecf88e5372958b275f713ac2592c2ff4601341",
+      "status": "ACCEPTED"
+    }
+  ],
+  "integration": {
+    "branch": "integration/v3-execution-wave4",
+    "validated_candidate_commit": "cc5eb18c87fd56a78d57fb96d399e56c67329178",
+    "validated_candidate_tree": "7b52c2d61c0fe5c86cf94bb6d8a536454cf40c44",
+    "merge_conflicts": 0,
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 20,
+      "tests": 105,
+      "failures": 0
+    },
+    "typecheck": "PASS",
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runner": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "runner": "scripts/acceptance/v3-wave4-runtime.ts",
+    "status": "PASS",
+    "input": {
+      "workflowExecutionId": "wf-wave4",
+      "roots": [
+        "health-a",
+        "health-b"
+      ],
+      "join": [
+        "join"
+      ]
+    },
+    "runtime": [
+      "WorkflowScheduler",
+      "V3CapabilityRuntime",
+      "InMemoryWorkflowTelemetry",
+      "FilesystemArtifactBus"
+    ],
+    "execution": {
+      "nodeExecutions": 3,
+      "workflowStatus": "completed",
+      "nodeStatuses": [
+        [
+          "health-a",
+          "completed"
+        ],
+        [
+          "health-b",
+          "completed"
+        ],
+        [
+          "join",
+          "completed"
+        ]
+      ],
+      "distributedAuditsValid": true
+    },
+    "output": {
+      "artifactId": "sha256:5b634244a3c37e9da7fc7d9c085b20251fb404639bfe7831f255f1fb86d24cdf",
+      "transferReceiptHash": "4d497a265f0e099cca2ad6f072ef6747e9d2999ce8f1693da4db71346ad45466",
+      "telemetry": {
+        "node.completed": 3,
+        "node.dispatched": 3,
+        "node.dispatched.device.windows-main": 3,
+        "workflow.completed": 1,
+        "workflow.submitted": 1
+      }
+    },
+    "note": "Runner is executed by tsx and formatted; eslint project-service intentionally excludes scripts/acceptance from tsconfig, so lint authority applies to the changed src/tests while runner execution itself is the runtime acceptance gate."
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 14,
+    "implementation_percent": 50,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    "W05 workflow.recovery",
+    "W07 workflow.triggers",
+    "P06 device.router",
+    "P07 device.agent.windows",
+    "P08 device.agent.macos",
+    "K01 workspace.worktree-runtime",
+    "X01 plugin.runtime"
+  ],
+  "blockers": [],
+  "canonical_end_marker": "END V3 EXECUTION WAVE4 ACCEPTANCE 20261007"
+}
