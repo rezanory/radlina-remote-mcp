@@ -1,0 +1,60 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-CONTRACT-FOUNDATIONS-INDEPENDENT-VALIDATION-20261007",
+  "project": "rezanory/radlina-remote-mcp",
+  "architecture_version": "1.0.0",
+  "rrmw_version": "1.0.0",
+  "csew_version": "3.1.5",
+  "validated_source": {
+    "branch": "integration/v3-contract-foundations",
+    "commit": "2b89e24f6759c3d9fd5ee3fc8e6b6c62fab725dd",
+    "tree": "24807e9c58684528230442cccbedeeaa09ae689b",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-contract-foundations-validation",
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "head": "2b89e24f6759c3d9fd5ee3fc8e6b6c62fab725dd",
+    "authoring_changes_allowed": false
+  },
+  "scope": {
+    "components": [
+      "W01 workflow.contracts",
+      "P01 platform.contracts"
+    ],
+    "changed_source_files": [
+      "src/v3/workflow/contracts.ts",
+      "src/v3/platform/contracts.ts"
+    ],
+    "changed_test_files": [
+      "tests/unit/v3/workflow-contracts.test.ts",
+      "tests/unit/v3/platform-contracts.test.ts"
+    ],
+    "runtime_wiring_changed": false,
+    "v2_runtime_changed": false
+  },
+  "results": {
+    "exact_head": "PASS",
+    "clean_detached_worktree": "PASS",
+    "typecheck": "PASS",
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope": "PASS",
+    "diff_check_against_architecture_freeze": "PASS",
+    "full_unit_suite": {
+      "status": "PASS",
+      "test_files_passed": 8,
+      "test_files_failed": 0,
+      "tests_passed": 36,
+      "tests_failed": 0
+    }
+  },
+  "real_operational_acceptance": {
+    "status": "NOT_YET_APPLICABLE_TO_THIS_BATCH",
+    "reason": "This validated batch introduces contracts/ports only and does not wire an executable V3 runtime path.",
+    "obligation": "Real operational acceptance remains mandatory when the first executable consumer is integrated."
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 CONTRACT FOUNDATIONS INDEPENDENT VALIDATION 20261007"
+}
