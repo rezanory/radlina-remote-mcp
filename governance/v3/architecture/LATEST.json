@@ -1,0 +1,18 @@
+{
+  "schema_version": "radlina.v3.architecture-latest/v1",
+  "document_id": "RADLINA-REMOTE-MCP-V3-ARCHITECTURE",
+  "architecture_version": "1.0.0",
+  "path": "governance/v3/architecture/v1.0.0",
+  "manifest_file": "V3_ARCHITECTURE_FREEZE.manifest.json",
+  "manifest_sha256": "f1185454baf95ddacc44324d304203a24ce26607cf04be3d1310495284840aef",
+  "architecture_freeze_file": "V3-00_ARCHITECTURE_FREEZE.md",
+  "architecture_freeze_sha256": "dfc59d5bf728c11ec6e65bbe5c993fe49b59bb6ce3c12346fa6d79a9cfeb1f11",
+  "dag_file": "V3_COMPONENT_CAPABILITY_DAG.json",
+  "dag_sha256": "01af11f97ef98940da5810305bc0d5e1b312c8b82da76e1bf7b39eefb8c1e926",
+  "contracts_file": "V3_CONTRACTS.json",
+  "contracts_sha256": "8a7bec3738a6e7aa372ef8446e4101d01c1bf75cdf97c669b48ffb0d8ccf5ac4",
+  "reuse_file": "V3_REUSE_RECONCILIATION.json",
+  "reuse_sha256": "2b4439a491251da7a0fa54227408ffea199dd1bef59ee553ee3efbadc9aca33d",
+  "rrmw_version": "1.0.0",
+  "csew_version": "3.1.5"
+}

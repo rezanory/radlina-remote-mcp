@@ -1,0 +1,614 @@
+{
+  "schema_version": "radlina.v3.component-capability-dag/v1",
+  "architecture_version": "1.0.0",
+  "project": "rezanory/radlina-remote-mcp",
+  "phase": "V3-00",
+  "authority": "This file is the V3 component dependency authority under RRMW 1.0.0 until superseded by a protected architecture revision.",
+  "rules": {
+    "dependency_authority": "depends_on",
+    "progress_unit": "component/capability",
+    "smart_operator_is_workflow_engine": false,
+    "canonical_workflow_single_authority": true,
+    "maximum_safe_parallelism": true,
+    "executable_pass_chain": "Input -> Runtime -> Execution -> Output -> Acceptance"
+  },
+  "nodes": [
+    {
+      "id": "G00",
+      "component": "governance.rrmw-csew",
+      "plane": "governance",
+      "owner": "Governance",
+      "status": "FROZEN",
+      "depends_on": [],
+      "capabilities": [
+        "authority.resolve",
+        "evidence.require",
+        "acceptance.real-operational"
+      ]
+    },
+    {
+      "id": "G01",
+      "component": "architecture.v3-contract-freeze",
+      "plane": "governance",
+      "owner": "Architecture",
+      "status": "FROZEN",
+      "depends_on": [
+        "G00"
+      ],
+      "capabilities": [
+        "architecture.freeze",
+        "dag.authority",
+        "ownership.freeze"
+      ]
+    },
+    {
+      "id": "W01",
+      "component": "workflow.contracts",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "ADMITTED",
+      "depends_on": [
+        "G01"
+      ],
+      "capabilities": [
+        "workflow.define",
+        "workflow.validate",
+        "node.define",
+        "selector.define",
+        "receipt.define"
+      ]
+    },
+    {
+      "id": "W02",
+      "component": "workflow.state-machine",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01"
+      ],
+      "capabilities": [
+        "workflow.transition",
+        "node.transition",
+        "terminal-state.validate"
+      ]
+    },
+    {
+      "id": "W03",
+      "component": "workflow.persistence",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01",
+        "W02"
+      ],
+      "capabilities": [
+        "workflow.save",
+        "workflow.load",
+        "workflow.atomic-transition",
+        "workflow.idempotency"
+      ]
+    },
+    {
+      "id": "W04",
+      "component": "workflow.scheduler",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01",
+        "W02",
+        "W03"
+      ],
+      "capabilities": [
+        "node.readiness",
+        "schedule.dispatch",
+        "schedule.parallel-safe",
+        "schedule.cancel"
+      ]
+    },
+    {
+      "id": "W05",
+      "component": "workflow.recovery",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W02",
+        "W03",
+        "W04"
+      ],
+      "capabilities": [
+        "execution.reconcile",
+        "attempt.retry",
+        "execution.resume",
+        "unknown-outcome.guard"
+      ]
+    },
+    {
+      "id": "W06",
+      "component": "workflow.observability",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01",
+        "W02",
+        "W03"
+      ],
+      "capabilities": [
+        "workflow.metrics",
+        "workflow.trace",
+        "workflow.event"
+      ]
+    },
+    {
+      "id": "W07",
+      "component": "workflow.triggers",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01",
+        "W03",
+        "W04"
+      ],
+      "capabilities": [
+        "trigger.accept",
+        "trigger.dedupe",
+        "trigger.submit"
+      ]
+    },
+    {
+      "id": "W08",
+      "component": "workflow.runtime",
+      "plane": "workflow-core",
+      "owner": "Workflow Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "W02",
+        "W03",
+        "W04",
+        "W05",
+        "W06",
+        "W07"
+      ],
+      "capabilities": [
+        "workflow.submit",
+        "workflow.status",
+        "workflow.cancel",
+        "workflow.resume",
+        "workflow.dispatch-port"
+      ]
+    },
+    {
+      "id": "S01",
+      "component": "security.user-auth",
+      "plane": "security-core",
+      "owner": "Security Core",
+      "status": "REUSE_ACCEPTED",
+      "depends_on": [
+        "G01"
+      ],
+      "capabilities": [
+        "oauth.authorize",
+        "oauth.refresh",
+        "owner.trust",
+        "session.rebind"
+      ]
+    },
+    {
+      "id": "P01",
+      "component": "platform.contracts",
+      "plane": "platform-backbone",
+      "owner": "Platform Backbone",
+      "status": "ADMITTED",
+      "depends_on": [
+        "G01"
+      ],
+      "capabilities": [
+        "platform.secret-protect",
+        "platform.process",
+        "platform.filesystem",
+        "platform.search",
+        "platform.lifecycle"
+      ]
+    },
+    {
+      "id": "P02",
+      "component": "device.identity",
+      "plane": "device-plane",
+      "owner": "Device Plane",
+      "status": "PLANNED",
+      "depends_on": [
+        "P01",
+        "S01"
+      ],
+      "capabilities": [
+        "device.identity",
+        "agent.identity",
+        "device.trust"
+      ]
+    },
+    {
+      "id": "P03",
+      "component": "device.registry",
+      "plane": "platform-backbone",
+      "owner": "Platform Backbone",
+      "status": "PLANNED",
+      "depends_on": [
+        "P02"
+      ],
+      "capabilities": [
+        "device.register",
+        "device.get",
+        "device.list",
+        "device.heartbeat",
+        "device.capabilities"
+      ]
+    },
+    {
+      "id": "P04",
+      "component": "device.agent-protocol",
+      "plane": "device-plane",
+      "owner": "Device Plane",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01",
+        "P01",
+        "P02"
+      ],
+      "capabilities": [
+        "agent.hello",
+        "agent.health",
+        "agent.execute",
+        "agent.cancel",
+        "agent.receipt"
+      ]
+    },
+    {
+      "id": "S02",
+      "component": "security.policy-v3",
+      "plane": "security-core",
+      "owner": "Security Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "S01",
+        "P02",
+        "W01"
+      ],
+      "capabilities": [
+        "policy.authorize-capability",
+        "policy.authorize-target",
+        "policy.route-bounds",
+        "control.kill-switch",
+        "control.emergency-readonly"
+      ]
+    },
+    {
+      "id": "S03",
+      "component": "audit.distributed",
+      "plane": "security-core",
+      "owner": "Security Core",
+      "status": "PLANNED",
+      "depends_on": [
+        "P02",
+        "W01"
+      ],
+      "capabilities": [
+        "audit.global-receipt",
+        "audit.local-chain",
+        "audit.correlate",
+        "audit.verify"
+      ]
+    },
+    {
+      "id": "P05",
+      "component": "capability.runtime",
+      "plane": "platform-backbone",
+      "owner": "Platform Backbone",
+      "status": "PLANNED",
+      "depends_on": [
+        "P04",
+        "S02",
+        "S03"
+      ],
+      "capabilities": [
+        "capability.register",
+        "capability.describe",
+        "capability.execute",
+        "capability.contract-verify"
+      ]
+    },
+    {
+      "id": "P06",
+      "component": "device.router",
+      "plane": "platform-backbone",
+      "owner": "Platform Backbone",
+      "status": "PLANNED",
+      "depends_on": [
+        "P03",
+        "P04",
+        "P05",
+        "S02"
+      ],
+      "capabilities": [
+        "route.resolve",
+        "route.exact-device",
+        "route.selector",
+        "route.no-silent-failover"
+      ]
+    },
+    {
+      "id": "P07",
+      "component": "device.agent.windows",
+      "plane": "device-plane",
+      "owner": "Windows Agent",
+      "status": "PLANNED",
+      "depends_on": [
+        "P01",
+        "P04",
+        "P05"
+      ],
+      "capabilities": [
+        "windows.health",
+        "windows.filesystem",
+        "windows.process",
+        "windows.search",
+        "windows.secrets"
+      ]
+    },
+    {
+      "id": "P08",
+      "component": "device.agent.macos",
+      "plane": "device-plane",
+      "owner": "macOS Agent",
+      "status": "PLANNED",
+      "depends_on": [
+        "P01",
+        "P04",
+        "P05"
+      ],
+      "capabilities": [
+        "macos.health",
+        "macos.filesystem",
+        "macos.process",
+        "macos.search",
+        "macos.secrets"
+      ]
+    },
+    {
+      "id": "O01",
+      "component": "operator.smart-adapter",
+      "plane": "operator-adapter",
+      "owner": "Operator Adapter",
+      "status": "PLANNED",
+      "depends_on": [
+        "W01",
+        "W08",
+        "S02"
+      ],
+      "capabilities": [
+        "operator.translate-v2-plan",
+        "operator.submit",
+        "operator.status",
+        "operator.cancel",
+        "operator.resume"
+      ]
+    },
+    {
+      "id": "A01",
+      "component": "artifact.contracts",
+      "plane": "artifact-plane",
+      "owner": "Artifact Plane",
+      "status": "PLANNED",
+      "depends_on": [
+        "G01",
+        "W01"
+      ],
+      "capabilities": [
+        "artifact.identity",
+        "artifact.metadata",
+        "artifact.integrity"
+      ]
+    },
+    {
+      "id": "A02",
+      "component": "artifact.bus",
+      "plane": "artifact-plane",
+      "owner": "Artifact Plane",
+      "status": "PLANNED",
+      "depends_on": [
+        "A01",
+        "P04",
+        "S03"
+      ],
+      "capabilities": [
+        "artifact.publish",
+        "artifact.fetch",
+        "artifact.transfer",
+        "artifact.verify"
+      ]
+    },
+    {
+      "id": "K01",
+      "component": "workspace.worktree-runtime",
+      "plane": "platform-backbone",
+      "owner": "Workspace Runtime",
+      "status": "PLANNED",
+      "depends_on": [
+        "P05",
+        "A02",
+        "S02",
+        "S03"
+      ],
+      "capabilities": [
+        "workspace.allocate",
+        "worktree.create",
+        "worktree.release",
+        "workspace.receipt"
+      ]
+    },
+    {
+      "id": "X01",
+      "component": "plugin.runtime",
+      "plane": "plugin-provider",
+      "owner": "Plugin Runtime",
+      "status": "PLANNED",
+      "depends_on": [
+        "P05",
+        "A02",
+        "S02",
+        "S03"
+      ],
+      "capabilities": [
+        "plugin.register",
+        "plugin.load",
+        "plugin.execute",
+        "plugin.isolate"
+      ]
+    },
+    {
+      "id": "X02",
+      "component": "agent-provider.runtime",
+      "plane": "plugin-provider",
+      "owner": "Agent Provider Runtime",
+      "status": "PLANNED",
+      "depends_on": [
+        "X01",
+        "W08",
+        "S02",
+        "S03"
+      ],
+      "capabilities": [
+        "agent-provider.register",
+        "agent-provider.invoke",
+        "agent-provider.cancel",
+        "agent-provider.receipt"
+      ]
+    },
+    {
+      "id": "F01",
+      "component": "fleet.upgrade-rollback",
+      "plane": "platform-backbone",
+      "owner": "Fleet Management",
+      "status": "PLANNED",
+      "depends_on": [
+        "P03",
+        "P06",
+        "P07",
+        "P08",
+        "S03"
+      ],
+      "capabilities": [
+        "fleet.plan",
+        "fleet.preflight",
+        "fleet.canary",
+        "fleet.rollout",
+        "fleet.rollback"
+      ]
+    },
+    {
+      "id": "C01",
+      "component": "control-plane.mcp-v3",
+      "plane": "control-plane",
+      "owner": "MCP Control Plane",
+      "status": "PLANNED",
+      "depends_on": [
+        "S01",
+        "S02",
+        "S03",
+        "P03",
+        "O01"
+      ],
+      "capabilities": [
+        "mcp.operator",
+        "mcp.devices",
+        "mcp.capabilities",
+        "mcp.admin",
+        "mcp.compat-v2"
+      ]
+    },
+    {
+      "id": "I01",
+      "component": "runtime.v3-composition",
+      "plane": "integration",
+      "owner": "V3 Integration",
+      "status": "PLANNED",
+      "depends_on": [
+        "W08",
+        "P06",
+        "P07",
+        "P08",
+        "O01",
+        "A02",
+        "K01",
+        "X01",
+        "X02",
+        "F01",
+        "C01"
+      ],
+      "capabilities": [
+        "runtime.compose",
+        "runtime.health",
+        "runtime.readiness"
+      ]
+    },
+    {
+      "id": "AC01",
+      "component": "acceptance.multidevice",
+      "plane": "acceptance",
+      "owner": "Independent Validation",
+      "status": "PLANNED",
+      "depends_on": [
+        "I01"
+      ],
+      "capabilities": [
+        "accept.windows-real",
+        "accept.macos-real",
+        "accept.parallel-cross-device",
+        "accept.dependency-join",
+        "accept.reconnect",
+        "accept.artifact-integrity",
+        "accept.distributed-audit",
+        "accept.native-chatgpt"
+      ]
+    }
+  ],
+  "first_admitted_lanes": [
+    {
+      "component_id": "W01",
+      "component": "workflow.contracts",
+      "admission": "ADMITTED_AFTER_V3_00_FREEZE",
+      "can_parallelize_with": [
+        "P01"
+      ],
+      "source_baseline": "V3 architecture freeze commit",
+      "acceptance_before_merge": [
+        "schema/type tests",
+        "invalid-DAG tests",
+        "legacy operator-plan translation contract tests"
+      ]
+    },
+    {
+      "component_id": "P01",
+      "component": "platform.contracts",
+      "admission": "ADMITTED_AFTER_V3_00_FREEZE",
+      "can_parallelize_with": [
+        "W01"
+      ],
+      "source_baseline": "V3 architecture freeze commit",
+      "acceptance_before_merge": [
+        "platform-neutral compile/type tests",
+        "no OS imports in core contract package",
+        "Windows/macOS adapter conformance fixtures"
+      ]
+    }
+  ],
+  "blocked_until_real_device": [
+    "P08 operational acceptance",
+    "AC01 macOS and cross-device acceptance"
+  ],
+  "v2_unaffected": true
+}

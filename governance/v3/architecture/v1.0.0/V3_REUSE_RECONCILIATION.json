@@ -1,0 +1,315 @@
+{
+  "schema_version": "radlina.v3.reuse-reconciliation/v1",
+  "architecture_version": "1.0.0",
+  "project": "rezanory/radlina-remote-mcp",
+  "phase": "V3-00",
+  "frozen_against": {
+    "radlina_remote_mcp": {
+      "v3_start_commit": "98d539158c34d4720452d3f726595b31ebfd234e",
+      "v3_start_tree": "24dd435c5b1d5239101ebaf8ed7810366cf5f70d",
+      "v2_product_commit": "df9d005c49e8f4ceb25105a81e33236f44543e54",
+      "v2_product_tree": "10bd0e7a0022987550b96795cdd1e9013e9975e2",
+      "v2_release_manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e"
+    },
+    "radlina_intelligence": {
+      "repository": "rezanory/radlina-intelligence",
+      "commit": "3ab4874892b5e9b01578918faa63607ebdb3dec6",
+      "tree": "09a6f120138b87a650bf6107c6e80193015d9525",
+      "branch_at_inventory": "feat/unified-frontend-v1"
+    },
+    "workflow_governance": {
+      "rrmw_version": "1.0.0",
+      "rrmw_sha256": "4d37836a3d2c2158471b45aa066e2a38c1d07359071996cf8b0c1912f5b14f04",
+      "csew_version": "3.1.5",
+      "csew_sha256": "fe48231026cdcd8ed75def9d2c6fa17fd20eb772f8db8faad663d2a05b7d6818"
+    }
+  },
+  "classifications": [
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "OAuth/AuthService user identity, token rotation, replay grace, trusted-owner and session semantics",
+      "anchors": [
+        "src/auth/service.ts"
+      ],
+      "classification": "REUSE_AS_IS",
+      "constraints": "Remain the accepted control-plane user identity baseline. Device/agent identity is additive and may not weaken these semantics."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "DPAPI secret protection",
+      "anchors": [
+        "src/auth/dpapi.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Move behind a platform-neutral SecretProtectorPort; keep DPAPI as the Windows implementation and add Keychain-backed macOS implementation."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "PolicyEngine authorization, scopes, kill switch, emergency read-only and command policy",
+      "anchors": [
+        "src/policy/engine.ts",
+        "src/policy/runtime.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Preserve fail-closed V2 behavior while adding explicit device/agent target context and routing decisions."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "AuditChain local HMAC chain and redaction",
+      "anchors": [
+        "src/audit/chain.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Preserve local tamper evidence and extend to distributed receipts containing workflow, node, attempt, resolved device and local receipt hash."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "Capability contracts and CapabilityRegistry",
+      "anchors": [
+        "src/components/contracts.ts",
+        "src/components/registry.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Add platform applicability, device locality, input/output contract identity and acceptance metadata; registry remains capability ownership authority, not scheduler."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "Built-in device.health/filesystem.info/process.exec implementations",
+      "anchors": [
+        "src/components/builtin.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Rehost as Windows agent capabilities behind DeviceAgentProtocol. Preserve policy bounds and process verification."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "Filesystem/Search/Process managers",
+      "anchors": [
+        "src/tools/filesystem",
+        "src/tools/search",
+        "src/tools/process"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Become platform/device capability implementations; workflow core never imports OS-specific managers."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "General SQLite store for auth, idempotency, sessions and local runtime state",
+      "anchors": [
+        "src/persistence/store.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Keep V2 security/session semantics. Canonical V3 workflow persistence is separately owned; V2 operator_jobs/operator_steps may not be authoritative V3 workflow state."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "OperatorManager sequential orchestration engine",
+      "anchors": [
+        "src/operator/manager.ts",
+        "src/operator/types.ts"
+      ],
+      "classification": "REPLACE",
+      "constraints": "Replace on V3 code path with a thin Smart Operator Adapter that translates legacy plans to canonical DAG submissions/status. V2 branch remains untouched as rollback."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "MCP surface and ToolRuntime wrapper",
+      "anchors": [
+        "src/mcp.ts",
+        "src/policy/runtime.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Preserve compatible public tools; list_devices becomes registry-backed and operator_* delegates to canonical workflow runtime."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "Single-workstation list_devices behavior",
+      "anchors": [
+        "src/mcp.ts"
+      ],
+      "classification": "REPLACE",
+      "constraints": "Replace with first-class DeviceRegistry results; exact device identity must be explicit in acceptance."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "UpgradeManager and release/rollback evidence model",
+      "anchors": [
+        "src/admin/upgrade.ts",
+        "src/admin/release-manifest.ts",
+        "src/admin/release-state.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Preserve manifest-bound verification and rollback semantics; extend orchestration to canary/staged fleet operations."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "ReliabilitySupervisor",
+      "anchors": [
+        "src/reliability/supervisor.ts",
+        "src/reliability/ingress.ts"
+      ],
+      "classification": "ADAPT",
+      "constraints": "Retain local reliability behavior and add device/fleet health dimensions without centralizing workflow retry semantics."
+    },
+    {
+      "source": "radlina-remote-mcp/V2",
+      "item": "Accepted V2 product release and rollback evidence",
+      "anchors": [
+        "product/v2.0.0-alpha.2",
+        "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e"
+      ],
+      "classification": "REUSE_AS_IS",
+      "constraints": "Immutable rollback/compatibility baseline until explicit V3 compatibility retirement."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/dag/executor.py",
+      "sha256": "a5a7e2223e1de389e84bebde8863fb97f7f0748bf9f6700993bbb41f254c2d8c",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Taxonomy and executor boundary are useful; implementation only returns True and is not a real DAG executor."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/dag/planner/planner.py",
+      "sha256": "0bf32be08feac881169bd9a247217299248e91557b95d3040c56660fdb6d2def",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Planner/order semantics are retained; implementation is a pass-through stub."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/engine/runtime.py",
+      "sha256": "d465ef43289248df15ebcdb158995817aa2e8fbdc60147a0e8a970c0634779bf",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "execute/resume boundary retained; implementation is a stub."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/scheduler/runtime.py",
+      "sha256": "54c7ed8325e51f05f27a1420bd603c4cd1debda40b74e685034188cc5e46dbc2",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "schedule/cancel boundary retained; implementation does not schedule."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/state/machine.py",
+      "sha256": "47691e36b6cb2d21cf92372e57acf05f43f0c0a4441c6fc434b47a4fc4e17296",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "State-machine ownership retained; transition implementation is a no-op."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/state/transitions.py",
+      "sha256": "761a9c76ee45e696807802afd6c75a5d27c61f5e4666da4176e404cbb39f26fd",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Failure/recovery semantics are useful but incomplete for production workflow state."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/persistence/store.py",
+      "sha256": "00100e93df5fc4a8eecfc6d34a55692cc1516c4c4c731209e1b3bbc627003747",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Save/load ownership retained; implementation is not persistence."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/recovery/retry.py",
+      "sha256": "8627591252f2e0f675b1fbd25fa6c51a73c3e22e5aafdbceb9fc641efb0355da",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Retry/recover boundary retained; production rules come from idempotency, state and exact outcome evidence."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/observability/metrics.py",
+      "sha256": "6b06fc06430f75213019b235b9b2e2365ffbd228a042bf59672fd24768e3b7c1",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Metrics/trace ownership retained; implementation is a stub."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/observability/runtime.py",
+      "sha256": "c2dc5cd97ea0d818786ce492ebc344510ccbb02c01f07876cf7859a6819ec0ae",
+      "classification": "ADAPT",
+      "reason": "Submit duration, success/failure, retry and recovery instrumentation are useful; replace in-memory/Python-specific mechanics with V3 observability ports."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/triggers/contract.py",
+      "sha256": "c3c3d4d2f2fa7aaa718d5ca79958e87ba83cac8c6c8e0e533f639ac10d7d1f39",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Trigger boundary retained; implementation is a pass-through stub."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "core/workflows/engine/persistence.py",
+      "sha256": "9219c703ebc76b7f481c1469426c6fa6bb4e44ee31f4c209a007a1e121c36408",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Explicit WorkflowStateStore abstraction is useful and provider-neutral."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "core/workflows/scheduler/contract.py",
+      "sha256": "f3ffb4baababd1f871f60841dbd2bf73187778a3c906eb836c77d034c24b369d",
+      "classification": "REUSE_CONTRACT_ONLY",
+      "reason": "Explicit scheduler port is useful but needs DAG readiness and resource-aware semantics."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "providers/workflow/models.py",
+      "sha256": "2dcc48de68949d12fcf2c87b873eeac932e8eb745a6d4b2000c22800d3c473f6",
+      "classification": "ADAPT",
+      "reason": "Provider-neutral execution state, idempotency, timeout, scheduling and correlation semantics are valuable; adapt from tenant/provider model to Radlina subject/device/workflow model."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "providers/workflow/runtime.py",
+      "sha256": "8280eda3eec6472af406ec859220312ff5c23d757a8a5911eb10c1f91b05780a",
+      "classification": "ADAPT",
+      "reason": "DurableWorkflowBridge/provider abstraction is useful. File contains duplicate test-provider definitions and is not suitable for copy-as-is."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "providers/workflow/native.py",
+      "sha256": "5eda56cf95e27772808528aab6e04549dfb9fd78b1e1e927bf8a192956da46c2",
+      "classification": "NOT_APPLICABLE",
+      "reason": "Explicitly declares itself replaceability/test-only and not production evidence for durable orchestration; may inspire tests but cannot be canonical V3 engine."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "providers/workflow/temporal.py",
+      "sha256": "fde4775fa2a7f6b4dd1b1cf30031768955421d52d30faeeb700712af676e93a1",
+      "classification": "ADAPT",
+      "reason": "Real durable provider bridge can become an optional external workflow-provider adapter; it is not the Smart Operator and does not own V3 product policy/device routing."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "providers/workflow/optional.py (Prefect/Airflow/Inngest)",
+      "sha256": "67e0cd48406b74b8e34e3390a8f125088f9c6e3aaec4b2496c1e5fa12a013c9f",
+      "classification": "NOT_APPLICABLE",
+      "reason": "Not required for initial V3 core and some status/cancel boundaries are incomplete. Future provider-plugin candidates only."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "providers/workflow/observed.py",
+      "sha256": "b2aa768d026c746a475da5bce6ab141f3d229efcddc81ea85c89c417884b638f",
+      "classification": "ADAPT",
+      "reason": "Provider instrumentation decorator concept is useful behind V3 observability ports."
+    },
+    {
+      "source": "radlina-intelligence",
+      "item": "workflows/operational/observability.py",
+      "sha256": "8f85e9f5c9bd6fc031b3485c94518a12dac27cedb7c2651ed81d951bf56207ad",
+      "classification": "ADAPT",
+      "reason": "Execution duration, queue delay, retry and result metrics are retained semantically."
+    }
+  ],
+  "conclusion": {
+    "copy_as_is_from_radlina_intelligence": false,
+    "canonical_decision": "Reuse taxonomy/contracts and selected provider semantics; implement production-grade TypeScript workflow core under RRMW/CSEW with Smart Operator only as adapter.",
+    "forbidden": [
+      "Copy stub workflow implementations as production code",
+      "Make Smart Operator a second scheduler/state store/retry engine",
+      "Treat NativeSQLiteWorkflowProvider as production durable-orchestration evidence",
+      "Make Temporal/Prefect/Airflow/Inngest the hidden owner of Radlina policy or device routing"
+    ]
+  }
+}

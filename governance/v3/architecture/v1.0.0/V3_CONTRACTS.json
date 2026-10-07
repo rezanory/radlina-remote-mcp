@@ -1,0 +1,313 @@
+{
+  "schema_version": "radlina.v3.architecture-contracts/v1",
+  "architecture_version": "1.0.0",
+  "status": "FROZEN",
+  "product_target": "Secure Multi-Device + Multi-Worker + Plugin-Based Smart Operator Platform",
+  "hierarchy": [
+    "CSEW Governance Plane",
+    "Canonical Workflow Plane",
+    "Radlina V3 Runtime Plane"
+  ],
+  "invariants": [
+    "Canonical Workflow Runtime is the sole authority for DAG dependencies, scheduling, workflow state, workflow persistence, recovery, workflow observability and triggers.",
+    "Smart Operator is an input/status adapter and MUST NOT own a scheduler, retry loop, workflow state machine or authoritative workflow store.",
+    "Device is a first-class identity and every dispatched attempt records the resolved device identity.",
+    "An exact-device selector MUST NOT silently reroute to another device.",
+    "Unknown or interrupted outcome for a non-idempotent capability MUST NOT be automatically retried.",
+    "OS-specific concerns are isolated behind platform contracts; workflow core imports no Windows/macOS/Tailscale implementation details.",
+    "V2 user authentication, OAuth rotation/replay protection, kill switch, emergency read-only and rollback evidence may not be weakened by V3.",
+    "Local device audit evidence and global workflow correlation are both required for distributed execution acceptance.",
+    "V2 production branch/evidence remains immutable rollback baseline during V3 development.",
+    "Executable production claims require Input -> Runtime -> Execution -> Output -> Acceptance; tests alone do not close production scope."
+  ],
+  "device_descriptor": {
+    "required": [
+      "deviceId",
+      "hostname",
+      "platform",
+      "architecture",
+      "agentVersion",
+      "status",
+      "lastSeen",
+      "capabilities",
+      "tags",
+      "trustState",
+      "health"
+    ],
+    "deviceId": "stable logical identifier such as windows-main or macbook-main",
+    "status_values": [
+      "online",
+      "offline",
+      "degraded",
+      "draining",
+      "unknown"
+    ],
+    "trustState_values": [
+      "pending",
+      "trusted",
+      "revoked",
+      "quarantined"
+    ]
+  },
+  "device_selector": {
+    "exactly_one_primary_selector": [
+      "deviceId",
+      "capability",
+      "platform",
+      "approvedTag"
+    ],
+    "optional_constraints": [
+      "architecture",
+      "agentVersionRange",
+      "health"
+    ],
+    "exact_device_failover": "FORBIDDEN",
+    "dynamic_selector_reroute": "Only when executionPolicy explicitly permits it and audit records both original selector and resolved device."
+  },
+  "workflow_definition": {
+    "required": [
+      "workflowId",
+      "definitionVersion",
+      "title",
+      "nodes"
+    ],
+    "node_required": [
+      "id",
+      "capability",
+      "input",
+      "dependsOn",
+      "target",
+      "maxAttempts",
+      "timeoutMs",
+      "executionPolicy",
+      "expectedOutput"
+    ],
+    "node_id_unique": true,
+    "dependency_cycle": "FORBIDDEN",
+    "missing_dependency": "FORBIDDEN",
+    "dependency_authority": "dependsOn only"
+  },
+  "canonical_states": {
+    "workflow": [
+      "queued",
+      "running",
+      "completed",
+      "failed",
+      "cancelled",
+      "interrupted"
+    ],
+    "node": [
+      "pending",
+      "ready",
+      "running",
+      "completed",
+      "failed",
+      "cancelled",
+      "interrupted",
+      "blocked"
+    ],
+    "provider_normalization": {
+      "PENDING": "queued",
+      "RUNNING": "running",
+      "SUCCEEDED": "completed",
+      "COMPLETED": "completed",
+      "FAILED": "failed",
+      "CANCELLED": "cancelled",
+      "CANCELED": "cancelled",
+      "TIMED_OUT": "failed",
+      "TERMINATED": "failed",
+      "UNKNOWN": "interrupted"
+    }
+  },
+  "persistence_ownership": {
+    "workflow_state_single_writer": "workflow.persistence",
+    "v2_operator_tables_in_v3": "NOT_AUTHORITATIVE",
+    "device_registry_owner": "device.registry",
+    "auth_session_owner": "security.user-auth",
+    "artifact_metadata_owner": "artifact.bus",
+    "transition_requirement": "State mutation and corresponding durable event/receipt must be atomic or recoverably journaled."
+  },
+  "scheduler_contract": {
+    "ready_when": "all dependsOn nodes are completed and execution policy/resource constraints permit dispatch",
+    "parallelism": "maximum safe parallelism only",
+    "dispatch_boundary": "ExecutionDispatchPort",
+    "scheduling_inputs": [
+      "authoritative DAG",
+      "durable states",
+      "policy decision",
+      "resource/target eligibility"
+    ],
+    "forbidden": [
+      "ordinal-only hidden dependencies",
+      "Smart Operator private retry loop",
+      "dispatch without persisted attempt identity"
+    ]
+  },
+  "recovery_contract": {
+    "startup": "reconcile durable running/dispatching attempts with device receipts before deciding retry/resume",
+    "idempotent_retry": "allowed only within configured budget and policy",
+    "non_idempotent_unknown": "manual/new explicit submission required; automatic retry forbidden",
+    "cancellation": "durable cancel intent before or atomically with dispatch cancellation request"
+  },
+  "operator_v2_compatibility": {
+    "public_tools": [
+      "operator_submit",
+      "operator_status",
+      "operator_recent",
+      "operator_resume",
+      "operator_cancel"
+    ],
+    "submit_translation": "Legacy V2 ordered steps translate to a DAG where step[0].dependsOn=[] and each later step dependsOn the immediately previous legacy step.",
+    "public_job_id": "V3 adapter returns the canonical workflow execution id as jobId for compatibility.",
+    "retries": "maxAttempts maps into node execution policy; non-idempotent capability still requires maxAttempts=1 unless a future protected contract explicitly proves safe semantics.",
+    "ownership": "Adapter performs validation/translation/auth context binding only; it does not execute nodes."
+  },
+  "execution_dispatch_receipt": {
+    "required": [
+      "workflowExecutionId",
+      "nodeId",
+      "attempt",
+      "resolvedDeviceId",
+      "capability",
+      "inputSha256",
+      "startedAt",
+      "terminalState",
+      "outputSha256",
+      "localAuditReceiptHash"
+    ],
+    "correlation": [
+      "globalCorrelationId",
+      "traceId"
+    ],
+    "device_receipt_required": true
+  },
+  "artifact_contract": {
+    "artifactId": "content-addressed SHA-256 identity",
+    "required_metadata": [
+      "artifactId",
+      "sha256",
+      "size",
+      "mediaType",
+      "producerWorkflowExecutionId",
+      "producerNodeId",
+      "producerDeviceId",
+      "createdAt"
+    ],
+    "transfer_acceptance": "consumer verifies hash and size before accepting artifact",
+    "workflow_state_ownership": false
+  },
+  "platform_ports": [
+    "SecretProtectorPort",
+    "ProcessPort",
+    "FilesystemPort",
+    "SearchPort",
+    "ServiceLifecyclePort",
+    "DeviceInfoPort"
+  ],
+  "workflow_ports": [
+    "WorkflowStorePort",
+    "SchedulerPort",
+    "ExecutionDispatchPort",
+    "WorkflowEventSinkPort",
+    "TriggerPort"
+  ],
+  "device_ports": [
+    "DeviceRegistryPort",
+    "DeviceAgentPort",
+    "DeviceRouterPort"
+  ],
+  "ownership_boundaries": {
+    "workflow_core": {
+      "owns": [
+        "DAG validation",
+        "workflow/node states",
+        "scheduler",
+        "workflow persistence",
+        "recovery",
+        "workflow metrics/traces",
+        "triggers"
+      ],
+      "forbidden": [
+        "MCP transport ownership",
+        "OS APIs",
+        "Tailscale specifics",
+        "provider-specific AI logic"
+      ]
+    },
+    "platform_backbone": {
+      "owns": [
+        "platform ports",
+        "device registry infrastructure",
+        "capability runtime",
+        "device routing",
+        "fleet lifecycle"
+      ],
+      "forbidden": [
+        "authoritative DAG mutation",
+        "workflow state transitions outside workflow ports"
+      ]
+    },
+    "device_plane": {
+      "owns": [
+        "device identity proof",
+        "agent protocol endpoint",
+        "OS capability adapters",
+        "local execution receipts"
+      ],
+      "forbidden": [
+        "global workflow scheduling",
+        "cross-workflow persistence authority"
+      ]
+    },
+    "operator_adapter": {
+      "owns": [
+        "legacy plan validation",
+        "legacy-to-DAG translation",
+        "public status projection"
+      ],
+      "forbidden": [
+        "scheduler",
+        "retry engine",
+        "workflow state DB",
+        "direct capability execution"
+      ]
+    },
+    "artifact_plane": {
+      "owns": [
+        "artifact identity",
+        "metadata",
+        "transfer",
+        "integrity verification"
+      ],
+      "forbidden": [
+        "workflow dependency semantics",
+        "scheduler decisions"
+      ]
+    },
+    "plugin_agent_providers": {
+      "owns": [
+        "provider registration",
+        "provider lifecycle",
+        "bounded invocation",
+        "provider receipts"
+      ],
+      "forbidden": [
+        "bypass policy",
+        "become hidden canonical scheduler",
+        "directly mutate workflow durable state"
+      ]
+    }
+  },
+  "initial_real_devices": {
+    "windows": {
+      "logicalDeviceId": "windows-main",
+      "hostname": "LAPTOP-13QINEIF",
+      "acceptance_required": true
+    },
+    "macos": {
+      "logicalDeviceId": "macbook-main",
+      "hostname": "TBD_AT_ENROLLMENT",
+      "acceptance_required": true
+    }
+  }
+}
