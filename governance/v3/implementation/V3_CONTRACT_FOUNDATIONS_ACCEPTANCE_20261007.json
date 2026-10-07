@@ -1,0 +1,140 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-CONTRACT-FOUNDATIONS-20261007",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "architecture": {
+    "version": "1.0.0",
+    "freeze_commit": "364d56c517fabe493b3697fb92e7b4aa54a0e681",
+    "freeze_tree": "c891f9269db510a17ea6c08693f1e95a5c5767f4",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "W01",
+      "component": "workflow.contracts",
+      "branch": "generation/v3-w01-workflow-contracts",
+      "commit": "da5af76d78691888b3f0bd86130bd51cdea988bb",
+      "tree": "5e8981ffd409a7448d589347fb8e48925c7ddcf5",
+      "status": "ACCEPTED",
+      "delivered": [
+        "Canonical workflow/node state contract",
+        "Device target selector contract with exact-one selector rule",
+        "Execution policy and expected-output contract",
+        "DAG semantic validation for duplicate ids, missing dependencies, self-dependencies and cycles",
+        "Exact-device no-dynamic-reroute guard",
+        "Dispatch receipt integrity/device identity contract",
+        "V2 ordered Smart Operator dependency-projection compatibility contract"
+      ],
+      "validation": {
+        "typecheck": "PASS",
+        "lint": "PASS",
+        "prettier": "PASS",
+        "diff_check": "PASS",
+        "unit_tests": {
+          "passed": 7,
+          "failed": 0
+        }
+      }
+    },
+    {
+      "id": "P01",
+      "component": "platform.contracts",
+      "branch": "generation/v3-p01-platform-contracts",
+      "commit": "873c62abc61a29462e2fda059d35b43445c9b37f",
+      "tree": "a40e5a8d2f378d5d77383216514e497ee1d2d28d",
+      "status": "ACCEPTED",
+      "delivered": [
+        "Platform-neutral SecretProtectorPort",
+        "Platform-neutral ProcessPort",
+        "Platform-neutral FilesystemPort",
+        "Platform-neutral SearchPort",
+        "Platform-neutral ServiceLifecyclePort",
+        "Platform-neutral DeviceInfoPort",
+        "PlatformAdapter aggregate contract and conformance check",
+        "Windows and macOS conformance fixtures without OS implementation imports"
+      ],
+      "validation": {
+        "typecheck": "PASS",
+        "lint": "PASS",
+        "prettier": "PASS",
+        "diff_check": "PASS",
+        "unit_tests": {
+          "passed": 4,
+          "failed": 0
+        }
+      }
+    }
+  ],
+  "integration": {
+    "branch": "integration/v3-contract-foundations",
+    "code_head": "45232b6fb42e0780272caa62147dda06436bd2e7",
+    "code_tree": "c856eda073492f9c6a14b8fffda69be8255fde63",
+    "merged_components": [
+      "W01",
+      "P01"
+    ],
+    "conflicts": 0,
+    "changed_files": 4,
+    "insertions": 639,
+    "validation": {
+      "typecheck": "PASS",
+      "lint": "PASS",
+      "prettier": "PASS",
+      "diff_check_against_freeze": "PASS",
+      "unit_tests": {
+        "files_passed": 2,
+        "tests_passed": 11,
+        "tests_failed": 0
+      }
+    }
+  },
+  "real_operational_test": {
+    "required_for_this_acceptance": false,
+    "rationale": "W01 and P01 are frozen contract/schema/port components and are not wired into a production execution path in this batch.",
+    "rule_status": "DEFERRED_NOT_WAIVED",
+    "first_required_at": "first executable workflow/device integration affected by these contracts"
+  },
+  "production_baseline": {
+    "v2_status": "100% REAL_PRODUCTION_READY",
+    "v2_runtime_affected": false,
+    "v2_release_manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e"
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 2,
+    "implementation_percent": 7.14,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    {
+      "id": "W02",
+      "component": "workflow.state-machine",
+      "prerequisites": [
+        "W01"
+      ],
+      "readiness": "ELIGIBLE_AFTER_CANONICAL_INTEGRATION"
+    },
+    {
+      "id": "P02",
+      "component": "device.identity",
+      "prerequisites": [
+        "P01",
+        "S01"
+      ],
+      "readiness": "ELIGIBLE_AFTER_CANONICAL_INTEGRATION",
+      "note": "S01 is REUSE_ACCEPTED from the V2 security baseline."
+    },
+    {
+      "id": "A01",
+      "component": "artifact.contracts",
+      "prerequisites": [
+        "G01",
+        "W01"
+      ],
+      "readiness": "ELIGIBLE_AFTER_CANONICAL_INTEGRATION"
+    }
+  ],
+  "canonical_end_marker": "END V3 CONTRACT FOUNDATIONS ACCEPTANCE 20261007"
+}
