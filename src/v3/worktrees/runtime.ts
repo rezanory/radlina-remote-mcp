@@ -137,8 +137,7 @@ export class WorktreeRuntime {
     const parsed = signedWorkspaceReceiptSchema.parse(receipt);
     const { recordHash, signature, ...payload } = parsed;
     return (
-      recordHash === sha256(canonicalJson(payload)) &&
-      this.signer.verify(recordHash, signature)
+      recordHash === sha256(canonicalJson(payload)) && this.signer.verify(recordHash, signature)
     );
   }
 
