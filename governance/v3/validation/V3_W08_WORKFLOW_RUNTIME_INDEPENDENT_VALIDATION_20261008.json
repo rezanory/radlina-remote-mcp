@@ -1,0 +1,41 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-W08-WORKFLOW-RUNTIME-INDEPENDENT-VALIDATION-20261008",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "generation/v3-w08-workflow-runtime",
+    "commit": "7cdc7d391bc67d6ed968a80cf935427c729874fa",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "mode": "GITHUB_ACTIONS_IMMUTABLE_CHECKOUT",
+    "run_id": 37704637205,
+    "job_id": 113075971360,
+    "checkout_sha": "7cdc7d391bc67d6ed968a80cf935427c729874fa"
+  },
+  "results": {
+    "exact_checkout": "PASS",
+    "typecheck": "PASS",
+    "affected_unit": {
+      "status": "PASS",
+      "test_files_passed": 4,
+      "tests_passed": 24,
+      "tests_failed": 0
+    },
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runner": "PASS",
+    "runtime_acceptance": {
+      "status": "PASS",
+      "acceptance_field": "PASS",
+      "dispatched_nodes": 3,
+      "workflow_status": "completed",
+      "durable_receipts": 3,
+      "durable_receipt_events": 3
+    }
+  },
+  "runtime_claim_boundary": "W08 canonical workflow runtime is accepted. This does not substitute for device-specific P07/P08 acceptance.",
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 W08 WORKFLOW RUNTIME INDEPENDENT VALIDATION 20261008"
+}
