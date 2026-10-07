@@ -1,0 +1,101 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-RESILIENCE-WAVE5-ACCEPTANCE-20261007",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "27680e296653820705fb7b85461c63d47892f567",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "W05",
+      "component": "workflow.recovery",
+      "commit": "a3b3fa566c72f4d5449704ff4db37a0cb26b1099",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "W07",
+      "component": "workflow.triggers",
+      "commit": "241f501ff17e0b0a84b630ca51f311c1af4c1695",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "P06",
+      "component": "device.router",
+      "commit": "3b70021a8b25ff9b56b85a1f34da475bfaf5f10d",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "K01",
+      "component": "workspace.worktree-runtime",
+      "commit": "4ddb6e27905df3e6ba74256f31a8f62b4b08263a",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "X01",
+      "component": "plugin.runtime",
+      "commit": "2569c5b758bc22c607a9331b414394c13c237982",
+      "status": "ACCEPTED"
+    }
+  ],
+  "integration": {
+    "branch": "integration/v3-resilience-wave5",
+    "validated_candidate_commit": "1eab24e4d998a71cad587800741ddc32a5717ded",
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 26,
+      "tests": 133,
+      "failures": 0
+    },
+    "typecheck": "PASS",
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runner": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "runner": "scripts/acceptance/v3-wave5-runtime.ts",
+    "status": "PASS",
+    "runtime": [
+      "WorkflowRecoveryEngine",
+      "WorkflowTriggerRuntime",
+      "DeviceRouter",
+      "WorktreeRuntime with real git worktree",
+      "PluginRuntime with ProcessIsolatedPluginHostFactory"
+    ],
+    "execution": {
+      "recoveryAction": "interrupted-unknown-outcome",
+      "unsafeRetryBlocked": true,
+      "triggerSubmitCount": 1,
+      "triggerReplay": true,
+      "routedDeviceId": "macbook-main",
+      "exactFailoverBlocked": true,
+      "pluginFilesystemReadAllowed": false,
+      "pluginRunsInSeparateProcess": true
+    },
+    "output": {
+      "worktreeReceiptArtifactId": "sha256:3639d682993180217b4141fcf5c2134220521c5558159e27160540d7b9195b09",
+      "worktreeReceiptValid": true,
+      "pluginLoadArtifactId": "sha256:b82740b2e0fd9dd7671a295cf4e78ed7326654c6a2d1a6914826ee594e23c337",
+      "pluginReceiptValid": true
+    }
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 19,
+    "implementation_percent": 67.86,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    "W08 workflow.runtime",
+    "P07 device.agent.windows",
+    "P08 device.agent.macos"
+  ],
+  "blockers": [
+    "P08 real macOS operational acceptance requires enrolled MacBook runtime/device."
+  ],
+  "canonical_end_marker": "END V3 RESILIENCE WAVE5 ACCEPTANCE 20261007"
+}
