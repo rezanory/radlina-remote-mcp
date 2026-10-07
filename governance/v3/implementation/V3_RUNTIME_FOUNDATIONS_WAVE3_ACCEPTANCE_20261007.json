@@ -1,0 +1,110 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-RUNTIME-FOUNDATIONS-WAVE3-ACCEPTANCE-20261007",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "fdad10bcf67d86b99c79121e62302136d7d70a63",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "W03",
+      "component": "workflow.persistence",
+      "commit": "876b1a8ee4f16b941c9da4aea01a86b39c100696",
+      "tree": "ebc471568e879200f72fee719cca53ccbbda072f",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "P03",
+      "component": "device.registry",
+      "commit": "5290c574c38a3bbdafaa0f48878d587233191638",
+      "tree": "bd141c4039f16c12581ba2434fdebb1948ec9483",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "P04",
+      "component": "device.agent-protocol",
+      "commit": "206739c8424dd4c25627d74bbf5da088bf72676e",
+      "tree": "dd32bd0224282380573d749f49fe6e78db054c28",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "S02",
+      "component": "security.policy-v3",
+      "commit": "44138964dc63bafdbf851bb2009026049412120d",
+      "tree": "ab7947c73c1af5c2989e99d47186718ae39e409e",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "S03",
+      "component": "audit.distributed",
+      "commit": "2f872e376fb4b48ef3db8f098e46de4cb1f0a70e",
+      "tree": "3873bb106144ece686faf3b437b56dd29025ff25",
+      "status": "ACCEPTED"
+    }
+  ],
+  "integration": {
+    "branch": "integration/v3-runtime-foundations-wave3",
+    "validated_candidate_commit": "4024645d01460b2bfca35a5f2532da444e5a56f3",
+    "validated_candidate_tree": "c301d4ff5c4de03b01f54122a41bbf1edb7f28cc",
+    "merge_conflicts": 0,
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 16,
+      "tests": 86,
+      "failures": 0
+    },
+    "typecheck": "PASS",
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "scope": "current wave3 runtime foundations only",
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "runner": "scripts/acceptance/v3-wave3-runtime.ts",
+    "status": "PASS",
+    "input": {
+      "workflowExecutionId": "wf-real-1",
+      "deviceId": "windows-main",
+      "capability": "device.health"
+    },
+    "runtime": [
+      "WorkflowSqliteStore",
+      "SqliteDeviceRegistry",
+      "PolicyEngine+V3ExecutionPolicyGuard",
+      "V3 device agent protocol",
+      "HMAC-SHA256 distributed audit"
+    ],
+    "execution": {
+      "workflowEvents": 6,
+      "workflowStatus": "completed",
+      "nodeStatus": "completed",
+      "heartbeatStatus": "online",
+      "policyAllowed": true
+    },
+    "output": {
+      "distributedAuditHash": "1ede5a256fdb26d1524447a830691ae1f098999031cc4d185b2533a8d8770657",
+      "resolvedDeviceId": "windows-main",
+      "terminalState": "completed"
+    },
+    "limitation": "This validates the executable runtime foundations introduced in wave3. It does not claim real network transport to a separate Windows/macOS agent; that remains mandatory for later agent/runtime components."
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 10,
+    "implementation_percent": 35.71,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    "W04 workflow.scheduler",
+    "W06 workflow.observability",
+    "P05 capability.runtime",
+    "A02 artifact.bus"
+  ],
+  "blockers": [],
+  "canonical_end_marker": "END V3 RUNTIME FOUNDATIONS WAVE3 ACCEPTANCE 20261007"
+}
