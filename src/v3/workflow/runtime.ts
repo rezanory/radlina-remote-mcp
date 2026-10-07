@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { canonicalJson, sha256 } from "../../utils/json.js";
 import {
   dispatchReceiptSchema,
   parseWorkflowDefinition,
@@ -109,6 +110,14 @@ export class CanonicalWorkflowRuntime {
     }
 
     const definition = await this.store.definition(executionId);
+    const runningNodes = snapshot.nodes.filter((node) => node.status === "running");
+    if (runningNodes.length > 0) {
+      await this.recovery.reconcileRunning(
+        executionId,
+        runningNodes.map((node) => ({ nodeId: node.id, attempt: node.attempts })),
+      );
+      snapshot = this.store.snapshot(executionId);
+    }
     const nodeById = new Map(definition.nodes.map((node) => [node.id, node] as const));
     let dispatchedNodes = 0;
     let cycles = 0;
@@ -118,7 +127,7 @@ export class CanonicalWorkflowRuntime {
       const decision = await this.scheduler.reconcile(executionId);
       if (decision.ready.length === 0) break;
 
-      await Promise.all(
+      const settled = await Promise.allSettled(
         decision.ready.map(async (nodeId) => {
           const node = nodeById.get(nodeId);
           if (!node) throw new WorkflowRuntimeError(`node definition not found: ${nodeId}`);
@@ -166,6 +175,10 @@ export class CanonicalWorkflowRuntime {
           }
         }),
       );
+      const rejected = settled.find(
+        (result): result is PromiseRejectedResult => result.status === "rejected",
+      );
+      if (rejected) throw rejected.reason;
     }
 
     snapshot = this.finalizeWorkflow(executionId, definition);
@@ -190,28 +203,46 @@ export class CanonicalWorkflowRuntime {
   }
 
   async cancel(executionId: string): Promise<WorkflowSnapshot> {
-    const snapshot = this.store.snapshot(executionId);
-    if (snapshot.status === "completed" || snapshot.status === "cancelled") return snapshot;
+    let snapshot = this.store.snapshot(executionId);
+    if (snapshot.status === "completed") return snapshot;
 
+    if (snapshot.status !== "cancelled") {
+      this.store.transitionWorkflow(executionId, "cancelled");
+      snapshot = this.store.snapshot(executionId);
+    }
+
+    let firstError: unknown;
     for (const node of snapshot.nodes) {
       if (node.status === "running") {
-        await this.dispatch.cancel?.({
-          workflowExecutionId: executionId,
-          nodeId: node.id,
-          attempt: node.attempts,
-        });
-        this.store.transitionNode(executionId, node.id, "cancelled");
+        if (!this.dispatch.cancel) {
+          firstError ??= new WorkflowRuntimeError("dispatch cancellation is not supported");
+          continue;
+        }
+        try {
+          await this.dispatch.cancel({
+            workflowExecutionId: executionId,
+            nodeId: node.id,
+            attempt: node.attempts,
+          });
+          this.store.transitionNode(executionId, node.id, "cancelled");
+        } catch (error) {
+          firstError ??= error;
+        }
       } else if (
         node.status === "pending" ||
         node.status === "ready" ||
-        node.status === "blocked"
+        node.status === "blocked" ||
+        node.status === "failed" ||
+        node.status === "interrupted"
       ) {
         this.store.transitionNode(executionId, node.id, "cancelled");
       }
     }
-    const current = this.store.snapshot(executionId);
-    if (current.status !== "cancelled") {
-      this.store.transitionWorkflow(executionId, "cancelled");
+
+    if (firstError) {
+      throw firstError instanceof Error
+        ? firstError
+        : new WorkflowRuntimeError("dispatch cancellation failed");
     }
     return this.store.snapshot(executionId);
   }
@@ -239,7 +270,7 @@ export class CanonicalWorkflowRuntime {
   ): void {
     const endedAt = this.now();
     if (receipt.terminalState === "completed") {
-      this.store.transitionNode(executionId, nodeId, "completed");
+      this.store.settleNodeAttempt(executionId, nodeId, receipt.attempt, receipt);
       this.telemetry.emit({
         type: "node.completed",
         workflowExecutionId: executionId,
@@ -251,15 +282,15 @@ export class CanonicalWorkflowRuntime {
     }
 
     if (receipt.terminalState === "cancelled") {
-      this.store.transitionNode(executionId, nodeId, "cancelled");
+      this.store.settleNodeAttempt(executionId, nodeId, receipt.attempt, receipt);
       return;
     }
     if (receipt.terminalState === "interrupted") {
-      this.store.transitionNode(executionId, nodeId, "interrupted");
+      this.store.settleNodeAttempt(executionId, nodeId, receipt.attempt, receipt);
       return;
     }
 
-    this.store.transitionNode(executionId, nodeId, "failed");
+    this.store.settleNodeAttempt(executionId, nodeId, receipt.attempt, receipt);
     this.telemetry.emit({
       type: "node.failed",
       workflowExecutionId: executionId,
@@ -322,13 +353,18 @@ export class CanonicalWorkflowRuntime {
     attempt: number,
     receipt: DispatchReceipt,
   ): void {
+    const expectedInputSha256 = sha256(canonicalJson(node.input));
+    const exactDeviceMismatch =
+      node.target.deviceId !== undefined && receipt.resolvedDeviceId !== node.target.deviceId;
     if (
       receipt.workflowExecutionId !== executionId ||
       receipt.nodeId !== node.id ||
       receipt.attempt !== attempt ||
-      receipt.capability !== node.capability
+      receipt.capability !== node.capability ||
+      receipt.inputSha256 !== expectedInputSha256 ||
+      exactDeviceMismatch
     ) {
-      throw new WorkflowRuntimeError("dispatch receipt identity mismatch");
+      throw new WorkflowRuntimeError("dispatch receipt identity or integrity mismatch");
     }
   }
 

@@ -4,7 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 
 import { canonicalJson, sha256 } from "../../utils/json.js";
 import {
+  dispatchReceiptSchema,
   parseWorkflowDefinition,
+  type DispatchReceipt,
   type NodeState,
   type WorkflowDefinition,
   type WorkflowState,
@@ -58,6 +60,12 @@ export class WorkflowSqliteStore {
         sequence INTEGER PRIMARY KEY AUTOINCREMENT, execution_id TEXT NOT NULL, node_id TEXT,
         kind TEXT NOT NULL, from_state TEXT, to_state TEXT NOT NULL, created_at INTEGER NOT NULL,
         FOREIGN KEY(execution_id) REFERENCES v3_workflows(execution_id) ON DELETE CASCADE
+      );
+      CREATE TABLE IF NOT EXISTS v3_workflow_attempt_receipts(
+        execution_id TEXT NOT NULL, node_id TEXT NOT NULL, attempt INTEGER NOT NULL,
+        receipt_json TEXT NOT NULL, receipt_sha256 TEXT NOT NULL, received_at INTEGER NOT NULL,
+        PRIMARY KEY(execution_id,node_id,attempt),
+        FOREIGN KEY(execution_id,node_id) REFERENCES v3_workflow_nodes(execution_id,node_id) ON DELETE CASCADE
       );
     `);
   }
@@ -195,6 +203,94 @@ export class WorkflowSqliteStore {
       throw error;
     }
     return attempt;
+  }
+
+  settleNodeAttempt(
+    executionId: string,
+    nodeId: string,
+    attempt: number,
+    rawReceipt: DispatchReceipt,
+  ): NodeState {
+    const receipt = dispatchReceiptSchema.parse(rawReceipt);
+    if (
+      receipt.workflowExecutionId !== executionId ||
+      receipt.nodeId !== nodeId ||
+      receipt.attempt !== attempt
+    ) {
+      throw new WorkflowPersistenceConflict("attempt receipt identity mismatch");
+    }
+
+    const receiptJson = canonicalJson(receipt);
+    const receiptSha256 = sha256(receiptJson);
+    const existing = this.db
+      .prepare(
+        "SELECT receipt_sha256 FROM v3_workflow_attempt_receipts WHERE execution_id=? AND node_id=? AND attempt=?",
+      )
+      .get(executionId, nodeId, attempt) as { receipt_sha256: string } | undefined;
+    if (existing) {
+      if (existing.receipt_sha256 !== receiptSha256) {
+        throw new WorkflowPersistenceConflict("attempt receipt conflicts with durable receipt");
+      }
+      const current = this.db
+        .prepare("SELECT status FROM v3_workflow_nodes WHERE execution_id=? AND node_id=?")
+        .get(executionId, nodeId) as { status: string } | undefined;
+      if (!current || current.status !== receipt.terminalState) {
+        throw new WorkflowPersistenceConflict("durable receipt does not match node state");
+      }
+      return current.status;
+    }
+
+    const row = this.db
+      .prepare("SELECT status,attempts FROM v3_workflow_nodes WHERE execution_id=? AND node_id=?")
+      .get(executionId, nodeId) as { status: string; attempts: number } | undefined;
+    if (!row) throw new WorkflowPersistenceConflict("workflow node was not found");
+    if (row.attempts !== attempt) {
+      throw new WorkflowPersistenceConflict("attempt number does not match durable node attempt");
+    }
+
+    const from = row.status as NodeState;
+    const to = receipt.terminalState as NodeState;
+    transitionNode(from, to);
+    const now = Date.now();
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(
+          "INSERT INTO v3_workflow_attempt_receipts(execution_id,node_id,attempt,receipt_json,receipt_sha256,received_at) VALUES(?,?,?,?,?,?)",
+        )
+        .run(executionId, nodeId, attempt, receiptJson, receiptSha256, now);
+      const result = this.db
+        .prepare(
+          "UPDATE v3_workflow_nodes SET status=? WHERE execution_id=? AND node_id=? AND status='running' AND attempts=?",
+        )
+        .run(to, executionId, nodeId, attempt);
+      if (Number(result.changes) !== 1) {
+        throw new WorkflowPersistenceConflict("workflow node changed before receipt settlement");
+      }
+      this.db
+        .prepare("UPDATE v3_workflows SET updated_at=? WHERE execution_id=?")
+        .run(now, executionId);
+      this.event(executionId, nodeId, "node.receipt", from, to, now);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return to;
+  }
+
+  attemptReceipt(
+    executionId: string,
+    nodeId: string,
+    attempt: number,
+  ): DispatchReceipt | undefined {
+    const row = this.db
+      .prepare(
+        "SELECT receipt_json FROM v3_workflow_attempt_receipts WHERE execution_id=? AND node_id=? AND attempt=?",
+      )
+      .get(executionId, nodeId, attempt) as { receipt_json: string } | undefined;
+    return row ? dispatchReceiptSchema.parse(JSON.parse(row.receipt_json)) : undefined;
   }
 
   transitionNode(executionId: string, nodeId: string, to: NodeState): NodeState {

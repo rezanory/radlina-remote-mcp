@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { canonicalJson, sha256 } from "../../../src/utils/json.js";
 import type { WorkflowDefinition } from "../../../src/v3/workflow/contracts.js";
 import { InMemoryWorkflowTelemetry } from "../../../src/v3/workflow/observability.js";
 import {
@@ -73,7 +74,7 @@ function receipt(
     attempt: input.attempt,
     resolvedDeviceId: "windows-main",
     capability: input.node.capability,
-    inputSha256: hash,
+    inputSha256: sha256(canonicalJson(input.node.input)),
     startedAt: "2026-10-07T18:30:00+03:00",
     terminalState,
     outputSha256: terminalState === "completed" ? hash : null,
@@ -137,6 +138,8 @@ describe("V3 canonical workflow runtime", () => {
       ["join", "completed", 1],
     ]);
     expect(new Set(seen)).toEqual(new Set(["a:1", "b:1", "join:1"]));
+    expect(value.store.attemptReceipt("wf-1", "a", 1)?.terminalState).toBe("completed");
+    expect(value.store.attemptReceipt("wf-1", "join", 1)?.resolvedDeviceId).toBe("windows-main");
     expect(value.telemetry.snapshot().counters).toMatchObject({
       "node.dispatched": 3,
       "node.completed": 3,
@@ -225,6 +228,64 @@ describe("V3 canonical workflow runtime", () => {
     expect(result.snapshot).toMatchObject({
       status: "completed",
       nodes: [{ id: "health", status: "completed", attempts: 2 }],
+    });
+    value.store.close();
+  });
+
+  it("rejects a receipt with a mismatched input hash or exact device", async () => {
+    const value = await harness({
+      execute: async (input) => ({
+        receipt: {
+          ...receipt(input),
+          inputSha256: "b".repeat(64),
+          resolvedDeviceId: "macbook-main",
+        },
+      }),
+    });
+    await value.runtime.submit({
+      executionId: "wf-1",
+      subject: "owner",
+      idempotencyKey: "idem-1",
+      definition: definition(),
+    });
+
+    await expect(value.runtime.runUntilIdle("wf-1")).rejects.toThrow(
+      /identity or integrity mismatch/u,
+    );
+    expect(value.runtime.status("wf-1")).toMatchObject({
+      status: "interrupted",
+      nodes: [{ id: "health", status: "interrupted", attempts: 1 }],
+    });
+    expect(value.store.attemptReceipt("wf-1", "health", 1)).toBeUndefined();
+    value.store.close();
+  });
+
+  it("persists workflow cancellation before requesting remote cancellation", async () => {
+    let statusObservedDuringCancel: string | undefined;
+    const statusReader: { read?: () => string } = {};
+    const dispatch: ExecutionDispatchPort = {
+      execute: async (input) => ({ receipt: receipt(input) }),
+      cancel: async () => {
+        statusObservedDuringCancel = statusReader.read?.();
+      },
+    };
+    const value = await harness(dispatch);
+    statusReader.read = () => value.runtime.status("wf-1").status;
+    await value.runtime.submit({
+      executionId: "wf-1",
+      subject: "owner",
+      idempotencyKey: "idem-1",
+      definition: definition(),
+    });
+    value.store.transitionWorkflow("wf-1", "running");
+    await value.scheduler.reconcile("wf-1");
+    value.store.beginNodeAttempt("wf-1", "health");
+
+    const cancelled = await value.runtime.cancel("wf-1");
+    expect(statusObservedDuringCancel).toBe("cancelled");
+    expect(cancelled).toMatchObject({
+      status: "cancelled",
+      nodes: [{ id: "health", status: "cancelled", attempts: 1 }],
     });
     value.store.close();
   });
