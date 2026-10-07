@@ -159,6 +159,44 @@ export class WorkflowSqliteStore {
     return to;
   }
 
+  beginNodeAttempt(executionId: string, nodeId: string): number {
+    const row = this.db
+      .prepare(
+        "SELECT status,attempts,max_attempts FROM v3_workflow_nodes WHERE execution_id=? AND node_id=?",
+      )
+      .get(executionId, nodeId) as
+      { status: string; attempts: number; max_attempts: number } | undefined;
+    if (!row) throw new WorkflowPersistenceConflict("workflow node was not found");
+    const from = row.status as NodeState;
+    transitionNode(from, "running");
+    if (row.attempts >= row.max_attempts) {
+      throw new WorkflowPersistenceConflict(`workflow node retry budget exhausted: ${nodeId}`);
+    }
+
+    const attempt = row.attempts + 1;
+    const now = Date.now();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = this.db
+        .prepare(
+          "UPDATE v3_workflow_nodes SET status='running',attempts=? WHERE execution_id=? AND node_id=? AND status=? AND attempts=?",
+        )
+        .run(attempt, executionId, nodeId, from, row.attempts);
+      if (Number(result.changes) !== 1) {
+        throw new WorkflowPersistenceConflict("workflow node changed concurrently");
+      }
+      this.db
+        .prepare("UPDATE v3_workflows SET updated_at=? WHERE execution_id=?")
+        .run(now, executionId);
+      this.event(executionId, nodeId, "node.attempt", from, "running", now);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return attempt;
+  }
+
   transitionNode(executionId: string, nodeId: string, to: NodeState): NodeState {
     const row = this.db
       .prepare("SELECT status FROM v3_workflow_nodes WHERE execution_id=? AND node_id=?")
