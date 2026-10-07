@@ -1,0 +1,77 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-FOUNDATIONS-WAVE2-ACCEPTANCE-20261007",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "6ec76da02c56466731bdf06977ac49c4cd6a60b9",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "W02",
+      "component": "workflow.state-machine",
+      "branch": "generation/v3-w02-workflow-state-machine",
+      "commit": "3896c1cf9204f93e9210cddc56380f9f28beac4f",
+      "tree": "7b04d299de17f7e6437d4312c387aaabe26dae8c",
+      "unit_tests": 9,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "P02",
+      "component": "device.identity",
+      "branch": "generation/v3-p02-device-identity",
+      "commit": "6799aeafc336d4382e04a7be3d65a853371f8427",
+      "tree": "a96c5827bbd728fa6cdecb8d61323ca06f604ec5",
+      "unit_tests": 7,
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "A01",
+      "component": "artifact.contracts",
+      "branch": "generation/v3-a01-artifact-contracts",
+      "commit": "d349758781ad35b231f63a14e21fc0affccf3aee",
+      "tree": "3663a68020491ec990af29ce31ad97060a41e9a9",
+      "unit_tests": 7,
+      "status": "ACCEPTED"
+    }
+  ],
+  "integration": {
+    "branch": "integration/v3-foundations-wave2",
+    "validated_code_commit": "b7523b779a46f0f085460758e29a84d0eca0c5e1",
+    "validated_code_tree": "34b5589d5fbfba5544c4954ee9ca7c08b0bb3c67",
+    "merge_conflicts": 0,
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 11,
+      "tests": 59,
+      "failures": 0
+    },
+    "typecheck": "PASS",
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_test": {
+    "status": "DEFERRED_NOT_WAIVED",
+    "rationale": "W02, P02 and A01 define state, identity and artifact contracts but do not yet wire executable dispatch, registry, agent or transfer paths.",
+    "first_required_at": "first executable consumer of each contract"
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 5,
+    "implementation_percent": 17.86,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    "W03 workflow.persistence",
+    "P03 device.registry",
+    "P04 device.agent-protocol",
+    "S02 security.policy-v3",
+    "S03 audit.distributed"
+  ],
+  "blockers": [],
+  "canonical_end_marker": "END V3 FOUNDATIONS WAVE2 ACCEPTANCE 20261007"
+}

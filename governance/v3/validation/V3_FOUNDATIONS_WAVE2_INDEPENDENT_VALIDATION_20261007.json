@@ -1,0 +1,42 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-FOUNDATIONS-WAVE2-INDEPENDENT-VALIDATION-20261007",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "integration/v3-foundations-wave2",
+    "commit": "b7523b779a46f0f085460758e29a84d0eca0c5e1",
+    "tree": "34b5589d5fbfba5544c4954ee9ca7c08b0bb3c67",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-foundations-wave2-validation",
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "head": "b7523b779a46f0f085460758e29a84d0eca0c5e1",
+    "authoring_changes_allowed": false
+  },
+  "results": {
+    "exact_head": "PASS",
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files_passed": 11,
+      "tests_passed": 59,
+      "tests_failed": 0
+    },
+    "prettier_changed_scope": "PASS",
+    "diff_check_against_canonical_baseline": "PASS",
+    "lint_changed_scope": {
+      "status": "PASS",
+      "note": "First lint session was interrupted by the remote execution session with no code failure output; only the incomplete lint check was retried. Fresh-session retry completed with exitCode 0 while Radlina service health was healthy."
+    }
+  },
+  "runtime_impact": {
+    "v2_runtime_changed": false,
+    "v3_executable_runtime_wiring_changed": false,
+    "real_operational_acceptance_required_now": false
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 FOUNDATIONS WAVE2 INDEPENDENT VALIDATION 20261007"
+}
