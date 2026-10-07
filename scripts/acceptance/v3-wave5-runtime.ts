@@ -9,10 +9,7 @@ import { HmacDistributedAuditSigner } from "../../src/v3/audit/distributed.js";
 import { FilesystemArtifactBus } from "../../src/v3/artifact/bus.js";
 import { parseDeviceDescriptor } from "../../src/v3/device/identity.js";
 import { DeviceRouter } from "../../src/v3/device/router.js";
-import {
-  PluginRuntime,
-  type PluginManifest,
-} from "../../src/v3/plugin/runtime.js";
+import { PluginRuntime, type PluginManifest } from "../../src/v3/plugin/runtime.js";
 import {
   ProcessIsolatedPluginHostFactory,
   type PluginSourceResolver,
@@ -24,10 +21,7 @@ import {
 } from "../../src/v3/workflow/persistence.js";
 import { WorkflowRecoveryEngine } from "../../src/v3/workflow/recovery.js";
 import { WorkflowTriggerRuntime } from "../../src/v3/workflow/triggers.js";
-import {
-  WorktreeRuntime,
-  type GitWorktreePort,
-} from "../../src/v3/worktrees/runtime.js";
+import { WorktreeRuntime, type GitWorktreePort } from "../../src/v3/worktrees/runtime.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -83,16 +77,8 @@ try {
     ],
   };
 
-  const workflowStore = new WorkflowSqliteStore(
-    path.join(root, "workflow.sqlite3"),
-    new Codec(),
-  );
-  await workflowStore.create(
-    "wf-recovery",
-    "owner",
-    "idem-recovery",
-    recoveryDefinition,
-  );
+  const workflowStore = new WorkflowSqliteStore(path.join(root, "workflow.sqlite3"), new Codec());
+  await workflowStore.create("wf-recovery", "owner", "idem-recovery", recoveryDefinition);
   workflowStore.transitionWorkflow("wf-recovery", "running");
   workflowStore.transitionNode("wf-recovery", "recoverable", "ready");
   workflowStore.transitionNode("wf-recovery", "recoverable", "running");
@@ -105,22 +91,15 @@ try {
   const recoveryActions = await recovery.reconcileRunning("wf-recovery", [
     { nodeId: "recoverable", attempt: 1 },
   ]);
-  const interruptedStatus =
-    workflowStore.snapshot("wf-recovery").nodes[0]?.status ?? null;
+  const interruptedStatus = workflowStore.snapshot("wf-recovery").nodes[0]?.status ?? null;
   await recovery.resumeNode("wf-recovery", "recoverable", 1);
-  const resumedStatus =
-    workflowStore.snapshot("wf-recovery").nodes[0]?.status ?? null;
+  const resumedStatus = workflowStore.snapshot("wf-recovery").nodes[0]?.status ?? null;
 
   const nonIdempotentStore = new WorkflowSqliteStore(
     path.join(root, "workflow-non-idempotent.sqlite3"),
     new Codec(),
   );
-  await nonIdempotentStore.create(
-    "wf-unsafe",
-    "owner",
-    "idem-unsafe",
-    recoveryDefinition,
-  );
+  await nonIdempotentStore.create("wf-unsafe", "owner", "idem-unsafe", recoveryDefinition);
   nonIdempotentStore.transitionWorkflow("wf-unsafe", "running");
   nonIdempotentStore.transitionNode("wf-unsafe", "recoverable", "ready");
   nonIdempotentStore.transitionNode("wf-unsafe", "recoverable", "running");
@@ -129,9 +108,7 @@ try {
     { lookup: async () => undefined },
     { isIdempotent: () => false },
   );
-  await unsafeRecovery.reconcileRunning("wf-unsafe", [
-    { nodeId: "recoverable", attempt: 1 },
-  ]);
+  await unsafeRecovery.reconcileRunning("wf-unsafe", [{ nodeId: "recoverable", attempt: 1 }]);
   let unsafeRetryBlocked = false;
   try {
     await unsafeRecovery.resumeNode("wf-unsafe", "recoverable", 1);
@@ -144,22 +121,14 @@ try {
     path.join(root, "trigger-workflows.sqlite3"),
     new Codec(),
   );
-  const triggers = new WorkflowTriggerRuntime(
-    path.join(root, "triggers.sqlite3"),
-    {
-      submit: async ({ subject, idempotencyKey, workflow }) => {
-        triggerSubmitCount += 1;
-        const executionId = "wf-triggered";
-        await triggerStore.create(
-          executionId,
-          subject,
-          idempotencyKey,
-          workflow,
-        );
-        return executionId;
-      },
+  const triggers = new WorkflowTriggerRuntime(path.join(root, "triggers.sqlite3"), {
+    submit: async ({ subject, idempotencyKey, workflow }) => {
+      triggerSubmitCount += 1;
+      const executionId = "wf-triggered";
+      await triggerStore.create(executionId, subject, idempotencyKey, workflow);
+      return executionId;
     },
-  );
+  });
   const triggerInput = {
     source: "acceptance",
     eventId: "event-wave5",
@@ -229,16 +198,7 @@ try {
 
   const gitPort: GitWorktreePort = {
     create: async ({ repositoryPath, targetPath, branchName, baseRef: base }) => {
-      await git([
-        "-C",
-        repositoryPath,
-        "worktree",
-        "add",
-        "-b",
-        branchName,
-        targetPath,
-        base,
-      ]);
+      await git(["-C", repositoryPath, "worktree", "add", "-b", branchName, targetPath, base]);
     },
     release: async (repositoryPath, targetPath) => {
       await git(["-C", repositoryPath, "worktree", "remove", targetPath]);
@@ -270,12 +230,7 @@ try {
     globalCorrelationId: "corr-worktree",
     traceId: "trace-worktree",
   });
-  const worktreeHead = await git([
-    "-C",
-    worktreeResult.targetPath,
-    "rev-parse",
-    "HEAD",
-  ]);
+  const worktreeHead = await git(["-C", worktreeResult.targetPath, "rev-parse", "HEAD"]);
   const worktreeReceiptValid = worktrees.verifyReceipt(worktreeResult.receipt);
   await worktrees.release({
     workspaceId: "wf-wave5-node-worktree",
@@ -330,9 +285,7 @@ try {
     childPid: number;
     fsReadAllowed: boolean | null;
   };
-  const pluginReceiptValid = plugins.verifyLoadReceipt(
-    loadedPlugin.receipt,
-  );
+  const pluginReceiptValid = plugins.verifyLoadReceipt(loadedPlugin.receipt);
   await plugins.unload("echo-plugin");
 
   const acceptance =
@@ -388,8 +341,7 @@ try {
         pluginFilesystemReadAllowed: pluginResult.fsReadAllowed,
       },
       output: {
-        worktreeReceiptArtifactId:
-          worktreeResult.receiptArtifact.artifactId,
+        worktreeReceiptArtifactId: worktreeResult.receiptArtifact.artifactId,
         worktreeReceiptValid,
         pluginLoadArtifactId: loadedPlugin.receiptArtifact.artifactId,
         pluginReceiptValid,
