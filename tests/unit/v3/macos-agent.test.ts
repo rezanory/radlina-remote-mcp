@@ -73,11 +73,7 @@ describe("V3 macOS agent candidate", () => {
       throw new Error("unexpected security command");
     };
 
-    const protector = new MacOSKeychainSecretProtector(
-      "com.radlina.test",
-      run,
-      () => "token-1",
-    );
+    const protector = new MacOSKeychainSecretProtector("com.radlina.test", run, () => "token-1");
     const plaintext = Buffer.from("macos-secret");
     const reference = await protector.protect(plaintext);
     expect(Buffer.from(reference).toString("utf8")).toBe("keychain:token-1");
