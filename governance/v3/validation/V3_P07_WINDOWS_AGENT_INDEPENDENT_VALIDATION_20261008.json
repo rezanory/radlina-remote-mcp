@@ -1,0 +1,48 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-P07-WINDOWS-AGENT-INDEPENDENT-VALIDATION-20261008",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "generation/v3-p07-windows-agent",
+    "commit": "cfe9989150009d5d0254c7941d7d8dcefdc0c259",
+    "tree": "424de9bff82dee8a68fc623d370d33627c000a1b",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "mode": "GITHUB_ACTIONS_IMMUTABLE_CHECKOUT",
+    "run_id": 37714810550,
+    "job_id": 113108759813,
+    "checkout_sha": "cfe9989150009d5d0254c7941d7d8dcefdc0c259",
+    "runner": "windows-latest"
+  },
+  "results": {
+    "exact_checkout": "PASS",
+    "setup_node_24_20_0": "PASS",
+    "npm_ci": "PASS",
+    "typecheck": "PASS",
+    "p07_unit_tests": "PASS",
+    "lint_p07_scope": "PASS",
+    "prettier": "PASS",
+    "real_device_runner_present": "PASS",
+    "local_real_windows_acceptance": {
+      "status": "PASS",
+      "host": "LAPTOP-13QINEIF",
+      "deviceId": "windows-main",
+      "dpapiRoundTrip": true,
+      "realFilesystem": true,
+      "realCmdProcess": true,
+      "realRipgrepSearch": true,
+      "capabilityExecution": true,
+      "terminalState": "completed"
+    }
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "progress_after_w08_and_p07_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 21,
+    "implementation_percent": 75
+  },
+  "canonical_end_marker": "END V3 P07 WINDOWS AGENT INDEPENDENT VALIDATION 20261008"
+}

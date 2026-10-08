@@ -1,0 +1,45 @@
+name: V3 P07 Windows Agent Validation
+
+on:
+  push:
+    branches:
+      - generation/v3-p07-windows-agent
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-code:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24.20.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: P07 unit tests
+        run: npx vitest run tests/unit/v3/windows-agent.test.ts
+
+      - name: Lint P07 scope
+        run: npx eslint src/v3/device/windows-agent.ts tests/unit/v3/windows-agent.test.ts
+
+      - name: Format check
+        run: npx prettier --check src/v3/device/windows-agent.ts tests/unit/v3/windows-agent.test.ts scripts/acceptance/v3-p07-windows-agent.ts
+
+      - name: Verify real-device runner is present
+        shell: pwsh
+        run: |
+          if (-not (Test-Path scripts/acceptance/v3-p07-windows-agent.ts)) { exit 1 }
+          Write-Host "Real LAPTOP-13QINEIF acceptance remains a separate gate."

@@ -1,0 +1,72 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-P07-WINDOWS-AGENT-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_PENDING_INDEPENDENT_VALIDATION",
+  "component": {
+    "id": "P07",
+    "name": "device.agent.windows"
+  },
+  "source_baseline": {
+    "canonical_commit": "5ba1a796d1353c3579eb42576bfeae3bbe683df0",
+    "component_commit": "082602073e0f7eda3bbe31682d2c04c37230d546",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "gates": {
+    "typecheck": "PASS",
+    "unit": {
+      "status": "PASS",
+      "tests": 4,
+      "failures": 0
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "host": "LAPTOP-13QINEIF",
+    "platform": "windows",
+    "deviceId": "windows-main",
+    "runner": "scripts/acceptance/v3-p07-windows-agent.ts",
+    "status": "PASS",
+    "runtime": [
+      "createWindowsPlatformAdapter",
+      "FilesystemService",
+      "ProcessManager",
+      "SearchManager+ripgrep",
+      "Windows DPAPI LocalMachine",
+      "WindowsDeviceAgent+V3CapabilityRuntime"
+    ],
+    "execution": {
+      "dpapiRoundTrip": true,
+      "fileKind": "file",
+      "directoryEntries": [
+        "acceptance.txt"
+      ],
+      "processStatus": "complete",
+      "processExitCode": 0,
+      "searchStatus": "complete",
+      "searchResultCount": 1,
+      "helloDeviceId": "windows-main",
+      "capabilityExecutionOk": true
+    },
+    "output": {
+      "resolvedDeviceId": "windows-main",
+      "terminalState": "completed",
+      "localAuditReceiptHash": "80c83e2e7e92c0fd0bc0c9d688f63f80286642cb3a156f1e5fab137d59d01f12"
+    }
+  },
+  "progress_if_independent_validation_passes": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes_after_w08_and_p07": 21,
+    "implementation_percent": 75,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "blockers": [
+    "Independent GitHub Actions validation is still required before canonical integration."
+  ],
+  "canonical_end_marker": "END V3 P07 WINDOWS AGENT ACCEPTANCE 20261008"
+}
