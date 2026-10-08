@@ -1,0 +1,67 @@
+{
+  "schema_version": "radlina.v3.component-implementation-status/v1",
+  "record_id": "V3-P08-MACOS-AGENT-CANONICALIZATION-20261008",
+  "component": {
+    "id": "P08",
+    "name": "platform.macos-device-agent"
+  },
+  "status": "CANONICAL_IMPLEMENTATION_READY_REAL_MACBOOK_ACCEPTANCE_PENDING",
+  "source": {
+    "authoritative_branch": "generation/v3-p08-macos-agent",
+    "source_head": "5f62d2242998f3b5abf7a50cb24a67efe25e9c33",
+    "hosted_validation_run_id": 37704820070,
+    "hosted_validation_job_id": 113076550901,
+    "hosted_runner": "macos-latest",
+    "hosted_acceptance": "PASS"
+  },
+  "canonicalization": {
+    "base_commit": "cd0dbdab3ee1e08bbdf68c8c2622a3aa987454ed",
+    "integration_branch": "integration/v3-p08-macos-canonical-20261008",
+    "candidate_head_before_evidence": "c9a2c1a7a59273ac7c4e4da1ae7dcb0a40042f65",
+    "source_equivalence": {
+      "status": "PASS",
+      "files": [
+        ".github/workflows/v3-p08-macos-validation.yml",
+        "scripts/acceptance/v3-p08-macos-agent.ts",
+        "src/v3/device/macos-agent.ts",
+        "tests/unit/v3/macos-agent.test.ts"
+      ]
+    },
+    "latest_canonical_compatibility": {
+      "typecheck": "PASS",
+      "p08_unit_tests": {
+        "status": "PASS",
+        "tests": 3,
+        "failures": 0
+      },
+      "lint": "PASS",
+      "prettier": "PASS",
+      "diff_check": "PASS",
+      "worktree_clean_before_evidence": true
+    }
+  },
+  "operational_acceptance": {
+    "hosted_macos": "PASS",
+    "enrolled_real_macbook": "PENDING",
+    "required_device_id": "macbook-main",
+    "current_radlina_devices_observed": [
+      "LAPTOP-13QINEIF"
+    ],
+    "production_acceptance": "NOT_GRANTED"
+  },
+  "progress": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 24,
+    "accepted_implementation_percent": 85.71,
+    "implemented_nodes_including_pending_p08": 25,
+    "implemented_percent_including_pending_p08": 89.29,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "blockers": [
+    "macbook-main is not yet enrolled/visible in the Radlina runtime.",
+    "Hosted GitHub macOS validation does not substitute for acceptance on the user's enrolled real MacBook."
+  ],
+  "canonical_acceptance_count_must_not_increase": true,
+  "canonical_end_marker": "END V3 P08 MACOS AGENT CANONICALIZATION 20261008"
+}
