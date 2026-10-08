@@ -1,0 +1,39 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-C01-CONTROL-PLANE-INDEPENDENT-VALIDATION-20261008",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "generation/v3-c01-control-plane",
+    "commit": "4b2d9394ac44a383ff505441678d7a12376189e4",
+    "tree": "78e446084ba492d44de18d9ac59ac23eced397ef",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-c01-control-plane-validation",
+    "head": "4b2d9394ac44a383ff505441678d7a12376189e4",
+    "clean": true
+  },
+  "results": {
+    "typecheck": "PASS",
+    "unit_regression": {
+      "status": "PASS",
+      "test_files": 30,
+      "tests_passed": 159,
+      "tests_failed": 0
+    },
+    "mcp_integration": {
+      "status": "PASS",
+      "tests_passed": 2,
+      "tests_failed": 0
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "diff_check": "PASS",
+    "runtime_acceptance": "PASS"
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "canonical_integration_authorized": true,
+  "blockers": [],
+  "canonical_end_marker": "END V3 C01 CONTROL PLANE INDEPENDENT VALIDATION 20261008"
+}

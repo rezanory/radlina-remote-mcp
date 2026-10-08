@@ -1,0 +1,75 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-C01-CONTROL-PLANE-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "component": {
+    "id": "C01",
+    "name": "control-plane.mcp-v3"
+  },
+  "source_baseline": {
+    "canonical_commit": "d14a5bdf12b207f66d46842cd3b08c4019ad1975",
+    "validated_commit": "4b2d9394ac44a383ff505441678d7a12376189e4",
+    "validated_tree": "78e446084ba492d44de18d9ac59ac23eced397ef",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "gates": {
+    "typecheck": "PASS",
+    "unit_regression": {
+      "status": "PASS",
+      "test_files": 30,
+      "tests": 159,
+      "failures": 0
+    },
+    "mcp_integration": {
+      "status": "PASS",
+      "tests": 2,
+      "failures": 0
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "runner": "scripts/acceptance/v3-c01-control-plane.ts",
+    "status": "PASS",
+    "transport": "streamable-http",
+    "protocol": "2026-07-28",
+    "toolCount": 10,
+    "path": [
+      "MCP Client",
+      "Streamable HTTP",
+      "buildV3ControlPlaneServer",
+      "V3 guard/identity/device/capability ports",
+      "SmartOperatorAdapter",
+      "CanonicalWorkflowRuntime"
+    ],
+    "execution": {
+      "deviceCount": 2,
+      "operatorReplaySameJobId": true,
+      "operatorFinalStatus": "completed",
+      "adminReady": true
+    }
+  },
+  "capabilities_closed": [
+    "mcp.operator",
+    "mcp.devices",
+    "mcp.capabilities",
+    "mcp.admin",
+    "mcp.compat-v2"
+  ],
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 24,
+    "implementation_percent": 85.71,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "blockers": [
+    "P08 requires final operational acceptance on the enrolled real MacBook before F01/I01/AC01 can close."
+  ],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 C01 CONTROL PLANE ACCEPTANCE 20261008"
+}
