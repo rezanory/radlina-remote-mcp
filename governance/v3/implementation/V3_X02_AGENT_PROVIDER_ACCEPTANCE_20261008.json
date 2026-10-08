@@ -1,0 +1,49 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-X02-AGENT-PROVIDER-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "component": {
+    "id": "X02",
+    "name": "agent-provider.runtime"
+  },
+  "source_baseline": {
+    "canonical_commit": "50eab9c0ab4012293a78c3acae8210e3db0725e3",
+    "validated_commit": "f3fda94416810582f553d3da20ec8837d146bab5",
+    "validated_tree": "d23fe0c5fe49b4c5f079630b514b8796cb99b3f7"
+  },
+  "gates": {
+    "typecheck": "PASS",
+    "unit": {
+      "passed": 8,
+      "failed": 0
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "runner": "scripts/acceptance/v3-x02-agent-provider.ts",
+    "status": "PASS",
+    "execution": {
+      "completed": true,
+      "completedTerminalState": "completed",
+      "cancelRequested": true,
+      "cancelledTerminalState": "cancelled",
+      "providerCancelCalls": 1
+    },
+    "output": {
+      "completedReceiptValid": true,
+      "cancelledReceiptValid": true,
+      "providerCount": 1
+    }
+  },
+  "architecture_assertions": [
+    "Provider invocation is policy-gated before provider code executes.",
+    "Cancellation uses AbortSignal plus provider cancellation hook.",
+    "Provider outcomes are normalized into signed correlated receipts.",
+    "Runtime has no workflow scheduler, transition, or persistence authority."
+  ],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 X02 AGENT PROVIDER ACCEPTANCE 20261008"
+}
