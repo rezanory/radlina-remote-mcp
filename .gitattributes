@@ -2,5 +2,6 @@
 .gitattributes text eol=lf
 governance/radlinaremote-workflow/** text eol=lf
 governance/v3/** text eol=lf
+scripts/enrollment/*.sh text eol=lf
 VERSIONING.md text eol=lf
 docs/LOCAL_LAYOUT.md text eol=lf

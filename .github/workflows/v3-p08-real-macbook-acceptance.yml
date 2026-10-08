@@ -1,0 +1,39 @@
+name: V3 P08 Real MacBook Acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  accept-real-macbook:
+    runs-on: [self-hosted, macOS, radlina-macbook]
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout P08 candidate
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24.20.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Real MacBook preflight and acceptance
+        env:
+          RADLINA_EXPECTED_TAILNET: rezanory.github
+          RADLINA_EXPECTED_MAGICDNS: taile17c9e.ts.net
+          RADLINA_DEVICE_ID: macbook-main
+          RADLINA_EXPECTED_NODE: v24.20.0
+        run: |
+          bash scripts/enrollment/v3-p08-real-macbook-acceptance.sh | tee p08-real-macbook-evidence.json
+
+      - name: Publish acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p08-real-macbook-evidence
+          path: p08-real-macbook-evidence.json
+          if-no-files-found: error

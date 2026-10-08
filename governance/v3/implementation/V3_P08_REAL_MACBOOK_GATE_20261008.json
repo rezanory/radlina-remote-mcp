@@ -1,0 +1,60 @@
+{
+  "schema_version": "radlina.v3.blocker-resolution/v1",
+  "record_id": "V3-P08-REAL-MACBOOK-GATE-20261008",
+  "component": {
+    "id": "P08",
+    "name": "device.agent.macos"
+  },
+  "status": "BLOCKED_WAITING_FOR_REAL_MACBOOK",
+  "official_v3_progress": {
+    "accepted_components": 24,
+    "total_components": 28,
+    "percent": 85.71
+  },
+  "code_validation": {
+    "hosted_macos": "PASS",
+    "hosted_run_id": 37704820070,
+    "hosted_candidate": "ce6f627ada5e4cf03e4ffaef35b26a25b6cc0d83",
+    "hosted_runner": "macos-latest",
+    "limitation": "GitHub-hosted macOS validates executable macOS behavior but is not the enrolled target MacBook."
+  },
+  "required_target": {
+    "logical_device_id": "macbook-main",
+    "platform": "macos",
+    "tailscale_tailnet": "rezanory.github",
+    "magic_dns_suffix": "taile17c9e.ts.net",
+    "github_runner_labels": ["self-hosted", "macOS", "radlina-macbook"],
+    "node_version": "v24.20.0",
+    "required_commands": ["security", "tailscale", "node", "npm", "npx", "git", "rg"]
+  },
+  "current_observation": {
+    "radlina_visible_devices": ["LAPTOP-13QINEIF"],
+    "rdc_visible_devices": ["LAPTOP-13QINEIF"],
+    "tailscale_windows_peer_has_real_macbook": false,
+    "self_hosted_mac_runner_available": false
+  },
+  "acceptance_entrypoint": "scripts/enrollment/v3-p08-real-macbook-acceptance.sh",
+  "workflow_entrypoint": ".github/workflows/v3-p08-real-macbook-acceptance.yml",
+  "pass_chain": [
+    "Darwin host",
+    "Tailscale Running",
+    "tailnet == rezanory.github",
+    "MagicDNS == taile17c9e.ts.net",
+    "Node == v24.20.0",
+    "P08 typecheck/unit/lint/format",
+    "real Keychain runtime",
+    "real filesystem",
+    "real process",
+    "real ripgrep search",
+    "MacOSDeviceAgent hello as macbook-main",
+    "capability execution completed",
+    "signed/local receipt evidence"
+  ],
+  "unlocks_on_pass": [
+    "P08 production acceptance",
+    "F01 fleet upgrade/rollback",
+    "I01 runtime composition",
+    "AC01 multi-device acceptance"
+  ],
+  "canonical_end_marker": "END V3 P08 REAL MACBOOK GATE 20261008"
+}
