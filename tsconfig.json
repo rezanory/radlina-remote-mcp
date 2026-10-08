@@ -26,7 +26,8 @@
     "src/**/*.ts",
     "tests/**/*.ts",
     "scripts/enrollment/macbook-readiness-policy.ts",
-    "scripts/acceptance/v3-p08-real-macbook.ts"
+    "scripts/acceptance/v3-p08-real-macbook.ts",
+    "scripts/acceptance/v3-cross-device-consent-local.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

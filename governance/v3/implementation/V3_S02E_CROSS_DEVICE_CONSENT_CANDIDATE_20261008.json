@@ -1,0 +1,89 @@
+{
+  "schema_version": "radlina.v3.cross-device-consent-core/v1",
+  "record_id": "V3-S02E-CROSS-DEVICE-CONSENT-CANDIDATE-20261008",
+  "status": "COMPONENT_IMPLEMENTED_LOCAL_ACCEPTANCE_PASS_PRODUCTION_NOT_ACTIVE",
+  "architecture": {
+    "frozen_version": "1.0.0",
+    "change_request": "V3-SEC-CONSENT-01",
+    "proposed_ownership": "S02 security policy extension",
+    "protected_review": "PENDING",
+    "no_new_official_DAG_component": true,
+    "canonical_workflow_runtime_remains_sole_engine": true
+  },
+  "input": {
+    "origin": "trusted attested requesting device",
+    "recipient": "trusted attested owner of target device",
+    "permission_scope": [
+      "direction",
+      "requester subject",
+      "capability",
+      "exact resourceKey",
+      "inputSha256"
+    ],
+    "permission_modes": [
+      "once",
+      "15m",
+      "1h",
+      "8h",
+      "24h",
+      "custom up to 30d",
+      "permanent"
+    ],
+    "implicit_reverse_access": false
+  },
+  "runtime": {
+    "storage": "node:sqlite WAL synchronous FULL transactional",
+    "target_signature": "Ed25519 pinned target approval key",
+    "idempotency": "per request",
+    "replay_protection": "signed request nonce and unique execution attempt IDs",
+    "use_once": "atomic, transaction-protected decrement",
+    "revocation": "recipient-initiated and audited",
+    "key_rotation": "invalidates past grants",
+    "audit": "hash-chained request/approve/deny/consume/revoke + retained signed proof",
+    "default_access": "DENY",
+    "UI_local_target_interactive_required": true
+  },
+  "evidence": {
+    "local_component": {
+      "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+      "test_runner": "scripts/acceptance/v3-cross-device-consent-local.ts",
+      "outcome": "LOCAL_COMPONENT_PASS",
+      "fixture_devices": "SYNTHETIC, not real enrolled hardware",
+      "actual_process_platform": "win32",
+      "productionAcceptance": "NOT_GRANTED"
+    },
+    "affected_scope_tests": {
+      "typecheck": "PASS",
+      "unit_security_and_workflow": {
+        "files": 3,
+        "passed": 34,
+        "failed": 0
+      },
+      "lint": "PASS",
+      "prettier": "PASS"
+    },
+    "live_cross_device_network": "NOT_TESTED",
+    "native_target_UI": "NOT_IMPLEMENTED",
+    "tailscale_policy": "NOT_MODIFIED"
+  },
+  "required_for_production": [
+    "protected architecture/security review and CSEW authority",
+    "enrolled real MacBook and Windows with target-held keys",
+    "authenticated local approval/revocation UI on both devices",
+    "P03/P06/C01/I01 actual mandatory consent wiring with immutable verified origin",
+    "target-side revalidation, active execution stop/cancel after revoke/expiry",
+    "Tailscale deny-by-default grants/firewall and JIT network enforcement, preserving V2",
+    "audit anchoring in S03 and independent evidence review",
+    "real bidirectional cross-device acceptance, including denial before approval"
+  ],
+  "progress_unchanged": {
+    "v2_production_percent": 100,
+    "v3_governance_preparation_percent": 100,
+    "v3_accepted_components": 24,
+    "v3_total_components": 28,
+    "v3_accepted_percent": 85.71,
+    "v3_implemented_including_P08_pending": 25,
+    "v3_implemented_percent": 89.29
+  },
+  "end_marker": "END V3 S02E CROSS DEVICE CONSENT CANDIDATE 20261008"
+}
