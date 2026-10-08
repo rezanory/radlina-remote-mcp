@@ -11,8 +11,8 @@ import {
   type DispatchReceipt,
   type LegacyOperatorPlan,
   type WorkflowDefinition,
-  type WorkflowSnapshot,
 } from "../workflow/contracts.js";
+import type { WorkflowSnapshot } from "../workflow/persistence.js";
 
 export type OperatorBoundContext = {
   subject: string;
