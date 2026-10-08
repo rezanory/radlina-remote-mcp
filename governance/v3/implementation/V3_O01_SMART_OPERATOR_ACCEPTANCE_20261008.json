@@ -1,0 +1,66 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-O01-SMART-OPERATOR-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "component": {
+    "id": "O01",
+    "name": "operator.smart-adapter"
+  },
+  "source_baseline": {
+    "canonical_commit": "50eab9c0ab4012293a78c3acae8210e3db0725e3",
+    "validated_commit": "11049a56bd92c14fea0d2fc86486e518cc56e9f9",
+    "validated_tree": "7808eaa071014f5b56f4c1cfc4a49040e44b2fd0"
+  },
+  "gates": {
+    "typecheck": "PASS",
+    "unit": {
+      "passed": 6,
+      "failed": 0
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "runner": "scripts/acceptance/v3-o01-smart-operator.ts",
+    "status": "PASS",
+    "input": {
+      "legacyPlanSteps": [
+        "health-a",
+        "health-b"
+      ],
+      "defaultDeviceId": "windows-main"
+    },
+    "execution": {
+      "jobId": "wf-o01",
+      "dispatchOrder": [
+        "health-a",
+        "health-b"
+      ],
+      "finalStatus": "completed",
+      "stepStates": [
+        [
+          "health-a",
+          "completed"
+        ],
+        [
+          "health-b",
+          "completed"
+        ]
+      ]
+    },
+    "output": {
+      "jobIdIsCanonicalExecutionId": true,
+      "workflowCompleted": true
+    }
+  },
+  "architecture_assertions": [
+    "Legacy ordered steps translate to canonical DAG dependencies.",
+    "Smart Operator adapter owns no workflow scheduler, retry engine, or workflow store.",
+    "Public jobId is the canonical workflow execution id.",
+    "Resume/cancel delegate to canonical workflow runtime."
+  ],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 O01 SMART OPERATOR ACCEPTANCE 20261008"
+}
