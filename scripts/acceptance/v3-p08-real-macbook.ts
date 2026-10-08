@@ -1,128 +1,171 @@
 import { execFile as execFileCallback } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { promisify } from "node:util";
 
+import {
+  assessMacReadiness,
+  type TailscaleMacStatus,
+} from "../enrollment/macbook-readiness-policy.js";
+
 const execFile = promisify(execFileCallback);
-const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
-type TailStatus = {
-  BackendState?: string;
-  CurrentTailnet?: { Name?: string };
-  Self?: {
-    HostName?: string;
-    OS?: string;
-    Online?: boolean;
-    DNSName?: string;
-    TailscaleIPs?: string[];
-  };
-};
-
-async function run(
-  executable: string,
-  args: string[],
-  options: { cwd?: string } = {},
-): Promise<{ stdout: string; stderr: string }> {
+async function run(executable: string, args: string[], cwd = root) {
   return await execFile(executable, args, {
-    cwd: options.cwd,
+    cwd,
     timeout: 120_000,
     maxBuffer: 4 * 1024 * 1024,
   });
 }
 
-async function resolveTailscale(): Promise<string> {
-  const candidates = ["tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"];
-  for (const candidate of candidates) {
+async function tailscaleCli(): Promise<string> {
+  for (const candidate of ["tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"]) {
     try {
       await run(candidate, ["version"]);
       return candidate;
     } catch {
-      // Try the next known macOS Tailscale CLI path.
+      // Only known macOS Tailscale binaries are considered.
     }
   }
-  throw new Error("Tailscale CLI is not available on the MacBook");
+  throw new Error("Tailscale CLI is unavailable on the MacBook");
 }
 
-if (process.platform !== "darwin") {
-  process.stdout.write(
-    JSON.stringify({
-      acceptance: "BLOCKED_REAL_MACBOOK_REQUIRED",
-      platform: process.platform,
-    }),
-  );
-  process.exit(2);
-}
-
-const expectedTailnet = process.env["RADLINA_EXPECTED_TAILNET"] ?? "rezanory.github";
-const windowsDns =
-  process.env["RADLINA_WINDOWS_TAILSCALE_DNS"] ?? "laptop-13qineif.taile17c9e.ts.net";
-
-const tailscale = await resolveTailscale();
-const statusRaw = await run(tailscale, ["status", "--json"]);
-const status = JSON.parse(statusRaw.stdout) as TailStatus;
-
-const tailnetMatches = status.CurrentTailnet?.Name === expectedTailnet;
-const selfOnline = status.BackendState === "Running" && status.Self?.Online === true;
-const macIdentity =
-  typeof status.Self?.OS === "string" && status.Self.OS.toLowerCase().includes("mac");
-
-let windowsReachable = false;
-let pingOutput = "";
-try {
-  const ping = await run(tailscale, ["ping", "--c", "3", windowsDns]);
-  pingOutput = ping.stdout.trim();
-  windowsReachable = /pong|via/i.test(ping.stdout);
-} catch (error) {
-  pingOutput = error instanceof Error ? error.message : "tailscale ping failed";
-}
-
-const git = await run("git", ["rev-parse", "HEAD"], { cwd: projectRoot });
-const sourceCommit = git.stdout.trim();
-
-const tsxCli = path.join(projectRoot, "node_modules", "tsx", "dist", "cli.mjs");
-const innerScript = path.join(projectRoot, "scripts", "acceptance", "v3-p08-macos-agent.ts");
-const inner = await run(process.execPath, [tsxCli, innerScript], { cwd: projectRoot });
-
-const innerLines = inner.stdout.trim().split(/\r?\n/u).filter(Boolean);
-const innerJson = JSON.parse(innerLines.at(-1) ?? "{}") as {
+type LocalRuntimeOutput = {
   acceptance?: string;
   execution?: Record<string, unknown>;
   output?: Record<string, unknown>;
 };
 
-const runtimeAccepted = innerJson.acceptance === "PASS";
-const acceptance =
-  tailnetMatches && selfOnline && macIdentity && windowsReachable && runtimeAccepted;
+async function runMain(): Promise<void> {
+  if (process.platform !== "darwin") {
+    process.stdout.write(
+      JSON.stringify({
+        readiness: "BLOCKED",
+        reason: "REAL_MACBOOK_REQUIRED",
+        platform: process.platform,
+        productionAcceptance: "NOT_GRANTED",
+      }) + "\n",
+    );
+    process.exitCode = 2;
+    return;
+  }
 
-process.stdout.write(
-  JSON.stringify({
-    input: {
-      expectedTailnet,
-      windowsDns,
-      sourceCommit,
+  const expectedTailnet = process.env["RADLINA_EXPECTED_TAILNET"] ?? "rezanory.github";
+  const expectedMagicDnsSuffix = process.env["RADLINA_EXPECTED_MAGICDNS"] ?? "taile17c9e.ts.net";
+  const windowsDns =
+    process.env["RADLINA_WINDOWS_TAILSCALE_DNS"] ?? "laptop-13qineif.taile17c9e.ts.net";
+  // Must be set by the owner after inspecting the actual MacBook's Tailscale node ID.
+  // A logical label such as macbook-main is never sufficient.
+  const approvedMacNodeId = process.env["RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID"] ?? "";
+
+  const cli = await tailscaleCli();
+  const raw = await run(cli, ["status", "--json"]);
+  const status = JSON.parse(raw.stdout) as TailscaleMacStatus;
+
+  let windowsPingSucceeded = false;
+  let pingReason = "";
+  try {
+    const response = await run(cli, ["ping", "--c", "3", windowsDns]);
+    windowsPingSucceeded = /\bpong\b/iu.test(response.stdout);
+    pingReason = windowsPingSucceeded ? "verified pong" : "missing pong evidence";
+  } catch (error) {
+    pingReason = error instanceof Error ? error.message : "ping failed";
+  }
+
+  const guard = assessMacReadiness(status, {
+    platform: process.platform,
+    expectedTailnet,
+    expectedMagicDnsSuffix,
+    approvedMacNodeId,
+    windowsPingSucceeded,
+  });
+
+  const gitHead = (await run("git", ["rev-parse", "HEAD"])).stdout.trim();
+  const gitTree = (await run("git", ["rev-parse", "HEAD^{tree}"])).stdout.trim();
+
+  const evidenceBase = {
+    schemaVersion: "radlina.v3.macbook-readiness/v1",
+    source: { commit: gitHead, tree: gitTree },
+    device: {
+      logicalDeviceId: "macbook-main",
+      hostname: status.Self?.HostName ?? null,
+      tailscaleNodeId: status.Self?.ID ?? null,
+      tailscaleDnsName: status.Self?.DNSName ?? null,
+      platform: "macos",
     },
-    runtime: {
-      tailscale,
-      backendState: status.BackendState ?? null,
+    network: {
+      backend: status.BackendState ?? null,
       tailnet: status.CurrentTailnet?.Name ?? null,
-      macHostName: status.Self?.HostName ?? null,
-      macDnsName: status.Self?.DNSName ?? null,
-      macTailscaleIps: status.Self?.TailscaleIPs ?? [],
+      magicDnsSuffix: status.MagicDNSSuffix ?? status.CurrentTailnet?.MagicDNSSuffix ?? null,
+      windowsDns,
+      pingReason,
     },
-    execution: {
-      tailnetMatches,
-      selfOnline,
-      macIdentity,
-      windowsReachable,
-      pingOutput,
-      p08RuntimeAcceptance: innerJson.acceptance ?? null,
-      p08Execution: innerJson.execution ?? null,
-    },
-    output: {
-      p08Output: innerJson.output ?? null,
-    },
-    acceptance: acceptance ? "PASS" : "FAIL",
-  }),
-);
+    guard,
+  };
 
-if (!acceptance) process.exitCode = 1;
+  if (!guard.ready) {
+    process.stdout.write(
+      JSON.stringify({
+        ...evidenceBase,
+        readiness: "BLOCKED",
+        productionAcceptance: "NOT_GRANTED",
+        reason: "MACBOOK_IDENTITY_OR_NETWORK_PREFLIGHT_FAILED",
+      }) + "\n",
+    );
+    process.exitCode = 2;
+    return;
+  }
+
+  // Exercise a REAL ripgrep process on the verified Mac, not a fake SearchPort.
+  const scratch = await mkdtemp(path.join(tmpdir(), "radlina-macbook-rg-"));
+  let ripgrepExecuted = false;
+  try {
+    const markerFile = path.join(scratch, "radlina-p08-search-evidence.txt");
+    await writeFile(markerFile, "radlina-p08-search-evidence");
+    const rg = await run("rg", ["-l", "-F", "radlina-p08-search-evidence", scratch]);
+    ripgrepExecuted = rg.stdout.includes("radlina-p08-search-evidence.txt");
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+
+  const tsxCli = path.join(root, "node_modules", "tsx", "dist", "cli.mjs");
+  const localScript = path.join(root, "scripts", "acceptance", "v3-p08-macos-agent.ts");
+  const local = await run(process.execPath, [tsxCli, localScript]);
+  const lines = local.stdout.trim().split(/\r?\n/u).filter(Boolean);
+  const localEvidence = JSON.parse(lines.at(-1) ?? "{}") as LocalRuntimeOutput;
+  const localRuntimePassed = localEvidence.acceptance === "PASS";
+  const readiness = ripgrepExecuted && localRuntimePassed ? "PASS" : "FAIL";
+
+  process.stdout.write(
+    JSON.stringify({
+      ...evidenceBase,
+      localMacRuntime: {
+        macosAgentRuntime: localEvidence.acceptance ?? "MISSING",
+        execution: localEvidence.execution ?? null,
+        output: localEvidence.output ?? null,
+        realRipgrepExecuted: ripgrepExecuted,
+        note: "The MacOSDeviceAgent runner uses a test fixture for trusted identity. It is NOT a live V3 registry enrollment.",
+      },
+      readiness,
+      productionAcceptance: "PENDING_TRUSTED_DEVICE_REGISTRY_AND_LIVE_ROUTE_ACCEPTANCE",
+      officialAcceptedCountMustNotIncrease: true,
+    }) + "\n",
+  );
+  if (readiness !== "PASS") process.exitCode = 1;
+}
+
+try {
+  await runMain();
+} catch (error) {
+  process.stdout.write(
+    JSON.stringify({
+      readiness: "ERROR",
+      productionAcceptance: "NOT_GRANTED",
+      error: error instanceof Error ? error.message : "unknown MacBook readiness error",
+    }) + "\n",
+  );
+  process.exitCode = 1;
+}

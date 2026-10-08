@@ -1,0 +1,132 @@
+{
+  "schema_version": "radlina.v3.p08-readiness-fanin/v1",
+  "record_id": "V3-P08-MACBOOK-READINESS-FANIN-20261008",
+  "status": "READY_FOR_CANONICALIZATION_REAL_MACBOOK_NOT_ENROLLED",
+  "component": {
+    "id": "P08",
+    "name": "device.agent.macos"
+  },
+  "baseline": {
+    "canonical_before": "aba8affb9bbe748510ce2da3c355031df5736986",
+    "source_branches": [
+      "generation/v3-p08-real-macbook-acceptance",
+      "integration/v3-p08-real-macbook-enrollment-20261008"
+    ],
+    "cherry_picked_source_commits": [
+      "94d3b42",
+      "84a0fe1"
+    ],
+    "integration_branch": "integration/v3-p08-real-macbook-readiness-20261008"
+  },
+  "changed_scope": [
+    "scripts/enrollment/macbook-readiness-policy.ts",
+    "scripts/acceptance/v3-p08-real-macbook.ts",
+    "scripts/enrollment/v3-p08-real-macbook-acceptance.sh",
+    ".github/workflows/v3-p08-real-macbook-acceptance.yml",
+    "tests/unit/v3/macbook-readiness-policy.test.ts",
+    "tsconfig.json",
+    "docs/operations/V3_P08_MACBOOK_MAIN_ENROLLMENT_HANDOFF.md"
+  ],
+  "acceptance_boundaries": {
+    "macos_hosted_test_prior": "PASS",
+    "trusted_live_real_macbook": "PENDING",
+    "current_tailscale_tailnet": "rezanory.github",
+    "mac_peer_visible_from_windows": false,
+    "radlina_mcp_visible_devices": [
+      "LAPTOP-13QINEIF"
+    ],
+    "live_v3_device_registry_trusted_macbook": "NOT_VERIFIED",
+    "final_real_route_and_correlated_audit": "NOT_EXECUTED",
+    "local_mac_smoke_fixture_does_not_prove_enrollment": true,
+    "progress_increase_authorized": false
+  },
+  "safety": {
+    "requires_owner_approved_tailscale_node_id": true,
+    "pin_source": "GitHub Actions repository secret RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID",
+    "checks": [
+      "darwin",
+      "Tailscale Running",
+      "correct tailnet",
+      "MagicDNS",
+      "self OS=macOS",
+      "self online",
+      "approved Node ID pinned",
+      "Node ID matches",
+      "self DNS in tailnet",
+      "real Tailscale ping Windows"
+    ],
+    "final_output_production_acceptance": "PENDING_TRUSTED_DEVICE_REGISTRY_AND_LIVE_ROUTE_ACCEPTANCE",
+    "workflow_is_readiness_only": true,
+    "no_second_workflow_engine": true
+  },
+  "gates": {
+    "npm_ci": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "typecheck_including_new_scripts": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "targeted_tests": {
+      "status": "PASS",
+      "test_files": 2,
+      "passed": 12,
+      "failed": 0
+    },
+    "lint": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "prettier": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "bash_syntax": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "windows_ts_runner_negative_gate": {
+      "status": "PASS_EXPECTED_BLOCK",
+      "exit_code": 2,
+      "readiness": "BLOCKED",
+      "productionAcceptance": "NOT_GRANTED"
+    },
+    "windows_shell_negative_gate": {
+      "status": "PASS_EXPECTED_BLOCK",
+      "exit_code": 2,
+      "readiness": "BLOCKED",
+      "productionAcceptance": "NOT_GRANTED"
+    },
+    "changed_scope_diff_check": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "real_macbook_job": {
+      "status": "NOT_RUN_NO_ENROLLED_MACBOOK"
+    }
+  },
+  "progress": {
+    "v2_production_percent": 100,
+    "governance_percent": 100,
+    "v3_official_accepted_nodes": 24,
+    "v3_total_nodes": 28,
+    "v3_official_accepted_percent": 85.71,
+    "v3_implemented_nodes_including_p08_pending": 25,
+    "v3_implemented_percent_including_p08_pending": 89.29
+  },
+  "risks": [
+    "npm ci reported 6 existing dependency advisories (5 high, 1 critical), not changed in this P08 readiness lane."
+  ],
+  "blockers": [
+    "Owner MacBook is absent from the Windows Tailscale peer list.",
+    "V3 trusted registry enrollment, exact-device route and correlated audit on the real MacBook have not been witnessed."
+  ],
+  "next_actions": [
+    "Connect owner's Mac to the same tailnet and verify its Tailscale Node ID independently.",
+    "Pin approved Node ID in GitHub Actions secret.",
+    "Enroll self-hosted Mac runner with label radlina-macbook.",
+    "Run Mac readiness workflow then separately complete trusted V3 registry/live routing acceptance."
+  ],
+  "canonical_end_marker": "END V3 P08 MACBOOK READINESS FANIN 20261008"
+}

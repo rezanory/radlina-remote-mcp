@@ -1,4 +1,4 @@
-name: V3 P08 Real MacBook Acceptance
+name: V3 P08 Real MacBook Readiness (NOT Production Acceptance)
 
 on:
   workflow_dispatch:
@@ -7,12 +7,13 @@ permissions:
   contents: read
 
 jobs:
-  accept-real-macbook:
+  macbook-readiness:
+    if: github.ref == 'refs/heads/generation/v3-multidevice-agent-os'
     runs-on: [self-hosted, macOS, radlina-macbook]
     timeout-minutes: 45
 
     steps:
-      - name: Checkout P08 candidate
+      - name: Checkout authoritative V3 candidate
         uses: actions/checkout@v4
 
       - name: Setup Node 24.20.0
@@ -21,19 +22,22 @@ jobs:
           node-version: 24.20.0
           cache: npm
 
-      - name: Real MacBook preflight and acceptance
+      - name: Verify MacBook identity and run local P08 readiness
+        shell: bash
         env:
           RADLINA_EXPECTED_TAILNET: rezanory.github
           RADLINA_EXPECTED_MAGICDNS: taile17c9e.ts.net
-          RADLINA_DEVICE_ID: macbook-main
+          RADLINA_WINDOWS_TAILSCALE_DNS: laptop-13qineif.taile17c9e.ts.net
           RADLINA_EXPECTED_NODE: v24.20.0
+          RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID: ${{ secrets.RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID }}
         run: |
-          bash scripts/enrollment/v3-p08-real-macbook-acceptance.sh | tee p08-real-macbook-evidence.json
+          set -o pipefail
+          bash scripts/enrollment/v3-p08-real-macbook-acceptance.sh 2>&1 | tee p08-macbook-readiness.log
 
-      - name: Publish acceptance evidence
+      - name: Preserve MacBook readiness evidence (never a production PASS)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: p08-real-macbook-evidence
-          path: p08-real-macbook-evidence.json
-          if-no-files-found: error
+          name: v3-p08-macbook-readiness-not-production-acceptance
+          path: p08-macbook-readiness.log
+          if-no-files-found: warn

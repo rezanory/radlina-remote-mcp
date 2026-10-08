@@ -22,6 +22,11 @@
     "declaration": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "scripts/enrollment/macbook-readiness-policy.ts",
+    "scripts/acceptance/v3-p08-real-macbook.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }
