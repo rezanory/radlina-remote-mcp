@@ -1,0 +1,52 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-ORCHESTRATION-WAVE6-INDEPENDENT-VALIDATION-20261007",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "integration/v3-orchestration-wave6",
+    "commit": "551cd19bd1b3999d9409aff8e858d829671379f5",
+    "tree": "8834af9fca1e986a07ed27b3fa99041e671ad9ba",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-orchestration-wave6-validation",
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "head": "551cd19bd1b3999d9409aff8e858d829671379f5",
+    "authoring_changes_allowed": false
+  },
+  "results": {
+    "exact_head": "PASS",
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files_passed": 28,
+      "tests_passed": 145,
+      "tests_failed": 0
+    },
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runners": "PASS",
+    "diff_check_against_previous_canonical": "PASS",
+    "runtime_acceptance": {
+      "W08": {
+        "status": "PASS",
+        "durableReceipts": 3,
+        "durableReceiptEvents": 3,
+        "workflowStatus": "completed"
+      },
+      "P07": {
+        "status": "PASS",
+        "realWindows": true,
+        "dpapiRoundTrip": true,
+        "filesystemReal": true,
+        "processReal": true,
+        "ripgrepSearchReal": true,
+        "resolvedDeviceId": "windows-main",
+        "terminalState": "completed"
+      }
+    }
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "blockers": [],
+  "canonical_integration_authorized": true,
+  "canonical_end_marker": "END V3 ORCHESTRATION WAVE6 INDEPENDENT VALIDATION 20261007"
+}

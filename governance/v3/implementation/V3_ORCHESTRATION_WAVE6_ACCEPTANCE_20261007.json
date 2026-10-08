@@ -1,0 +1,126 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-ORCHESTRATION-WAVE6-ACCEPTANCE-20261007",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "5ba1a796d1353c3579eb42576bfeae3bbe683df0",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "W08",
+      "component": "workflow.runtime",
+      "commit": "8dd7f59586769bb7995f23bf5a10c93d6d7cdbc8",
+      "status": "ACCEPTED",
+      "acceptance": [
+        "canonical single workflow authority",
+        "durable atomic attempt receipt settlement",
+        "receipt input/exact-device integrity validation",
+        "startup running-attempt reconciliation",
+        "maximum-safe parallel dispatch with dependency join",
+        "durable cancellation intent before dispatch cancellation"
+      ]
+    },
+    {
+      "id": "P07",
+      "component": "device.agent.windows",
+      "commit": "082602073e0f7eda3bbe31682d2c04c37230d546",
+      "status": "ACCEPTED",
+      "acceptance": [
+        "real Windows DPAPI LocalMachine round-trip",
+        "real FilesystemService execution",
+        "real ProcessManager cmd.exe execution",
+        "real SearchManager production ripgrep execution",
+        "Windows agent hello and capability execution on windows-main"
+      ]
+    }
+  ],
+  "integration": {
+    "branch": "integration/v3-orchestration-wave6",
+    "validated_candidate_commit": "551cd19bd1b3999d9409aff8e858d829671379f5",
+    "validated_candidate_tree": "8834af9fca1e986a07ed27b3fa99041e671ad9ba",
+    "merge_conflicts": 0,
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 28,
+      "tests": 145,
+      "failures": 0
+    },
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runners": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+    "W08": {
+      "runner": "scripts/acceptance/v3-w08-runtime.ts",
+      "status": "PASS",
+      "execution": {
+        "dispatchedNodes": 3,
+        "cycles": 3,
+        "workflowStatus": "completed",
+        "nodeStates": [
+          [
+            "health-a",
+            "completed",
+            1
+          ],
+          [
+            "health-b",
+            "completed",
+            1
+          ],
+          [
+            "join",
+            "completed",
+            1
+          ]
+        ]
+      },
+      "output": {
+        "durableReceipts": 3,
+        "durableReceiptEvents": 3,
+        "resolvedDeviceId": "windows-main"
+      }
+    },
+    "P07": {
+      "runner": "scripts/acceptance/v3-p07-windows-agent.ts",
+      "status": "PASS",
+      "execution": {
+        "hostname": "LAPTOP-13QINEIF",
+        "dpapiRoundTrip": true,
+        "fileKind": "file",
+        "processStatus": "complete",
+        "processExitCode": 0,
+        "searchStatus": "complete",
+        "searchResultCount": 1,
+        "helloDeviceId": "windows-main",
+        "capabilityExecutionOk": true
+      },
+      "output": {
+        "resolvedDeviceId": "windows-main",
+        "terminalState": "completed",
+        "localAuditReceiptHash": "80c83e2e7e92c0fd0bc0c9d688f63f80286642cb3a156f1e5fab137d59d01f12"
+      }
+    }
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 21,
+    "implementation_percent": 75,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "next_dag_eligible": [
+    "O01 operator.smart-adapter",
+    "X02 agent-provider.runtime",
+    "P08 device.agent.macos implementation (real acceptance pending MacBook)"
+  ],
+  "blockers": [
+    "P08 production acceptance requires an enrolled real MacBook/macOS Radlina runtime."
+  ],
+  "canonical_end_marker": "END V3 ORCHESTRATION WAVE6 ACCEPTANCE 20261007"
+}
