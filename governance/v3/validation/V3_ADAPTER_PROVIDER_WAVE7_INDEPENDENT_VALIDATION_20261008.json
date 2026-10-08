@@ -1,0 +1,36 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-ADAPTER-PROVIDER-WAVE7-INDEPENDENT-VALIDATION-20261008",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "integration/v3-adapter-provider-wave7-20261008",
+    "commit": "3eb6c6ac747c7ea5101f68e7f944f0acee83afca",
+    "tree": "6191f3fab9331893db8b89e2048a67671e257bc9",
+    "github_remote_verified": true
+  },
+  "validator": {
+    "mode": "DETACHED_IMMUTABLE_CANDIDATE",
+    "worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-adapter-provider-wave7-validation-20261008",
+    "head": "3eb6c6ac747c7ea5101f68e7f944f0acee83afca",
+    "clean": true
+  },
+  "results": {
+    "exact_head": "PASS",
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 30,
+      "tests_passed": 159,
+      "tests_failed": 0
+    },
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runners": "PASS",
+    "diff_check": "PASS",
+    "O01_runtime_acceptance": "PASS",
+    "X02_runtime_acceptance": "PASS"
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "canonical_integration_authorized": true,
+  "blockers": [],
+  "canonical_end_marker": "END V3 ADAPTER PROVIDER WAVE7 INDEPENDENT VALIDATION 20261008"
+}

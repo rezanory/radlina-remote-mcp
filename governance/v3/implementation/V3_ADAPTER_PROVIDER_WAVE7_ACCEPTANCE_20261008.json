@@ -1,0 +1,76 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-ADAPTER-PROVIDER-WAVE7-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "50eab9c0ab4012293a78c3acae8210e3db0725e3",
+    "integration_commit": "3eb6c6ac747c7ea5101f68e7f944f0acee83afca",
+    "integration_tree": "6191f3fab9331893db8b89e2048a67671e257bc9",
+    "architecture_version": "1.0.0",
+    "rrmw_version": "1.0.0",
+    "csew_version": "3.1.5"
+  },
+  "components": [
+    {
+      "id": "O01",
+      "component": "operator.smart-adapter",
+      "validated_commit": "11049a56bd92c14fea0d2fc86486e518cc56e9f9",
+      "evidence": "V3_O01_SMART_OPERATOR_INDEPENDENT_VALIDATION_20261008.json",
+      "status": "ACCEPTED"
+    },
+    {
+      "id": "X02",
+      "component": "agent-provider.runtime",
+      "validated_commit": "f3fda94416810582f553d3da20ec8837d146bab5",
+      "evidence": "V3_X02_AGENT_PROVIDER_INDEPENDENT_VALIDATION_20261008.json",
+      "status": "ACCEPTED"
+    }
+  ],
+  "integration": {
+    "merge_conflicts": 0,
+    "typecheck": "PASS",
+    "full_unit": {
+      "status": "PASS",
+      "test_files": 30,
+      "tests": 159,
+      "failures": 0
+    },
+    "lint_changed_scope": "PASS",
+    "prettier_changed_scope_and_runners": "PASS",
+    "diff_check": "PASS"
+  },
+  "real_operational_acceptance": {
+    "O01": {
+      "status": "PASS",
+      "runner": "scripts/acceptance/v3-o01-smart-operator.ts",
+      "workflowAuthority": "CanonicalWorkflowRuntime",
+      "jobId": "wf-o01",
+      "dispatchOrder": [
+        "health-a",
+        "health-b"
+      ],
+      "finalStatus": "completed"
+    },
+    "X02": {
+      "status": "PASS",
+      "runner": "scripts/acceptance/v3-x02-agent-provider.ts",
+      "completedTerminalState": "completed",
+      "cancelledTerminalState": "cancelled",
+      "providerCancelCalls": 1,
+      "completedReceiptValid": true,
+      "cancelledReceiptValid": true
+    }
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 23,
+    "implementation_percent": 82.14,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "known_pending": [
+    "P08 macOS agent is hosted-macOS validated but remains pending final acceptance on the enrolled real MacBook."
+  ],
+  "blockers": [],
+  "canonical_end_marker": "END V3 ADAPTER PROVIDER WAVE7 ACCEPTANCE 20261008"
+}
