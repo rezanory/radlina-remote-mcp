@@ -147,10 +147,7 @@ try {
     cancel: async () => undefined,
   };
 
-  const workflowStore = new WorkflowSqliteStore(
-    path.join(root, "workflow.sqlite3"),
-    new Codec(),
-  );
+  const workflowStore = new WorkflowSqliteStore(path.join(root, "workflow.sqlite3"), new Codec());
   const scheduler = new WorkflowScheduler(workflowStore);
   const recovery = new WorkflowRecoveryEngine(
     workflowStore,
@@ -198,20 +195,8 @@ try {
     ],
   };
 
-  const submitted = await operator.submit(
-    auth,
-    "owner",
-    "test",
-    plan,
-    "o01-idempotency",
-  );
-  const replay = await operator.submit(
-    auth,
-    "owner",
-    "test",
-    plan,
-    "o01-idempotency",
-  );
+  const submitted = await operator.submit(auth, "owner", "test", plan, "o01-idempotency");
+  const replay = await operator.submit(auth, "owner", "test", plan, "o01-idempotency");
 
   const run = await workflow.runUntilIdle(submitted.jobId);
   const projected = operator.status("owner", submitted.jobId);
@@ -273,10 +258,8 @@ try {
           step.attempts,
           step.receipt?.resolvedDeviceId ?? null,
         ]),
-        durableBindingContainsInputPlaintext:
-          encodedBinding.includes("secret-input-marker"),
-        durableBindingContainsToken:
-          encodedBinding.includes("o01-acceptance-token"),
+        durableBindingContainsInputPlaintext: encodedBinding.includes("secret-input-marker"),
+        durableBindingContainsToken: encodedBinding.includes("o01-acceptance-token"),
       },
       acceptance: acceptance ? "PASS" : "FAIL",
     }),

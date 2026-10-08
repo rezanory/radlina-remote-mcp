@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { CapabilityRegistry } from "../../../src/components/registry.js";
 import { PolicyEngine } from "../../../src/policy/engine.js";
-import { SmartOperatorAdapter, type OperatorWorkflowPort } from "../../../src/v3/operator/adapter.js";
+import {
+  SmartOperatorAdapter,
+  type OperatorWorkflowPort,
+} from "../../../src/v3/operator/adapter.js";
 import type {
   DispatchReceipt,
   WorkflowDefinition,
@@ -163,9 +166,7 @@ describe("V3 SmartOperatorAdapter", () => {
 
   it("submits to the canonical runtime and persists only compatibility metadata", async () => {
     const value = adapter();
-    await expect(
-      value.adapter.submit(auth, "owner", "test", plan(), "idem-1"),
-    ).resolves.toEqual({
+    await expect(value.adapter.submit(auth, "owner", "test", plan(), "idem-1")).resolves.toEqual({
       jobId,
       status: "queued",
       steps: 2,
@@ -189,9 +190,9 @@ describe("V3 SmartOperatorAdapter", () => {
     await expect(
       value.adapter.submit(auth, "owner", "test", plan(), "idem-1"),
     ).resolves.toMatchObject({ jobId, replayed: true });
-    await expect(
-      value.adapter.submit(auth, "owner", "other", plan(), "idem-1"),
-    ).rejects.toThrow(/different profile/u);
+    await expect(value.adapter.submit(auth, "owner", "other", plan(), "idem-1")).rejects.toThrow(
+      /different profile/u,
+    );
     value.db.close();
   });
 

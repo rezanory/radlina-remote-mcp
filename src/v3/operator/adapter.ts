@@ -34,11 +34,7 @@ export interface OperatorWorkflowPort {
 }
 
 export interface OperatorReceiptReader {
-  attemptReceipt(
-    executionId: string,
-    nodeId: string,
-    attempt: number,
-  ): DispatchReceipt | undefined;
+  attemptReceipt(executionId: string, nodeId: string, attempt: number): DispatchReceipt | undefined;
 }
 
 type BindingRow = {
@@ -230,7 +226,10 @@ export class SmartOperatorAdapter {
     };
   }
 
-  translate(plan: LegacyOperatorPlan, target: DeviceTarget = this.defaultTarget): WorkflowDefinition {
+  translate(
+    plan: LegacyOperatorPlan,
+    target: DeviceTarget = this.defaultTarget,
+  ): WorkflowDefinition {
     const parsed = legacyOperatorPlanSchema.parse(plan);
     const selectedTarget = deviceTargetSchema.parse(target);
     return {
