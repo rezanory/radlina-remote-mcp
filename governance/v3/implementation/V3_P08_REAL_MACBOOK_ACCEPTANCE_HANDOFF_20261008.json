@@ -1,0 +1,58 @@
+{
+  "schema_version": "radlina.v3.real-device-handoff/v1",
+  "record_id": "V3-P08-REAL-MACBOOK-ACCEPTANCE-HANDOFF-20261008",
+  "status": "READY_PENDING_REAL_MACBOOK_CONNECTION",
+  "component": {
+    "id": "P08",
+    "name": "device.agent.macos"
+  },
+  "source": {
+    "branch": "generation/v3-p08-real-macbook-acceptance",
+    "base_candidate": "5f62d22",
+    "hosted_macos_validation": {
+      "run_id": 37704820070,
+      "commit": "ce6f627ada5e4cf03e4ffaef35b26a25b6cc0d83",
+      "conclusion": "success",
+      "real_macos_runtime_acceptance": "PASS"
+    }
+  },
+  "current_connectivity_evidence": {
+    "radlina_devices": [
+      "LAPTOP-13QINEIF"
+    ],
+    "rdc_devices": [
+      "LAPTOP-13QINEIF"
+    ],
+    "tailscale": {
+      "local_host": "LAPTOP-13QINEIF",
+      "backend": "Running",
+      "tailnet": "rezanory.github",
+      "windows_dns": "laptop-13qineif.taile17c9e.ts.net",
+      "real_mac_peer_present": false
+    }
+  },
+  "runner": "scripts/acceptance/v3-p08-real-macbook.ts",
+  "required_real_device_chain": [
+    "MacBook joins Tailscale tailnet rezanory.github",
+    "MacBook can Tailscale-ping laptop-13qineif.taile17c9e.ts.net",
+    "runner executes on darwin",
+    "inner MacOSDeviceAgent acceptance returns PASS",
+    "combined runner returns acceptance=PASS"
+  ],
+  "execution_command": "node node_modules/tsx/dist/cli.mjs scripts/acceptance/v3-p08-real-macbook.ts",
+  "optional_environment": {
+    "RADLINA_EXPECTED_TAILNET": "rezanory.github",
+    "RADLINA_WINDOWS_TAILSCALE_DNS": "laptop-13qineif.taile17c9e.ts.net"
+  },
+  "progress_effect": {
+    "official_accepted_nodes": 24,
+    "official_percent": 85.71,
+    "P08_not_counted_until_real_macbook_pass": true
+  },
+  "downstream_blocked_by_P08": [
+    "F01",
+    "I01",
+    "AC01"
+  ],
+  "canonical_end_marker": "END V3 P08 REAL MACBOOK ACCEPTANCE HANDOFF 20261008"
+}
