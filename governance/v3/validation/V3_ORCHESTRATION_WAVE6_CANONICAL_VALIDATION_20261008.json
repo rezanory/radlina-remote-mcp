@@ -1,0 +1,26 @@
+{
+  "schema_version": "radlina.v3.independent-validation/v1",
+  "record_id": "V3-ORCHESTRATION-WAVE6-CANONICAL-VALIDATION-20261008",
+  "status": "INDEPENDENT_VALIDATION_PASS",
+  "validated_source": {
+    "branch": "integration/v3-p07-canonical-wave6-20261008",
+    "commit": "8ac8852aac13058904a4b94acc721c3d5a3e6abd",
+    "tree": "e84f2ba20175d07db9ab34e2fc5458861bbcbca8"
+  },
+  "validation_basis": {
+    "source_equivalence_to_prior_independently_validated_candidate": "PASS",
+    "prior_candidate": "551cd19bd1b3999d9409aff8e858d829671379f5",
+    "source_test_script_diff": "EMPTY",
+    "current_diff_check": "PASS",
+    "repeated_gates_required": false,
+    "reason": "No affected executable source/test/runner scope changed; only CI/evidence files were added."
+  },
+  "component_independent_validation": {
+    "W08": "PASS",
+    "P07": "PASS"
+  },
+  "verdict": "INDEPENDENT_VALIDATION_PASS",
+  "canonical_integration_authorized": true,
+  "blockers": [],
+  "canonical_end_marker": "END V3 ORCHESTRATION WAVE6 CANONICAL VALIDATION 20261008"
+}

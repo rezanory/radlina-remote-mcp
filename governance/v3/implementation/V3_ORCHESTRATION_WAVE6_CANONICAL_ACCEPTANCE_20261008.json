@@ -1,0 +1,66 @@
+{
+  "schema_version": "radlina.v3.component-acceptance/v1",
+  "record_id": "V3-ORCHESTRATION-WAVE6-CANONICAL-ACCEPTANCE-20261008",
+  "status": "ACCEPTED_FOR_CANONICAL_INTEGRATION",
+  "source_baseline": {
+    "canonical_commit": "e09ad0fdca556ca52e708cad7c43ba7102aebfb9",
+    "integration_commit": "8ac8852aac13058904a4b94acc721c3d5a3e6abd",
+    "integration_tree": "e84f2ba20175d07db9ab34e2fc5458861bbcbca8"
+  },
+  "components": [
+    {
+      "id": "W08",
+      "component": "workflow.runtime",
+      "status": "ACCEPTED",
+      "evidence": "V3_W08_WORKFLOW_RUNTIME_INDEPENDENT_VALIDATION_20261008.json"
+    },
+    {
+      "id": "P07",
+      "component": "device.agent.windows",
+      "status": "ACCEPTED",
+      "evidence": "V3_P07_WINDOWS_AGENT_INDEPENDENT_VALIDATION_20261008.json"
+    }
+  ],
+  "validated_source_equivalence": {
+    "prior_candidate": "551cd19bd1b3999d9409aff8e858d829671379f5",
+    "current_candidate": "8ac8852aac13058904a4b94acc721c3d5a3e6abd",
+    "compared_paths": [
+      "src",
+      "tests",
+      "scripts"
+    ],
+    "diff": "EMPTY",
+    "status": "PASS",
+    "prior_validation": {
+      "full_unit": {
+        "test_files": 28,
+        "tests": 145,
+        "failures": 0
+      },
+      "typecheck": "PASS",
+      "lint_changed_scope": "PASS",
+      "prettier": "PASS",
+      "diff_check": "PASS",
+      "W08_runtime_acceptance": "PASS",
+      "P07_real_windows_acceptance": "PASS"
+    },
+    "current_extra_files_only": [
+      ".github/workflows/v3-p07-windows-validation.yml",
+      "governance/v3/implementation/V3_P07_WINDOWS_AGENT_ACCEPTANCE_20261008.json",
+      "governance/v3/implementation/V3_W08_WORKFLOW_RUNTIME_ACCEPTANCE_20261008.json",
+      "governance/v3/validation/V3_P07_WINDOWS_AGENT_INDEPENDENT_VALIDATION_20261008.json",
+      "governance/v3/validation/V3_W08_WORKFLOW_RUNTIME_INDEPENDENT_VALIDATION_20261008.json"
+    ]
+  },
+  "progress_after_canonical_integration": {
+    "implementation_nodes_total": 28,
+    "accepted_implementation_nodes": 21,
+    "implementation_percent": 75,
+    "governance_preparation_percent": 100,
+    "v2_percent": 100
+  },
+  "blockers": [
+    "P08 production acceptance still requires enrolled real MacBook/macOS Radlina runtime."
+  ],
+  "canonical_end_marker": "END V3 ORCHESTRATION WAVE6 CANONICAL ACCEPTANCE 20261008"
+}
