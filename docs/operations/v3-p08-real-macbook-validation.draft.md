@@ -1,6 +1,6 @@
 # V3 P08 real MacBook acceptance workflow — inactive draft
 
-The executable YAML draft is deliberately **not committed or activated**. Its local copy remains under `docs/operations/`, outside `.github/workflows/`, with a separate recovery backup. This documentation can be published without triggering remote execution.
+The YAML draft is intentionally inert and versioned under `docs/operations/`, outside `.github/workflows/`. Its automatic `push` trigger has been removed, and its macOS job has `if: false`, so publishing it cannot execute a MacBook-side action. An independent recovery backup retains the original version.
 
 The source draft used an automatic `push` trigger for a self-hosted macOS runner and an outbound Tailscale probe. It has **not** been activated as a GitHub Actions workflow because the requested per-action cross-device consent gate has not been demonstrated in that execution path.
 

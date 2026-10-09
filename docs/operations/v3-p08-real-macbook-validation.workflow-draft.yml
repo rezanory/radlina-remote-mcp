@@ -1,0 +1,56 @@
+name: V3 P08 Real MacBook Acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-macbook-acceptance:
+    # Fail closed: no MacBook-side execution until peer-issued scoped consent is verified.
+    if: false
+    runs-on:
+      - self-hosted
+      - macOS
+    timeout-minutes: 30
+    env:
+      RADLINA_EXPECTED_TAILNET: rezanory.github
+      RADLINA_WINDOWS_TAILSCALE_DNS: laptop-13qineif.taile17c9e.ts.net
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node 24.20.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.20.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Confirm macOS self-hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = "Darwin"
+          echo "runner_arch=$(uname -m)"
+          echo "runner_host=$(hostname)"
+
+      - name: Verify handoff formatting
+        run: npx prettier --check scripts/acceptance/v3-p08-real-macbook.ts scripts/acceptance/v3-p08-macos-agent.ts
+
+      - name: Real MacBook P08 acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx tsx scripts/acceptance/v3-p08-real-macbook.ts | tee p08-real-macbook-acceptance.json
+
+      - name: Upload P08 acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p08-real-macbook-acceptance
+          path: p08-real-macbook-acceptance.json
+          if-no-files-found: warn
