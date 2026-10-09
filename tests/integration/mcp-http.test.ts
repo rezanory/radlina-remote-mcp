@@ -89,6 +89,28 @@ describe("Streamable HTTP MCP", () => {
       const tools = await client.listTools();
       expect(tools.tools).toHaveLength(45);
       const toolNames = new Set(tools.tools.map((tool) => tool.name));
+      const startProcessTool = tools.tools.find((tool) => tool.name === "start_process");
+      const readProcessOutputTool = tools.tools.find((tool) => tool.name === "read_process_output");
+      expect(startProcessTool?.description).toContain(
+        "timeoutMs is a hard maximum child-process runtime",
+      );
+      const timeoutSchema: unknown = startProcessTool?.inputSchema.properties?.["timeoutMs"];
+      if (
+        typeof timeoutSchema !== "object" ||
+        timeoutSchema === null ||
+        !("description" in timeoutSchema) ||
+        typeof timeoutSchema.description !== "string"
+      ) {
+        throw new Error("start_process.timeoutMs description missing from tools/list");
+      }
+      expect(timeoutSchema.description).toContain("Hard maximum child-process runtime");
+      expect(startProcessTool?.description).toContain(
+        "reconcile caller-owned sessions before retrying",
+      );
+      expect(readProcessOutputTool?.description).toContain("Continue polling the same sessionId");
+      expect(readProcessOutputTool?.description).toContain(
+        "Only status complete with exitCode 0 is success",
+      );
       for (const required of [
         "admin_stage_release",
         "admin_verify_release",

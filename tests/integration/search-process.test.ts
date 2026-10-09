@@ -83,6 +83,60 @@ describe("reconnectable jobs", () => {
     store.close();
   });
 
+  it("keeps a long job alive within its runtime cap and supports terminal polling", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "radlina-process-long-job-"));
+    cleanup.push(root);
+    const config = testConfig(root);
+    const profile = config.profiles["test"];
+    if (!profile) throw new Error("test profile missing");
+    profile.commands = [{ executable: process.execPath, argumentPatterns: [".*"] }];
+    const store = new Store(config.storage.directory);
+    const policy = new PolicyEngine(config, {
+      killSwitch: () => false,
+      emergencyReadOnly: () => false,
+    });
+    const processes = new ProcessManager(config, store, policy);
+    const files = new FilesystemService([root], 1024 * 1024, path.join(root, ".trash"), false);
+    const started = (await processes.start("subject", "test", profile, files.resolver, {
+      executable: process.execPath,
+      args: ["-e", "setTimeout(() => process.stdout.write('LONG_JOB_DONE\\n'), 1200)"],
+      cwd: root,
+      timeoutMs: 5_000,
+    })) as { sessionId: string; status: string; outputCursor: string };
+
+    expect(started.status).toBe("running");
+    try {
+      let cursor: string | undefined = started.outputCursor;
+      let result = (await processes.readOutput(started.sessionId, "subject", cursor)) as {
+        status: string;
+        output: string;
+        nextCursor: string;
+        hasMore: boolean;
+        exitCode: number | null;
+      };
+      let collectedOutput = result.output;
+      const deadline = Date.now() + 7_000;
+      while (result.status === "running" || result.hasMore) {
+        if (Date.now() >= deadline) throw new Error("long process did not reach a terminal state");
+        cursor = result.nextCursor;
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        result = (await processes.readOutput(
+          started.sessionId,
+          "subject",
+          cursor,
+        )) as typeof result;
+        collectedOutput += result.output;
+      }
+
+      expect(result.status).toBe("complete");
+      expect(result.exitCode).toBe(0);
+      expect(collectedOutput).toContain("LONG_JOB_DONE");
+    } finally {
+      processes.shutdown();
+      store.close();
+    }
+  });
+
   it("enforces process timeouts and bounded output", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "radlina-process-limits-"));
     cleanup.push(root);

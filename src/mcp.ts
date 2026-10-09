@@ -585,13 +585,21 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
     "start_process",
     {
       description:
-        "Start an allowlisted executable without a shell and return a reconnectable session.",
+        "Start an allowlisted executable without a shell and return a reconnectable session. timeoutMs is a hard maximum child-process runtime, not the MCP call or first-response wait; reaching it terminates the child. For long jobs, omit timeoutMs to use the configured policy maximum or set it above the expected runtime, then poll read_process_output with the same sessionId and returned nextCursor until status is not running and hasMore is false. Treat only status complete with exitCode 0 as success. If the start response is lost, reconcile caller-owned sessions before retrying so the job is not duplicated.",
       inputSchema: z.object({
         executable: pathInput,
         args: z.array(z.string().max(4096)).max(128).default([]),
         cwd: pathInput,
         env: z.record(z.string(), z.string().max(4096)).optional(),
-        timeoutMs: z.number().int().min(100).max(86_400_000).optional(),
+        timeoutMs: z
+          .number()
+          .int()
+          .min(100)
+          .max(86_400_000)
+          .describe(
+            "Hard maximum child-process runtime in milliseconds; reaching it terminates the child. This is not the MCP call/response wait timeout. Omit to use policy.maxProcessRuntimeMs; for long work, set it above the expected runtime and poll the returned process session.",
+          )
+          .optional(),
         profile: profileInput,
         idempotencyKey: idempotencyInput,
       }),
@@ -641,7 +649,8 @@ export function buildMcpServer(runtime: AppRuntime): McpServer {
   server.registerTool(
     "read_process_output",
     {
-      description: "Read bounded output from a process session owned by the caller.",
+      description:
+        "Read bounded output from a process session owned by the caller. Continue polling the same sessionId with the returned nextCursor while status is running or hasMore is true. Only status complete with exitCode 0 is success; timed-out, interrupted, error, output-limit, or terminated are not successful completion. Do not start a duplicate merely because a client/tool response timed out; reconcile the existing session first.",
       inputSchema: z.object({
         sessionId: sessionIdInput,
         cursor: z.string().optional(),
