@@ -28,7 +28,8 @@
     "scripts/enrollment/macbook-readiness-policy.ts",
     "scripts/acceptance/v3-p08-real-macbook.ts",
     "scripts/acceptance/v3-cross-device-consent-local.ts",
-    "scripts/acceptance/v3-local-beta-gateway.ts"
+    "scripts/acceptance/v3-local-beta-gateway.ts",
+    "scripts/acceptance/v3-f01-fleet-local.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }
