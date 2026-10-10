@@ -1,0 +1,101 @@
+{
+  "schema_version": "radlina.v3.macbook-native-readiness-evidence/v1",
+  "record_id": "V3-P08-OWNER-MACBOOK-NATIVE-READINESS-20261011",
+  "status": "REAL_PHYSICAL_MACBOOK_READINESS_PASS_NOT_PRODUCTION_ACCEPTANCE",
+  "source": {
+    "canonical_base": "843c7f8efce2e8f123d0238af86afec74563e243",
+    "candidate_branch": "fix/v3-p08-headless-keychain-20261011",
+    "pinned_candidate_commit": "765072304d49108858f9ec7cfea87d9c8f4c1f3d",
+    "pinned_candidate_tree": "b4fd352a0597a1007aeadf73e8061be3dc166a6e",
+    "scope": [
+      "scripts/acceptance/v3-p08-macos-agent.ts",
+      "scripts/acceptance/v3-p08-real-macbook.ts"
+    ]
+  },
+  "actualMacBook": {
+    "runner": "radlina-macbook-main",
+    "runner_id": 21,
+    "hostname": "amirs-MacBook-Pro.local",
+    "architecture": "x64",
+    "nodeVersion": "v24.20.0",
+    "logicalDeviceId": "macbook-main",
+    "tailnet": "rezanory.github",
+    "nodeIdFingerprintSha256": "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c",
+    "windows_peer_fingerprint_independently_equal": true,
+    "approvedNodeIdStoredAsGitHubSecret": true,
+    "rawNodeIdExcluded": true
+  },
+  "actualGitHubRunnerJobs": {
+    "owner_only_probe": {
+      "runId": 38090088043,
+      "jobId": 114324570539,
+      "status": "PASS"
+    },
+    "initial_source_staging": {
+      "runId": 38090127017,
+      "jobId": 114324682777,
+      "status": "FAIL_KEYCHAIN_HEADLESS"
+    },
+    "isolated_keychain_repair": {
+      "runId": 38090645692,
+      "jobId": 114326194305,
+      "status": "PASS_REAL_MACOS_COMPONENT"
+    },
+    "first_full_readiness": {
+      "runId": 38090800284,
+      "jobId": 114326643700,
+      "status": "BLOCKED_DIRECT_TAILSCALE_PING_ONLY"
+    },
+    "relay_aware_readiness": {
+      "runId": 38091109343,
+      "jobId": 114327557934,
+      "status": "PASS_ALL_TEN_GUARDS"
+    }
+  },
+  "operational": {
+    "chain": "Owner-approved physical macOS -> pinned git source -> real native macOS Keychain, process, filesystem, ripgrep -> device.health execution -> receipt -> independent GitHub acceptance",
+    "realKeychain": "PASS_ISOLATED_TEMPORARY_NON_LOGIN_KEYCHAIN",
+    "realFilesystem": "PASS",
+    "realProcess": "PASS",
+    "realSearch": "PASS",
+    "nativeDeviceHealthExecution": "PASS",
+    "localExecutionReceiptBoundDevice": "macbook-main",
+    "actualTailscaleWindowsReachability": "PASS_VERIFIED_PONG_VIA_AUTHENTICATED_TAILSCALE_RELAY",
+    "identityGuard": {
+      "passed": 10,
+      "total": 10
+    },
+    "macOSUnitTests": {
+      "passed": 12,
+      "total": 12
+    },
+    "physicalMacTypecheck": "PASS",
+    "macNpmAudit": "ZERO_REPORTED",
+    "stagingLocation": "$HOME/.local/share/radlina/v3-beta/<pinned-commit>",
+    "sourceWasFakeTrustedFixture": true
+  },
+  "windowsAuthoring": {
+    "typecheck": "PASS",
+    "macReadinessUnitTests": "12/12 PASS",
+    "fullV3UnitSuite": "168/168 PASS",
+    "focusedESLint": "PASS",
+    "globalESLint": "PASS",
+    "prettier": "PASS",
+    "gitDiff": "PASS"
+  },
+  "officialAcceptance": {
+    "liveP03ApprovedTrustedEnrollment": "NOT_PROVEN",
+    "P06_exactDeviceRouteAcrossRealHosts": "NOT_PROVEN",
+    "authenticatedV3DispatchAndS02Econsent": "NOT_PROVEN",
+    "nativeChatGPTV3App": "NOT_CONNECTED",
+    "productionP08": "NOT_ACCEPTED",
+    "v3Official": {
+      "accepted": 24,
+      "total": 28,
+      "percent": 85.71
+    },
+    "productionV2Manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "V2ServiceUnmodified": true
+  },
+  "end_marker": "END V3 P08 PHYSICAL MAC LOCAL READINESS 20261011"
+}
