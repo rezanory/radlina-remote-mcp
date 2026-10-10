@@ -1,0 +1,98 @@
+{
+  "schema_version": "radlina.v3.independent-local-gateway-validation/v1",
+  "record_id": "V3-BETA-GATEWAY-INDEPENDENT-VALIDATION-20261010",
+  "component": "V3 local beta gateway (supporting I01, NOT completed I01)",
+  "candidate": {
+    "source_commit": "30228a2c5712742a415f683d26cca5faf5a4a125",
+    "source_tree": "b0ec33c96423b889fcd7fdf1cb074ac2d4f54d3d",
+    "base_commit": "4a5f454949db58838073c0297403b60274e52239",
+    "authoring_branch": "integration/v3-beta-gateway-local-20261010",
+    "validation_worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-beta-gateway-validation-20261010",
+    "detached_HEAD": true,
+    "worktree_clean": true
+  },
+  "gates": {
+    "npm_ci": {
+      "exit": 0,
+      "result": "PASS",
+      "packages_installed": 487
+    },
+    "typecheck": {
+      "exit": 0,
+      "result": "PASS"
+    },
+    "unit_v3_complete": {
+      "exit": 0,
+      "result": "PASS",
+      "files_passed": 28,
+      "files_total": 28,
+      "tests_passed": 168,
+      "tests_total": 168,
+      "important": "real Windows DPAPI test PASS"
+    },
+    "targeted_lint": {
+      "exit": 0,
+      "result": "PASS"
+    },
+    "targeted_prettier": {
+      "exit": 0,
+      "result": "PASS"
+    },
+    "git_diff_check": {
+      "exit": 0,
+      "result": "PASS"
+    },
+    "real_loopback_mcp": {
+      "exit": 0,
+      "result": "LOCAL_V3_BETA_PASS",
+      "chain": "Input -> Runtime -> Execution -> Output -> Acceptance",
+      "transport": "2026-07-28 Streamable HTTP",
+      "localAuthorization": true,
+      "invalidBearerDenied": true,
+      "actualSqliteRegistryIsEmpty": true,
+      "realOperatorDispatchDenied": true,
+      "V2_7337_get_mcp_still_401": true,
+      "realMacBookEnrolled": false,
+      "oauthEnabled": false
+    }
+  },
+  "failure_reconciled": {
+    "first_complete_suite": {
+      "tests_passed": 167,
+      "tests_failed": 1,
+      "reason": "spawn powershell.exe ENOENT"
+    },
+    "root_cause": "test-launch PATH excluded C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+    "remediation": "set correct subprocess PATH, without changing source or the running V2 service",
+    "final_complete_suite_result": "168/168 PASS"
+  },
+  "security_and_limits": {
+    "V3_bind": "127.0.0.1 only",
+    "V2_port_is_not_reused": true,
+    "publicTailnetRouteAdded": false,
+    "unsafeOperatorMcpToolsAreAdvertisedButTheirExecutionIsDenied": true,
+    "note": "Before ChatGPT beta registration, add production OAuth and advertise only truly allowed read tools; do not expose this local token gateway.",
+    "installed_dependency_advisories": "6 reported: 5 high, 1 critical (pre-existing lockfile)"
+  },
+  "production": {
+    "active_v2": "2.0.0-alpha.2",
+    "v2_health": "healthy at preflight",
+    "v2_release_manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "v2_restarted": false,
+    "v3_official_accepted": {
+      "nodes": 24,
+      "total": 28,
+      "percent": 85.71
+    },
+    "v3_beta_real_production_ready": false,
+    "actualMacbookAndChatGPTAcceptance": "PENDING",
+    "blocklist": [
+      "P08",
+      "F01",
+      "I01",
+      "AC01",
+      "S02E live consent enforcement"
+    ]
+  },
+  "end_marker": "END V3 LOCAL BETA GATEWAY INDEPENDENT VALIDATION 20261010"
+}
