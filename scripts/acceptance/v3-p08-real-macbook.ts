@@ -68,7 +68,9 @@ async function runMain(): Promise<void> {
   let windowsPingSucceeded = false;
   let pingReason = "";
   try {
-    const response = await run(cli, ["ping", "--c", "3", windowsDns]);
+    // A secure DERP relay is valid Tailscale connectivity; a direct UDP path is
+    // not required for this readiness check. Still require an actual pong.
+    const response = await run(cli, ["ping", "--c", "3", "--until-direct=false", windowsDns]);
     windowsPingSucceeded = /\bpong\b/iu.test(response.stdout);
     pingReason = windowsPingSucceeded ? "verified pong" : "missing pong evidence";
   } catch (error) {
