@@ -1,0 +1,105 @@
+{
+  "schema_version": "radlina.v3.supply-chain-remediation/v1",
+  "record_id": "V3-SECURITY-NPM-REMEDIATION-20261010",
+  "status": "LOCAL_SOURCE_VALIDATED_INDEPENDENT_CHECK_PENDING",
+  "base_canonical": "8e3462ee1105578f137dcb1285d842a212c0b8ae",
+  "branch": "security/v3-proxy-addr-audit-20261010",
+  "owner": "security / dependency governance",
+  "touched_files": [
+    "package.json",
+    "package-lock.json"
+  ],
+  "baseline": {
+    "npm_audit_total": 6,
+    "critical": 1,
+    "high": 5,
+    "production_audit_critical": [
+      {
+        "package": "proxy-addr",
+        "version": "2.0.7",
+        "advisory": "GHSA-jqcg-44mw-7w3h"
+      }
+    ],
+    "development_advisories": [
+      "GHSA-6qxp-vccf-f47h",
+      "GHSA-ch52-4w7c-c8xp",
+      "GHSA-68fv-2mgg-jv7q"
+    ]
+  },
+  "remediation": {
+    "npm_audit_fix_no_force": true,
+    "explicit_development_updates": [
+      {
+        "name": "@modelcontextprotocol/client",
+        "version": "2.3.1"
+      },
+      {
+        "name": "@modelcontextprotocol/inspector",
+        "version": "2.10.1"
+      }
+    ],
+    "resolved": {
+      "proxy-addr": "2.0.8",
+      "http-cache-semantics": "4.3.0",
+      "source-map-js": "1.2.2"
+    },
+    "npm_ci_packages": 487,
+    "npm_ci_exit": 0,
+    "npm_audit_after_total": 0,
+    "npm_audit_after_critical": 0,
+    "npm_audit_after_high": 0,
+    "npm_install_scripts_warning": "Four packages have scripts not approved; installer did not auto-approve them"
+  },
+  "validation": {
+    "typecheck": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "complete_V3_unit": {
+      "status": "PASS",
+      "tests_passed": 168,
+      "test_files": 28,
+      "exit": 0
+    },
+    "C01_MCP_local_acceptance": {
+      "status": "LOCAL_V3_BETA_PASS",
+      "exit": 0
+    },
+    "V3_targeted_eslint": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "changed_files_prettier": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "git_diff_check": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "repo_wide_lint": {
+      "status": "EXISTING_BASELINE_FAILURES",
+      "total_errors": 10,
+      "findings": "9 out-of-tsconfig acceptance scripts and 1 pre-existing prefer-const in src/http.ts",
+      "V2_runtime_source_changed": false
+    }
+  },
+  "boundaries": {
+    "no_v2_release_manifest_changes": true,
+    "no_v2_service_restart": true,
+    "no_active_tailscale_configuration_changes": true,
+    "no_production_activation": true,
+    "native_MacBook_P08_acceptance": "PENDING",
+    "official_V3_accepted_nodes": 24,
+    "official_V3_total_nodes": 28,
+    "official_V3_accepted_percent": 85.71
+  },
+  "next_gates": [
+    "Independent immutable-commit validation",
+    "Review transitive dependency updates and environment behavior",
+    "Security lane exact fast-forward admission if independently green",
+    "Separately resolve baseline repo-wide lint defects without scope mixing",
+    "P08 real MacBook enrollment and S02E consent before distributed execution"
+  ],
+  "marker": "END V3 NPM SECURITY REMEDIATION 20261010"
+}
