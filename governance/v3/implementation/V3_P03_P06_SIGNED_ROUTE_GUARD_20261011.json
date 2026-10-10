@@ -1,0 +1,61 @@
+{
+  "schema_version": "radlina.v3.p03-p06-signed-route-guard/v1",
+  "record_id": "V3-P03-P06-SIGNED-ROUTE-CANDIDATE-20261011",
+  "base_candidate": "df9b20885fa090eb2a22ea7ba2bdeacb35375dd4",
+  "branch": "feature/v3-p03-owner-pinned-enrollment-20261011",
+  "status": "DORMANT_SIGNED_ROUTE_GUARD_CANDIDATE_NOT_LIVE",
+  "implementation": {
+    "added": "src/v3/device/owner-pinned-router.ts",
+    "extended": [
+      "src/v3/device/owner-pinned-enrollment.ts",
+      "tests/unit/v3/owner-pinned-enrollment.test.ts"
+    ],
+    "guardRequirements": [
+      "Stored P03 owner+device signed Trusted identity",
+      "Exact device signing key fingerprint match",
+      "Live Windows-observed Tailscale node fingerprint equals pinned identity",
+      "Signed heartbeat exists in nonce ledger and matches authoritative lastSeen",
+      "Fresh heartbeat, <=120000ms and not future-dated",
+      "Healthy and online exactly selected device; NO silent failover",
+      "Routing gate is not a transport or cross-device consent authority"
+    ]
+  },
+  "authoringValidation": {
+    "typecheck": "PASS",
+    "scopedEslint": "PASS",
+    "globalEslint": "PASS",
+    "fullV3Unit": {
+      "passed": 184,
+      "total": 184,
+      "files": 29,
+      "exitCode": 0
+    },
+    "P03DedicatedTests": {
+      "passed": 16,
+      "total": 16
+    },
+    "P06ExistingTests": {
+      "passed": 6,
+      "total": 6
+    },
+    "prettier": "PASS",
+    "gitDiffCheck": "PASS"
+  },
+  "authoritativeAcceptedState": {
+    "physicalMacNativeReadiness": "PASS",
+    "windowsV3BetaDaemon": "ACTIVE_LOOPBACK_READONLY",
+    "MacP03RecordInLiveBetaDb": false,
+    "realMacKeyProvisioning": false,
+    "realMacSignedHeartbeat": false,
+    "realNetworkP06Dispatch": false,
+    "recipientConsentLive": false,
+    "V2ProductionChanged": false
+  },
+  "securityNote": "Source-only constraint gate. Before I01, require independent reviewer and real signer/peer observer; trust revocation and expired heartbeat must stop new dispatch.",
+  "officialProgress": {
+    "accepted": 24,
+    "total": 28,
+    "percentage": 85.71
+  },
+  "end_marker": "END V3 P03 P06 SIGNED ROUTE CANDIDATE 20261011"
+}

@@ -1,0 +1,87 @@
+{
+  "schema_version": "radlina.v3.p03-owner-pinned-candidate/v1",
+  "record_id": "V3-P03-OWNER-PINNED-ENROLLMENT-AUTHORING-20261011",
+  "baseline": "90188eed93efef41958e5f2cbd21f31461786590",
+  "branch": "feature/v3-p03-owner-pinned-enrollment-20261011",
+  "status": "DORMANT_CANDIDATE_VALIDATED_NOT_PRODUCTION_ADMITTED",
+  "owned_scope": [
+    "src/v3/device/owner-pinned-enrollment.ts",
+    "src/v3/device/registry.ts",
+    "tests/unit/v3/owner-pinned-enrollment.test.ts",
+    "scripts/enrollment/v3-p03-real-mac-pending.ts",
+    "tsconfig.json"
+  ],
+  "implementation": [
+    "Pending-only first device registration; never trust hostnames or self-reported trust state",
+    "Ed25519 device-signed challenge AND independently pinned owner-signed challenge for trusted promotion",
+    "Owner-pinned and live Windows-observed Tailscale peer ID hash matching",
+    "10-minute single-use enrollment challenge and atomic expiry rotation",
+    "Atomic SQLite promotion with replay-safe challenge CAS and stored public-key pin",
+    "Signed/nonce-fresh heartbeat mandatory for trusted health and capability updates",
+    "Unsigned legacy trusted-device heartbeat denied",
+    "Offline owner-signed trust revocation with immediate P06 fail-closed routing",
+    "Hash-linked local audit log requiring independent external S03 anchoring before production"
+  ],
+  "tests": {
+    "npmCi": {
+      "status": "PASS",
+      "packages": 487,
+      "vulnerabilities": 0
+    },
+    "typecheck": "PASS",
+    "scopedEslint": "PASS",
+    "fullRepositoryEslint": "PASS",
+    "fullV3Suite": {
+      "result": "PASS",
+      "files": 29,
+      "passed": 181,
+      "total": 181
+    },
+    "dedicatedP03Suite": {
+      "result": "PASS",
+      "passed": 13,
+      "total": 13
+    },
+    "priorMacRealReadiness": {
+      "result": "PASS",
+      "runId": 38091109343,
+      "realMacBook": true
+    }
+  },
+  "liveEnrollment": {
+    "MacPhysicalEvidence": "VERIFIED",
+    "MacTailscaleNodeFingerprintSha256": "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c",
+    "V3BetaLocalDaemon": "ACTIVE_READONLY_LOCAL_ONLY",
+    "V3BetaListener": "127.0.0.1:7343",
+    "V3RegistryInitialCount": 0,
+    "pendingInsertionAttempt": "BLOCKED_BY_REMOTE_MCP_ENVIRONMENT_VARIABLE_POLICY",
+    "deniedVariable": "RADLINA_V3_BETA_STATE_DIRECTORY",
+    "actualPendingMacInsert": "NOT_PERFORMED",
+    "actualTrustedMacInsert": "NOT_PERFORMED",
+    "bypassAttempted": false,
+    "ownerMacAgentSigningPublicKey": "NOT_ENROLLED",
+    "ownerHumanSignoff": "REQUIRED_FOR_TRUST",
+    "realP06MacDispatch": "NOT_VERIFIED"
+  },
+  "architecture": {
+    "changeToV2ProductionSource": false,
+    "changeToV2ReleaseManifest": false,
+    "changeToMain": false,
+    "TailscaleServeModified": false,
+    "V3RuntimeWriteCapabilityEnabled": false,
+    "P08OfficialAcceptance": false,
+    "F01OfficialAcceptance": false
+  },
+  "officialProgress": {
+    "accepted": 24,
+    "total": 28,
+    "percent": 85.71
+  },
+  "remaining": [
+    "Real Mac persistent identity key + local owner approval UI",
+    "Owner-signed P03 trusted transition and independently verified live heartbeat",
+    "P06 real exact target network dispatch, S02E local recipient consent, S03 audited receipt",
+    "F01 real device upgrade/rollback; I01 V3 OAuth integration; AC01 native ChatGPT acceptance"
+  ],
+  "marker": "END V3 P03 OWNER PINNED ENROLLMENT CANDIDATE 20261011"
+}

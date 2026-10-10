@@ -1,0 +1,100 @@
+{
+  "schema_version": "radlina.v3.p03-owner-pinned-independent-validation/v1",
+  "record_id": "V3-P03-OWNER-PINNED-INDEPENDENT-VALIDATION-20261011",
+  "state": "SOURCE_VALIDATED_DORMANT_NOT_PRODUCTION_ACCEPTED",
+  "candidate": {
+    "branch": "feature/v3-p03-owner-pinned-enrollment-20261011",
+    "authoring_commit": "751b065c1da28b43467286df9f09e3e495e81f85",
+    "authoring_tree": "0ee52dd0af2a8a51658ec2853e0ea3f84dd356e2",
+    "canonical_baseline": "90188eed93efef41958e5f2cbd21f31461786590",
+    "validation_worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-p03-owner-pinned-validation-20261011",
+    "validated_detached": true,
+    "source_unchanged": true
+  },
+  "tests": {
+    "freshNpmCI": {
+      "exit": 0,
+      "packages": 487,
+      "reportedVulnerabilities": 0
+    },
+    "typecheck": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "fullV3Unit": {
+      "status": "PASS",
+      "files": 29,
+      "passed": 181,
+      "total": 181,
+      "exit": 0
+    },
+    "dedicatedP03Unit": {
+      "status": "PASS",
+      "passed": 13,
+      "total": 13
+    },
+    "globalLint": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "touchedPrettier": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "sourceDiffCheck": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "actualLoopbackMCP": {
+      "status": "LOCAL_V3_BETA_PASS",
+      "exit": 0,
+      "macDeviceEnrolled": false,
+      "operatorDenied": true,
+      "anonymousDenied": true,
+      "V2ServiceAuthBoundaryUnchanged": true
+    }
+  },
+  "security_properties": {
+    "ownerAndAgentSignaturesRequired": true,
+    "peerIdentityPinnedAndObservedOnWindows": true,
+    "trustedUnverifiedHeartbeatRejected": true,
+    "expiredChallengeReplayDenied": true,
+    "ownerRevocationOfflinePermitted": true,
+    "revokedDeviceP06RoutingDenied": true,
+    "challengeAndHeartbeatReplayChecks": true,
+    "localSqliteHashChainVerifiable": true
+  },
+  "limitations": {
+    "P03MacOwnerSigningKeyProvisioned": false,
+    "P03MacPersistentDevicePrivateKeyProvisioned": false,
+    "P03RealTrustedMacRecord": false,
+    "P03RealPendingMacRecord": false,
+    "RealPendingRegistrationAttempt": "POLICY_DENIED_ENV_VAR",
+    "ToolPolicyBypassed": false,
+    "NativeLiveSignedHeartbeat": false,
+    "S03AuditExternallyAnchored": false,
+    "NativeMacP06Dispatch": false,
+    "LocalDestinationConsentLive": false,
+    "V3NativeChatGPTAppInstalled": false
+  },
+  "preserved": {
+    "V2Version": "2.0.0-alpha.2",
+    "V2ReleaseManifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "V2RuntimeChanged": false,
+    "TailnetConfigChanged": false,
+    "MainChanged": false
+  },
+  "official_progress": {
+    "accepted": 24,
+    "total": 28,
+    "percent": 85.71
+  },
+  "next": [
+    "Independent reviewer: inspect P03 key management and audit durability",
+    "Owner-authorized Mac key provisioning and signed challenge exchange",
+    "Trusted P03 admission and signed live heartbeat on macbook-main",
+    "P06 exact route with S02E recipient approval",
+    "P08/F01/I01/AC01 operational acceptance"
+  ],
+  "marker": "END V3 P03 INDEPENDENT VALIDATION 20261011"
+}

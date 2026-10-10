@@ -1,0 +1,95 @@
+{
+  "schema_version": "radlina.v3.p03-p06-signed-route-independent-validation/v1",
+  "record_id": "V3-P03-P06-SIGNED-ROUTE-INDEPENDENT-VALIDATION-20261011",
+  "scope": "Dormant P03 signed enrollment and P06 exact-route gate ONLY",
+  "status": "SOURCE_VALIDATED_NOT_PRODUCTION_ACCEPTED",
+  "candidate": {
+    "branch": "feature/v3-p03-owner-pinned-enrollment-20261011",
+    "immutable_commit": "6780a644e0cd60858851c56d1f88057b639c8b45",
+    "immutable_tree": "2c8f3a1fbfb6627675f968e78b701ed91806ffcb",
+    "parent_development_commit": "df9b20885fa090eb2a22ea7ba2bdeacb35375dd4",
+    "canonical_base": "90188eed93efef41958e5f2cbd21f31461786590",
+    "validation_worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-p03-route-guard-validation-20261011",
+    "detached_head": true,
+    "source_tree_clean": true
+  },
+  "gates": {
+    "npm_ci": {
+      "status": "PASS",
+      "exit": 0,
+      "installedPackages": 487,
+      "reportedVulnerabilities": 0
+    },
+    "typecheck": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "full_v3_unit_suite": {
+      "status": "PASS",
+      "files": 29,
+      "tests": 184,
+      "exit": 0
+    },
+    "owner_pinned_p03_p06_targeted": {
+      "status": "PASS",
+      "newSecurityTests": 16,
+      "existingDeviceRouterTests": 6
+    },
+    "repo_eslint": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "prettier": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "git_diff_check": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "local_mcp_operational": {
+      "status": "LOCAL_V3_BETA_PASS",
+      "actualClientMCPTransport": "StreamableHTTP",
+      "anonymousAuthDenied": true,
+      "operatorDenied": true,
+      "v2_auth_boundary_remained_401": true,
+      "realMacPendingRecord": false,
+      "realMacTrustedRecord": false
+    }
+  },
+  "code_capabilities": [
+    "Requires Ed25519 proofs from device and separately pinned owner for P03 trust promotion",
+    "Requires independently observed Windows Tailscale peer pin",
+    "Atomically rejects challenge and signed heartbeat replay or stale assertions",
+    "Requires fresh (<120 seconds), healthy, correctly pinned signed heartbeat before exact P06 routing",
+    "Rejects key change, Tailscale peer swap, offline/stale Mac and unauthorized rerouting",
+    "Supports owner-signed offline trust revocation with immediate fail-closed P06"
+  ],
+  "boundaries": {
+    "mac_original_physical_readiness": "PASS_10_OF_10_ON_GITHUB_OWNER_SELFHOSTED_RUNNER",
+    "mac_real_node_id_sha256": "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c",
+    "mac_owner_key_provisioned": false,
+    "mac_device_key_persistently_provisioned": false,
+    "live_p03_mac_insert": false,
+    "pending_insert_denied_by_mcp_policy": "RADLINA_V3_BETA_STATE_DIRECTORY disallowed; no bypass attempted",
+    "signed_heartbeat_from_real_mac": false,
+    "live_p06_dispatch": false,
+    "recipient_side_S02E_consent": false,
+    "external_s03_signed_audit": false,
+    "OAuth_ChatGPT_V3_app": false,
+    "V2_production_manifest_changed": false,
+    "tailnet_routing_changed": false,
+    "source_registered_as_production": false
+  },
+  "governance": {
+    "independent_human_security_review": "PENDING",
+    "PR2_must_remain_draft": true,
+    "F01_requires_real_P08": true,
+    "official_v3": {
+      "accepted": 24,
+      "total": 28,
+      "percent": 85.71
+    }
+  },
+  "marker": "END V3 P03 P06 SIGNED ROUTE INDEPENDENT VALIDATION 20261011"
+}
