@@ -1,0 +1,79 @@
+{
+  "schema_version": "radlina.v3.supply-chain-independent-acceptance/v1",
+  "record_id": "V3-NPM-SECURITY-INDEPENDENT-VALIDATION-20261010",
+  "source": {
+    "branch": "security/v3-proxy-addr-audit-20261010",
+    "exact_commit": "a3e01dbdf6bd48e39d912e5f936b4038f8349a79",
+    "exact_tree": "1cfaea9b5378f34ed191bc7f0cf9b1dfb726af6a",
+    "canonical_base": "8e3462ee1105578f137dcb1285d842a212c0b8ae",
+    "changed_files": [
+      "package.json",
+      "package-lock.json",
+      "governance/v3/validation/V3_DEPENDENCY_AUDIT_REMEDIATION_20261010.json"
+    ]
+  },
+  "independent_validation": {
+    "detached_worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-proxy-addr-validation-20261010",
+    "exact_SHA_confirmed": true,
+    "tree_confirmed": true,
+    "worktree_clean": true,
+    "npm_ci": {
+      "status": "PASS",
+      "packages": 487,
+      "exit": 0
+    },
+    "npm_audit": {
+      "status": "PASS",
+      "vulnerabilities": 0,
+      "critical": 0,
+      "high": 0
+    },
+    "typecheck": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "V3_test_suite": {
+      "status": "PASS",
+      "tests": 168,
+      "files": 28,
+      "exit": 0
+    },
+    "V3_scoped_eslint": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "package_format": {
+      "status": "PASS",
+      "exit": 0
+    },
+    "local_gateway": {
+      "status": "LOCAL_V3_BETA_PASS",
+      "transport": "StreamableHTTP",
+      "protocol": "2026-07-28",
+      "unauthenticated_denied": true,
+      "operator_denied": true,
+      "V2_7337_still_401": true,
+      "actual_MacBook_enrolled": false
+    }
+  },
+  "baseline_lint": {
+    "global_lint_status": "PREEXISTING_FAILURES_NOT_MODIFIED",
+    "count": 10,
+    "causes": [
+      "acceptance scripts outside tsconfig project",
+      "src/http.ts existing prefer-const"
+    ],
+    "scope_remediation": "dependency updates only; V2 runtime source unchanged"
+  },
+  "rollout_authority": {
+    "security_lockfile_authoring_complete": true,
+    "frozen_v3_architecture_changed": false,
+    "production_v2_manifest_unchanged": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "P08_and_V3_production_switch_not_authorized": true,
+    "canonical_integration_authorized": "ONLY_FF_SAFETY_BOUNDED_SOURCE_CHANGE",
+    "V3_accepted_components": 24,
+    "V3_total_components": 28,
+    "V3_official_accepted_percent": 85.71
+  },
+  "end_marker": "END V3 NPM SECURITY INDEPENDENT VALIDATION 20261010"
+}
