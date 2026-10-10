@@ -1,0 +1,83 @@
+{
+  "schema_version": "radlina.v3.independent-lint-gate/v1",
+  "record_id": "V3-GLOBAL-LINT-INDEPENDENT-VALIDATION-20261010",
+  "component": {
+    "category": "non-DAG-development-hardening",
+    "name": "Global ESLint baseline hardening"
+  },
+  "base": "71fbc926a24c260e4b8f4cc1770f4d2eaad6d70d",
+  "candidate": {
+    "commit": "d48845ca5be2fef4ffc599a90cce3abdab6fb717",
+    "tree": "85a36ee25e613e8159d8a5408175affd7639a3d6",
+    "validation_mode": "detached immutable worktree",
+    "validation_path": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-lint-validation-20261010",
+    "source_tree_clean": true,
+    "validation_tree_clean": true
+  },
+  "gates": {
+    "npm_ci": {
+      "status": "PASS",
+      "packages": 487,
+      "reported_vulnerabilities": 0
+    },
+    "full_repository_eslint": {
+      "status": "PASS",
+      "exitCode": 0
+    },
+    "typecheck": {
+      "status": "PASS",
+      "exitCode": 0
+    },
+    "full_V3_units": {
+      "status": "PASS",
+      "count": 168,
+      "files": 28,
+      "exitCode": 0
+    },
+    "prettier": {
+      "status": "PASS"
+    },
+    "diff_check": {
+      "status": "PASS",
+      "exitCode": 0
+    },
+    "actual_local_MCP_acceptance": {
+      "status": "LOCAL_V3_BETA_PASS",
+      "transport": "streamable-http",
+      "authenticated_client": "PASS",
+      "anonymous_denied": "PASS",
+      "operator_mutations_denied": "PASS",
+      "V2_live_auth_boundary_untouched": true,
+      "actual_MAC_enrollment": false
+    }
+  },
+  "waivers_scope_and_review": {
+    "historical_test_file": "scripts/acceptance/v3-wave4-runtime.ts",
+    "legacy_only": [
+      "no-unsafe-assignment",
+      "no-unsafe-member-access",
+      "no-unsafe-argument"
+    ],
+    "frozen_V2_handler_file": "src/http.ts",
+    "V2_waiver_only": "prefer-const",
+    "not_applicable_to_other_sources": true,
+    "independent_code_review_required": true,
+    "no_live_V2_runtime_source_edits": true,
+    "no_frozen_historical_acceptance_script_edits": true
+  },
+  "release_boundaries": {
+    "canonical_workflow_runtime_unchanged": true,
+    "V2_manifest_unchanged": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "V2_service_restart_performed": false,
+    "Tailscale_configuration_changed": false,
+    "standalone_V3_native_ChatGPT_app": "NOT_CONNECTED",
+    "P08_real_MacBook": "NOT_ACCEPTED",
+    "F01_real_fleet": "PENDING_REAL_HARDWARE",
+    "V3_accepted": {
+      "completed": 24,
+      "total": 28,
+      "percentage": 85.71
+    }
+  },
+  "marker": "END V3 GLOBAL LINT INDEPENDENT VALIDATION 20261010"
+}
