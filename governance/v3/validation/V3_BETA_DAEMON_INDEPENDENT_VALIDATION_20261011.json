@@ -1,0 +1,79 @@
+{
+  "schema_version": "radlina.v3.beta-daemon-independent-validation/v1",
+  "record_id": "V3-WINDOWS-LOOPBACK-DAEMON-INDEPENDENT-VALIDATION-20261011",
+  "source": {
+    "repo": "rezanory/radlina-remote-mcp",
+    "authoring_branch": "feature/v3-beta-daemon-20261011",
+    "commit": "de5dea2636499adbbd34c3b6c4c26a60c7f6d362",
+    "tree": "3c0215c819faede1fa97ff98add99a64feb64c3b",
+    "canonical_base": "e177db75a99c4234a025a410d12b36cd23f70533",
+    "validated_from_detached_worktree": true,
+    "validation_worktree": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-beta-daemon-validation-20261011"
+  },
+  "actual_test_evidence": {
+    "physicalWindowsHost": "LAPTOP-13QINEIF",
+    "npmCi": {
+      "exitCode": 0,
+      "dependenciesAdded": 487,
+      "auditVulnerabilities": 0
+    },
+    "typecheck": {
+      "exitCode": 0,
+      "status": "PASS"
+    },
+    "fullV3Unit": {
+      "exitCode": 0,
+      "testFiles": 28,
+      "testsPassed": 168
+    },
+    "touchedScopeEslint": {
+      "exitCode": 0
+    },
+    "touchedScopePrettier": {
+      "exitCode": 0
+    },
+    "MCPStreamableHttpOperational": {
+      "exitCode": 0,
+      "status": "LOCAL_V3_BETA_PASS",
+      "actualBearer": true,
+      "anonymousDenied": true,
+      "operatorBlocked": true,
+      "registryRealButEmpty": true
+    },
+    "liveDaemon": {
+      "pid": 19028,
+      "processSession": "a4b0cd47-68c4-4783-9d05-52ebb443ef8d",
+      "listening": "127.0.0.1:7343",
+      "localMcp": "http://127.0.0.1:7343/mcp",
+      "anonymousMcpStatus": 401,
+      "anonymousHealthStatus": 401
+    },
+    "liveV2": {
+      "pid": 24668,
+      "listening": "127.0.0.1:7337",
+      "anonymousMcpStatus": 401,
+      "releaseManifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+      "serviceNeverRestarted": true
+    },
+    "allLiveDaemonPortsOnlyLoopback": true,
+    "noNewTailscaleServeOrFunnel": true
+  },
+  "limitations": {
+    "officialProductionReady": false,
+    "startupPersistence": "NOT_CONFIGURED",
+    "v3IsolatedService": "ACTIVE_READONLY_LOCAL_ONLY",
+    "anonymousNetworkAccess": "DENIED",
+    "credential": "EPHEMERAL_ONLY_NEVER_PRINTED_OR_PERSISTED",
+    "advertisedButDeniedOperatorTools": true,
+    "remoteMacConnectivity": "NOT_ENABLED_TO_THIS_LOOPBACK_GATEWAY",
+    "liveMacTrustedP03Record": "NOT_PRESENT",
+    "P06AuthenticCrossHostRoute": "NOT_ACCEPTED",
+    "S02ERecipientConsent": "NOT_LIVE",
+    "OAuthAndSeparateChatGPTApp": "NOT_ACTIVE",
+    "acceptedComponents": 24,
+    "totalComponents": 28,
+    "officialAcceptancePercent": 85.71
+  },
+  "decision": "INDEPENDENT_LOCAL_BETA_DAEMON_VALIDATED; NO PRODUCTION OR MULTIDEVICE ADMISSION",
+  "marker": "END V3 WINDOWS BETA DAEMON INDEPENDENT VALIDATION 20261011"
+}
