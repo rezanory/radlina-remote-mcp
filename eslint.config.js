@@ -35,4 +35,20 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off",
     },
   },
+  // Frozen historical acceptance fixture: a legacy untyped result list is intentionally
+  // preserved as evidence. The waiver is scoped ONLY to this file, not runtime code.
+  {
+    files: ["scripts/acceptance/v3-wave4-runtime.ts"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+    },
+  },
+  // Protected V2 HTTP bootstrap uses a two-step self-referential MCP handler
+  // initialization. Preserve the frozen runtime source; waive prefer-const only here.
+  {
+    files: ["src/http.ts"],
+    rules: { "prefer-const": "off" },
+  },
 );

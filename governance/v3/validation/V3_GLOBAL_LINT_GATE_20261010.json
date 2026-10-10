@@ -1,0 +1,61 @@
+{
+  "schema_version": "radlina.v3.lint-baseline-governance/v1",
+  "record_id": "V3-GLOBAL-LINT-GATE-20261010",
+  "status": "SOURCE_CONFIG_CANDIDATE_VALIDATED_NOT_PRODUCTION_ACTIVATION",
+  "authoring": {
+    "canonical_baseline": "71fbc926a24c260e4b8f4cc1770f4d2eaad6d70d",
+    "branch": "fix/v3-lint-baseline-20261010"
+  },
+  "scope": [
+    "eslint.config.js",
+    "scripts/acceptance/tsconfig.json"
+  ],
+  "validation": {
+    "install": "npm ci PASS 487 packages (audited zero vulnerabilities)",
+    "typecheck": "PASS",
+    "full_repo_eslint": "PASS",
+    "V3_unit_suite": {
+      "result": "PASS",
+      "tests": 168,
+      "files": 28
+    },
+    "local_V3_gateway": "LOCAL_V3_BETA_PASS",
+    "prettier": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "exemptions": {
+    "historical_wave4_fixture": {
+      "file": "scripts/acceptance/v3-wave4-runtime.ts",
+      "waived_rules": [
+        "no-unsafe-assignment",
+        "no-unsafe-member-access",
+        "no-unsafe-argument"
+      ],
+      "justification": "Preserve frozen legacy acceptance evidence without source edits",
+      "review_required": true
+    },
+    "V2_http_bootstrap": {
+      "file": "src/http.ts",
+      "waived_rule": "prefer-const",
+      "justification": "Preserve frozen V2 production source and two-stage self-referential handler initialization",
+      "review_required": true
+    }
+  },
+  "source_protection": {
+    "V2_runtime_source_changed": false,
+    "V2_release_manifest_changed": false,
+    "V2_service_restarted": false,
+    "no_existing_historical_acceptance_source_changed": true,
+    "global_lint_PASS_is_not_equivalent_to_no_waivers": true
+  },
+  "blocked_acceptance": {
+    "P08_real_macbook": "NOT_VERIFIED",
+    "F01_real_fleet": "DRAFT_ONLY",
+    "I01_runtime_composition": "PENDING",
+    "AC01_independent": "PENDING",
+    "official_accepted_nodes": 24,
+    "total_nodes": 28,
+    "official_percent": 85.71
+  },
+  "end_marker": "END V3 GLOBAL LINT CANDIDATE GATE 20261010"
+}
