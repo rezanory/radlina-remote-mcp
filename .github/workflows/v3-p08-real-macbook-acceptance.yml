@@ -8,7 +8,8 @@ permissions:
 
 jobs:
   macbook-readiness:
-    if: github.ref == 'refs/heads/generation/v3-multidevice-agent-os'
+    if: github.repository == 'rezanory/radlina-remote-mcp' && github.actor == 'rezanory' && github.ref == 'refs/heads/generation/v3-multidevice-agent-os'
+    environment: v3-physical-mac-owner-approval
     runs-on: [self-hosted, macOS, radlina-macbook]
     timeout-minutes: 45
 
