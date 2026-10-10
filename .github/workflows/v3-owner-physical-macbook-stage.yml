@@ -80,7 +80,7 @@ jobs:
         if: ${{ inputs.mode == 'stage' || inputs.mode == 'readiness' }}
         shell: bash
         env:
-          V3_PINNED_COMMIT: "843c7f8efce2e8f123d0238af86afec74563e243"
+          V3_PINNED_COMMIT: "085d9fbb3a586116e49f4569c9a6fc54918b2dc5"
           APPROVED_NODE_ID: ${{ secrets.RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID }}
           RADLINA_MODE: ${{ inputs.mode }}
         run: |
