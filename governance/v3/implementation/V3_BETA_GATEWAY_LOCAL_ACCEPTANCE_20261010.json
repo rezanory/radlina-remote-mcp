@@ -1,0 +1,97 @@
+{
+  "schema_version": "radlina.v3.local-beta-gateway-acceptance/v1",
+  "record_id": "V3-BETA-GATEWAY-LOCAL-ACCEPTANCE-20261010",
+  "status": "LOCAL_V3_BETA_PASS_NOT_PRODUCTION",
+  "canonical_base": "4a5f454949db58838073c0297403b60274e52239",
+  "authoring_branch": "integration/v3-beta-gateway-local-20261010",
+  "owned_scope": [
+    "src/v3/gateway/beta.ts",
+    "scripts/acceptance/v3-local-beta-gateway.ts",
+    "tests/unit/v3/local-beta-gateway.test.ts",
+    "tsconfig.json"
+  ],
+  "runtime_design": {
+    "listener": "127.0.0.1:ephemeral test port (isolated, no public routing)",
+    "transport": "Streamable HTTP MCP",
+    "existing_control_plane": "C01 buildV3ControlPlaneServer",
+    "existing_registry": "P03 SqliteDeviceRegistry",
+    "state": "temporary independent SQLite device registry",
+    "identity": "strong local-only bearer token (not user OAuth)",
+    "current_macbook_real_enrollment": false,
+    "registry_list_from_real_db": true,
+    "advertised_tool_count": 10,
+    "write_execution": "DENY",
+    "login_to_ChatGPT_available": false,
+    "note": "C01 currently advertises its 10 tools even when the beta guard denies unsafe calls; do not register this beta in ChatGPT until scoped tool advertising and OAuth are complete."
+  },
+  "gates": {
+    "npm_ci": {
+      "status": "PASS",
+      "exit_code": 0,
+      "packages": 487
+    },
+    "typecheck": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "unit_tests": {
+      "status": "PASS",
+      "files": 4,
+      "passed": 33,
+      "failed": 0
+    },
+    "changed_scope_eslint": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "prettier": {
+      "status": "PASS",
+      "exit_code": 0
+    },
+    "operational": {
+      "status": "LOCAL_V3_BETA_PASS",
+      "input": "MCP client with actual localhost bearer credential",
+      "runtime": "C01 + P03 + Express Streamable HTTP",
+      "execution": {
+        "unauthorizedRejected": true,
+        "bearerAccepted": true,
+        "v3McpConnected": true,
+        "registryEmptyAndNotFabricated": true,
+        "adminProductionReadyFalse": true,
+        "operatorBlocked": true,
+        "v2AuthorizationUnaffected": true
+      },
+      "output": {
+        "protocol": "2026-07-28",
+        "liveDevices": 0
+      },
+      "acceptance": "LOCAL_V3_BETA_PASS"
+    }
+  },
+  "v2_production": {
+    "status": "healthy",
+    "release": "2.0.0-alpha.2",
+    "active_manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "port": 7337,
+    "restarted": false,
+    "tailnet_configuration_modified": false
+  },
+  "risks": [
+    "npm ci reported 6 inherited dependency vulnerabilities (5 high, 1 critical). No automatic audit fix was attempted."
+  ],
+  "pending": [
+    "macbook-main real P08 enrollment and signed local execution proof",
+    "genuine I01 runtime wiring, target-side consent and routing",
+    "isolated hardened OAuth and HTTPS gateway for separate ChatGPT V3 app",
+    "F01 fleet and AC01 independent multidevice acceptance",
+    "separate protection of long running processes on recipient device"
+  ],
+  "official_progress": {
+    "accepted": 24,
+    "total": 28,
+    "percentage": 85.71
+  },
+  "protected_architecture_contract_version": "1.0.0",
+  "production_activation_authorized": false,
+  "canonical_end_marker": "END V3 BETA GATEWAY LOCAL ACCEPTANCE 20261010"
+}
