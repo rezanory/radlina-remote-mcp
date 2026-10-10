@@ -1,8 +1,9 @@
-import { spawn } from "node:child_process";
+import { execFile as execFileCallback, spawn } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import { promisify } from "node:util";
 
 import type { AuthInfo } from "@modelcontextprotocol/server";
 
@@ -31,6 +32,23 @@ if (process.platform !== "darwin") {
 }
 
 const root = await mkdtemp(path.join(tmpdir(), "radlina-v3-p08-"));
+const isolatedKeychainFile = path.join(root, "acceptance-only.keychain-db");
+const execFile = promisify(execFileCallback);
+
+// macOS self-hosted CI has no interactive login Keychain; never unlock the
+// user's personal Keychain or change the default Keychain search list.
+async function scopedSecurity(args: string[]): Promise<string> {
+  try {
+    const { stdout } = await execFile("security", args, {
+      timeout: 10_000,
+      maxBuffer: 1024 * 1024,
+    });
+    return stdout.trim();
+  } catch {
+    // No exception may expose a synthetic Keychain password in public CI logs.
+    throw new Error(`isolated macOS Keychain command ${args[0] ?? "unknown"} failed`);
+  }
+}
 const processSessions = new Map<
   string,
   { status: "running" | "complete" | "failed" | "terminated"; exitCode: number | null }
@@ -107,7 +125,15 @@ try {
     cancel: async () => undefined,
   };
 
-  const keychain = new MacOSKeychainSecretProtector(`com.radlina.remote-mcp.p08.${process.pid}`);
+  const fixturePassword = randomBytes(36).toString("hex");
+  await scopedSecurity(["create-keychain", "-p", fixturePassword, isolatedKeychainFile]);
+  await scopedSecurity(["unlock-keychain", "-p", fixturePassword, isolatedKeychainFile]);
+  // Scope every CRUD command to the freshly created test Keychain only.
+  // Never mutate the default login Keychain or its trusted-app ACLs.
+  const keychain = new MacOSKeychainSecretProtector(
+    `com.radlina.remote-mcp.p08.${process.pid}`,
+    (args) => scopedSecurity([...args, isolatedKeychainFile]),
+  );
   const adapter = createMacOSPlatformAdapter({
     filesystem,
     process: processPort,
@@ -256,7 +282,7 @@ try {
       },
       runtime: {
         agent: "MacOSDeviceAgent",
-        keychain: "macOS security generic-password",
+        keychain: "macOS security isolated test Keychain (not login Keychain)",
         process: "native child_process",
         filesystem: "native fs/promises",
         search: "native directory search",
@@ -281,5 +307,10 @@ try {
   );
   if (!acceptance) process.exitCode = 1;
 } finally {
+  try {
+    await scopedSecurity(["delete-keychain", isolatedKeychainFile]);
+  } catch {
+    // Never touch the user login Keychain; only the acceptance temp directory.
+  }
   await rm(root, { recursive: true, force: true });
 }
