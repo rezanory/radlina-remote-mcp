@@ -1,0 +1,62 @@
+{
+  "schema_version": "radlina.v3.independent-f01-evidence/v1",
+  "record_id": "V3-F01-FLEET-INDEPENDENT-VALIDATION-20261010",
+  "component": {
+    "id": "F01",
+    "name": "fleet.upgrade-rollback",
+    "status": "DORMANT_SOURCE_VALIDATED_REAL_ACCEPTANCE_PENDING"
+  },
+  "authoring": {
+    "branch": "feature/v3-f01-fleet-runtime-20261010",
+    "commit": "8625903e308bb92885565b77379ba6b4706a8fc5",
+    "tree": "ebebf2df40aa898721dc38b3d299df30c5165269",
+    "canonical_base": "8e3462ee1105578f137dcb1285d842a212c0b8ae"
+  },
+  "independent_validation": {
+    "mode": "DETACHED_IMMUTABLE_WORKTREE",
+    "path": "C:\\radlina-remote-mcp\\.local\\worktrees\\integration\\v3-f01-fleet-validation-20261010",
+    "commit_matches": true,
+    "tree_matches": true,
+    "clean": true,
+    "npm_ci": "PASS",
+    "typecheck": "PASS",
+    "complete_V3_unit_suite": {
+      "status": "PASS",
+      "passed": 182,
+      "total": 182,
+      "files": 29
+    },
+    "git_diff_check": "PASS",
+    "authoring_lint": "PASS",
+    "authoring_prettier": "PASS",
+    "independent_lint": "NOT_RERUN_TOOL_SAFETY_LIMIT",
+    "operational_chain": {
+      "runner": "scripts/acceptance/v3-f01-fleet-local.ts",
+      "input": "two synthetic device IDs, exact target/rollback manifests and canary",
+      "runtime": "actual SQLite fleet plan journal + controller",
+      "execution": "synthetic agent ports and synthetic recipient consent",
+      "output": "complete, 12 events, chain valid, duplicate run denied",
+      "local_acceptance": "LOCAL_SIMULATED_F01_PASS",
+      "real_multidevice_proof": "NOT_RUN"
+    }
+  },
+  "critical_boundaries": {
+    "V2_manifests_unchanged": true,
+    "no_relay_or_real_release_activation": true,
+    "MACOS_P08_trusted_enrollment_not_verified": true,
+    "signed_device_receipts_in_real_agents_not_wired": true,
+    "rollback_on_real_mac_not_tested": true,
+    "S02E_recipient_consent_live_wiring_not_tested": true,
+    "fleet_production_activation": "NOT_AUTHORIZED",
+    "approval_replay_binding_of_real_receipts": "REQUIRES_INDEPENDENT_SECURITY_REVIEW",
+    "S03_audit_external_anchoring": "PENDING",
+    "F01_official_acceptance": "PENDING"
+  },
+  "V3_official_progress_unchanged": {
+    "accepted": 24,
+    "total": 28,
+    "percentage": 85.71
+  },
+  "dependency_advisories": "npm ci reported 6 existing issues: 5 high, 1 critical; no lockfile changes",
+  "canonical_end_marker": "END V3 F01 INDEPENDENT VALIDATION 20261010"
+}
