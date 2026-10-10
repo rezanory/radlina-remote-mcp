@@ -1,5 +1,5 @@
-import { execFile as execFileCallback, spawn } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { execFile as execFileCallback } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -17,7 +17,10 @@ import {
   MacOSKeychainSecretProtector,
   createMacOSPlatformAdapter,
 } from "../../src/v3/device/macos-agent.js";
-import type { FilesystemPort, ProcessPort, SearchPort } from "../../src/v3/platform/contracts.js";
+import {
+  createMacOSNativePorts,
+  type MacOSNativePorts,
+} from "../../src/v3/device/macos-native-ports.js";
 import { V3ExecutionPolicyGuard } from "../../src/v3/security/policy.js";
 import { testConfig } from "../../tests/helpers/config.js";
 
@@ -49,81 +52,17 @@ async function scopedSecurity(args: string[]): Promise<string> {
     throw new Error(`isolated macOS Keychain command ${args[0] ?? "unknown"} failed`);
   }
 }
-const processSessions = new Map<
-  string,
-  { status: "running" | "complete" | "failed" | "terminated"; exitCode: number | null }
->();
+let nativePorts: MacOSNativePorts | undefined;
 
 try {
-  const filesystem: FilesystemPort = {
-    getFileInfo: async (target) => {
-      const info = await stat(target);
-      return {
-        path: target,
-        kind: info.isDirectory() ? "directory" : info.isFile() ? "file" : "other",
-        size: info.size,
-        modifiedAt: info.mtime.toISOString(),
-      };
-    },
-    readFile: async (target, offset, length) => {
-      const bytes = await readFile(target);
-      return bytes.subarray(offset, offset + length);
-    },
-    writeFile: async (target, value, overwrite) => {
-      await writeFile(target, value, { flag: overwrite ? "w" : "wx" });
-    },
-    listDirectory: async (target) => (await readdir(target)).sort(),
-  };
-
-  const processPort: ProcessPort = {
-    start: async (request) => {
-      const sessionId = randomUUID();
-      const child = spawn(request.executable, request.args, {
-        cwd: request.cwd,
-        env: { ...process.env, ...(request.env ?? {}) },
-        stdio: ["pipe", "ignore", "ignore"],
-      });
-      processSessions.set(sessionId, { status: "running", exitCode: null });
-      child.once("exit", (code) => {
-        processSessions.set(sessionId, {
-          status: code === 0 ? "complete" : "failed",
-          exitCode: code,
-        });
-      });
-      return { sessionId, pid: child.pid ?? null };
-    },
-    read: async (sessionId) => ({
-      sessionId,
-      ...(processSessions.get(sessionId) ?? { status: "failed" as const, exitCode: null }),
-    }),
-    interact: async () => undefined,
-    terminate: async (sessionId) => {
-      processSessions.set(sessionId, { status: "terminated", exitCode: null });
-    },
-  };
-
-  let searchResults: unknown[] = [];
-  const search: SearchPort = {
-    start: async (request) => {
-      const entries = await readdir(request.root);
-      searchResults = entries
-        .filter((name) =>
-          request.caseSensitive
-            ? name.includes(request.pattern)
-            : name.toLowerCase().includes(request.pattern.toLowerCase()),
-        )
-        .slice(0, request.maxResults)
-        .map((name) => ({ path: path.join(request.root, name) }));
-      return { searchId: "p08-search" };
-    },
-    status: async (searchId) => ({
-      searchId,
-      status: "complete",
-      resultCount: searchResults.length,
-    }),
-    results: async () => [...searchResults],
-    cancel: async () => undefined,
-  };
+  nativePorts = await createMacOSNativePorts({
+    roots: [root],
+    executableAllowlist: ["/bin/sh"],
+    environmentAllowlist: ["PATH"],
+    ripgrepExecutable: process.env["RADLINA_RG_EXECUTABLE"] ?? "/usr/local/bin/rg",
+    maxProcessRuntimeMs: 5_000,
+    maxSearchRuntimeMs: 5_000,
+  });
 
   const fixturePassword = randomBytes(36).toString("hex");
   await scopedSecurity(["create-keychain", "-p", fixturePassword, isolatedKeychainFile]);
@@ -135,9 +74,9 @@ try {
     (args) => scopedSecurity([...args, isolatedKeychainFile]),
   );
   const adapter = createMacOSPlatformAdapter({
-    filesystem,
-    process: processPort,
-    search,
+    filesystem: nativePorts.filesystem,
+    process: nativePorts.process,
+    search: nativePorts.search,
     secrets: keychain,
     agentVersion: "3.0.0-alpha.1",
     readiness: async () => ({ ready: true, detail: "p08-acceptance" }),
@@ -175,7 +114,11 @@ try {
     literal: true,
     maxResults: 10,
   });
-  const searchState = await adapter.search.status(searchHandle.searchId);
+  let searchState = await adapter.search.status(searchHandle.searchId);
+  for (let attempt = 0; attempt < 100 && searchState.status === "running"; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    searchState = await adapter.search.status(searchHandle.searchId);
+  }
   const found = await adapter.search.results(searchHandle.searchId);
 
   const registry = new CapabilityRegistry();
@@ -283,9 +226,9 @@ try {
       runtime: {
         agent: "MacOSDeviceAgent",
         keychain: "macOS security isolated test Keychain (not login Keychain)",
-        process: "native child_process",
-        filesystem: "native fs/promises",
-        search: "native directory search",
+        process: "policy-bounded macOS native child_process",
+        filesystem: "policy-bounded macOS native fs/promises",
+        search: "policy-bounded real ripgrep",
       },
       execution: {
         hostname: info.hostname,
@@ -307,6 +250,7 @@ try {
   );
   if (!acceptance) process.exitCode = 1;
 } finally {
+  await nativePorts?.close();
   try {
     await scopedSecurity(["delete-keychain", isolatedKeychainFile]);
   } catch {
