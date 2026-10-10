@@ -407,6 +407,14 @@ export class SqliteOwnerPinnedEnrollmentAuthority {
     };
   }
 
+  latestSignedHeartbeatMs(deviceId: string): number | null {
+    if (!this.trustedIdentity(deviceId)) return null;
+    const row = this.registry.db
+      .prepare("SELECT MAX(signed_at_ms) AS latest FROM v3_p03_heartbeat_nonces WHERE device_id=?")
+      .get(deviceId) as { latest: number | null };
+    return row.latest;
+  }
+
   /**
    * Only a LIVE signed heartbeat from the enrolled key and pinned Tailnet
    * peer may update the trusted device's health or advertised capabilities.

@@ -15,6 +15,7 @@ import {
   type SignedAgentHeartbeat,
 } from "../../../src/v3/device/owner-pinned-enrollment.js";
 import { SqliteDeviceRegistry } from "../../../src/v3/device/registry.js";
+import { OwnerPinnedMacRouteGuard } from "../../../src/v3/device/owner-pinned-router.js";
 import { DeviceRouter } from "../../../src/v3/device/router.js";
 
 const NODE_HASH = sha256("REAL_TAILSCALE_NODE_ID_IS_NEVER_IN_TEST_EVIDENCE");
@@ -112,6 +113,8 @@ async function fixture() {
     config,
     ownerPublicPem,
     devicePublicPem,
+    currentTime: () => clock,
+    currentObserved: () => observedHash,
     advanceClock: (milliseconds: number) => {
       clock += milliseconds;
     },
@@ -379,6 +382,79 @@ describe("P03 owner-pinned signed macOS enrollment (dormant candidate)", () => {
       f.authority.revokeByOwner(ownerRevocation, signPayload(f.owner.privateKey, ownerRevocation)),
     ).toThrow(/timestamp invalid/u);
     expect(f.registry.require(MAC).trustState).toBe("trusted");
+  });
+
+  it("P06 refuses pending or trusted-but-no-signed-heartbeat Mac, then routes exact signed healthy Mac only", async () => {
+    const f = await fixture();
+    const guard = new OwnerPinnedMacRouteGuard(
+      f.registry,
+      f.authority,
+      f.currentObserved,
+      f.currentTime,
+    );
+    f.staged();
+    expect(() => guard.exact(MAC, "device.health")).toThrow(/trust identity is missing/u);
+
+    const db2 = await fixture();
+    const guard2 = new OwnerPinnedMacRouteGuard(
+      db2.registry,
+      db2.authority,
+      db2.currentObserved,
+      db2.currentTime,
+    );
+    db2.admitted();
+    expect(() => guard2.exact(MAC, "device.health")).toThrow(/no verified live signed heartbeat/u);
+    const heartbeat = db2.heartbeat();
+    db2.authority.applySignedHeartbeat(heartbeat, signPayload(db2.mac.privateKey, heartbeat));
+    expect(guard2.exact(MAC, "device.health")).toMatchObject({
+      exact: true,
+      device: { deviceId: MAC, platform: "macos", trustState: "trusted" },
+    });
+    expect(() => guard2.exact("windows-main", "device.health")).toThrow(
+      /trust identity is missing/u,
+    );
+  });
+
+  it("P06 fails closed for changed Tailscale peer, stale signed heartbeat or corrupted descriptor", async () => {
+    const f = await fixture();
+    f.admitted();
+    const heartbeat = f.heartbeat();
+    f.authority.applySignedHeartbeat(heartbeat, signPayload(f.mac.privateKey, heartbeat));
+    const guard = new OwnerPinnedMacRouteGuard(
+      f.registry,
+      f.authority,
+      f.currentObserved,
+      f.currentTime,
+    );
+    f.setObservedHash(OTHER_HASH);
+    expect(() => guard.exact(MAC, "device.health")).toThrow(/Tailscale peer identity/u);
+    f.setObservedHash(NODE_HASH);
+    f.advanceClock(120_001);
+    expect(() => guard.exact(MAC, "device.health")).toThrow(/stale/u);
+    f.advanceClock(-120_001);
+    const current = f.registry.require(MAC);
+    f.registry.db
+      .prepare("UPDATE v3_devices SET descriptor_json=? WHERE device_id=?")
+      .run(canonicalJson({ ...current, lastSeen: "2030-01-01T00:00:00.000Z" }), MAC);
+    expect(() => guard.exact(MAC, "device.health")).toThrow(/no verified live signed heartbeat/u);
+  });
+
+  it("P06 rejects identity-table key replacement independently of device trust flags", async () => {
+    const f = await fixture();
+    f.admitted();
+    const heartbeat = f.heartbeat();
+    f.authority.applySignedHeartbeat(heartbeat, signPayload(f.mac.privateKey, heartbeat));
+    const guard = new OwnerPinnedMacRouteGuard(
+      f.registry,
+      f.authority,
+      f.currentObserved,
+      f.currentTime,
+    );
+    const wrongPem = f.alternate.publicKey.export({ type: "spki", format: "pem" }).toString();
+    f.registry.db
+      .prepare("UPDATE v3_p03_trusted_identities SET device_public_key_pem=? WHERE device_id=?")
+      .run(wrongPem, MAC);
+    expect(() => guard.exact(MAC, "device.health")).toThrow(/signing key changed/u);
   });
 
   it("persists independently verified public key and detects tampering in the local audit journal", async () => {
