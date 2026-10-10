@@ -1,0 +1,120 @@
+name: V3 Owner-Gated Physical MacBook Probe and Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Read-only physical Mac probe or isolated V3 source staging"
+        required: true
+        type: choice
+        default: probe
+        options:
+          - probe
+          - stage
+          - readiness
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-owner-macbook-workflow
+  cancel-in-progress: false
+
+jobs:
+  physical-mac:
+    if: ${{ github.repository == 'rezanory/radlina-remote-mcp' && github.actor == 'rezanory' && github.ref == 'refs/heads/production/controller-full-control-v1' }}
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 45
+
+    steps:
+      - name: Verify exact physical runner and sanitised Tailscale identity
+        shell: bash
+        env:
+          RADLINA_MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == "radlina-macbook-main" ]]
+          [[ "$(uname -s)" == "Darwin" ]]
+          [[ "$(uname -m)" == "x86_64" ]]
+          [[ "$(hostname)" == "amirs-MacBook-Pro.local" ]]
+          [[ "$(node --version)" == "v24.20.0" ]]
+          printf 'runner.name=%s\n' "$RUNNER_NAME"
+          printf 'host.name=%s\n' "$(hostname)"
+          printf 'platform=%s\n' "$(uname -s)"
+          printf 'architecture=%s\n' "$(uname -m)"
+          printf 'node.version=%s\n' "$(node --version)"
+          printf 'workflow.mode=%s\n' "$RADLINA_MODE"
+          command -v git
+          command -v security
+          if command -v rg >/dev/null 2>&1; then
+            printf 'ripgrep.available=true\n'
+          else
+            printf 'ripgrep.available=false\n'
+          fi
+          node <<'CHECK_TAILNET'
+          const { execFileSync } = require('node:child_process');
+          const { createHash } = require('node:crypto');
+          const fs = require('node:fs');
+          const candidates = ['/opt/homebrew/bin/tailscale', '/usr/local/bin/tailscale',
+            '/Applications/Tailscale.app/Contents/MacOS/Tailscale'];
+          const binary = candidates.find(p => fs.existsSync(p)) || 'tailscale';
+          const status = JSON.parse(execFileSync(binary, ['status','--json'], {encoding:'utf8', timeout:15000}));
+          const actual = status.Self || {};
+          const tailnet = status.CurrentTailnet?.Name || '';
+          const nodeId = actual.ID || '';
+          const windowsSeen = Object.values(status.Peer || {}).some(p =>
+            /LAPTOP-13QINEIF/i.test(p.HostName || '') ||
+            /laptop-13qineif/i.test(p.DNSName || ''));
+          console.log('tailnet.name=' + tailnet);
+          console.log('tailnet.backend=' + status.BackendState);
+          console.log('tailnet.selfNodeHash=' + (nodeId ? createHash('sha256').update(nodeId).digest('hex') : 'MISSING'));
+          console.log('tailnet.windowsPeerVisible=' + windowsSeen);
+          if (status.BackendState !== 'Running' || tailnet !== 'rezanory.github' ||
+              actual.OS !== 'macOS' || !nodeId || !windowsSeen) {
+            console.error('MACBOOK_TAILNET_READINESS_BLOCKED');
+            process.exitCode = 2;
+          }
+          CHECK_TAILNET
+
+      - name: Stage pinned V3 source in isolated MacBook directory and run macOS checks
+        if: ${{ inputs.mode == 'stage' || inputs.mode == 'readiness' }}
+        shell: bash
+        env:
+          V3_PINNED_COMMIT: "843c7f8efce2e8f123d0238af86afec74563e243"
+          APPROVED_NODE_ID: ${{ secrets.RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID }}
+          RADLINA_MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$APPROVED_NODE_ID" ]]; then
+            printf '::add-mask::%s\\n' "$APPROVED_NODE_ID"
+          fi
+          if [[ "$RADLINA_MODE" == "readiness" && -z "$APPROVED_NODE_ID" ]]; then
+            echo "BLOCKED: approved MacBook Node ID secret is not set"
+            exit 25
+          fi
+          ROOT="$HOME/.local/share/radlina/v3-beta"
+          TARGET="$ROOT/$V3_PINNED_COMMIT"
+          mkdir -p "$ROOT"
+          if [[ -e "$TARGET" && ! -d "$TARGET/.git" ]]; then
+            echo "BLOCKED: owned staging path exists without a Git checkout"
+            exit 26
+          fi
+          if [[ ! -d "$TARGET/.git" ]]; then
+            git clone --quiet --no-checkout --filter=blob:none --branch generation/v3-multidevice-agent-os https://github.com/rezanory/radlina-remote-mcp.git "$TARGET"
+          fi
+          git -C "$TARGET" fetch --quiet --no-tags origin "$V3_PINNED_COMMIT"
+          git -C "$TARGET" checkout --quiet --detach "$V3_PINNED_COMMIT"
+          [[ "$(git -C "$TARGET" rev-parse HEAD)" == "$V3_PINNED_COMMIT" ]]
+          cd "$TARGET"
+          echo "mac.staging.commit=$V3_PINNED_COMMIT"
+          npm ci --ignore-scripts
+          npm run typecheck
+          node node_modules/vitest/vitest.mjs run tests/unit/v3/macos-agent.test.ts tests/unit/v3/macbook-readiness-policy.test.ts
+          node node_modules/tsx/dist/cli.mjs scripts/acceptance/v3-p08-macos-agent.ts
+          if [[ "$RADLINA_MODE" == "readiness" ]]; then
+            export RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID="$APPROVED_NODE_ID"
+            bash scripts/enrollment/v3-p08-real-macbook-acceptance.sh
+          else
+            echo "mac.staging.localTests=PASS"
+            echo "mac.staging.productionAcceptance=NOT_GRANTED"
+          fi
