@@ -29,7 +29,9 @@
     "scripts/acceptance/v3-p08-real-macbook.ts",
     "scripts/acceptance/v3-cross-device-consent-local.ts",
     "scripts/acceptance/v3-local-beta-gateway.ts",
-    "scripts/operations/v3-beta-local-daemon.ts"
+    "scripts/operations/v3-beta-local-daemon.ts",
+    "scripts/operations/v3-oauth-readonly-daemon.ts",
+    "scripts/operations/v3-oauth-approve.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }
