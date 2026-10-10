@@ -1,0 +1,88 @@
+{
+  "schema_version": "radlina.v3.f01-local-candidate/v1",
+  "record_id": "V3-F01-FLEET-CANDIDATE-20261010",
+  "component": {
+    "id": "F01",
+    "name": "fleet.upgrade-rollback",
+    "official_acceptance": "PENDING_REAL_MACBOOK_AND_WINDOWS"
+  },
+  "source": {
+    "canonical_base": "8e3462ee1105578f137dcb1285d842a212c0b8ae",
+    "branch": "feature/v3-f01-fleet-runtime-20261010"
+  },
+  "ownership": {
+    "component_plane": "Platform Backbone / Fleet Management",
+    "canonical_workflow_engine_unchanged": true,
+    "V2_release_manager_untouched": true,
+    "no_new_public_MCP_tool": true,
+    "no_production_fleet_port_activation": true
+  },
+  "implementation": {
+    "modules": [
+      "src/v3/fleet/contracts.ts",
+      "src/v3/fleet/store.ts",
+      "src/v3/fleet/controller.ts"
+    ],
+    "test": "tests/unit/v3/fleet-controller.test.ts",
+    "acceptance_script": "scripts/acceptance/v3-f01-fleet-local.ts",
+    "features": [
+      "exact-device manifest-pinned fleet plans",
+      "verified trusted healthy registry eligibility",
+      "owner authority + recipient per-operation consent",
+      "signed evidence verifier port mandatory",
+      "all-devices preflight before canary",
+      "canary verified before subsequent rollout",
+      "atomic SQLite state transitions and hash-chain events",
+      "replay and concurrent-plan conflict prevention",
+      "rollback in reverse order with fresh consent",
+      "unknown side-effects require independent reconciliation; no automatic retry",
+      "manual intervention when rollback cannot be verified"
+    ]
+  },
+  "local_test_evidence": {
+    "npm_ci": "PASS 487 packages",
+    "typecheck": "PASS",
+    "full_V3_unit_suite": {
+      "passed": 182,
+      "total": 182,
+      "test_files": 29
+    },
+    "F01_unit_suite": {
+      "passed": 14,
+      "total": 14
+    },
+    "lint": "PASS",
+    "prettier": "PASS",
+    "local_operational": {
+      "label": "LOCAL_SIMULATED_F01_PASS",
+      "chain": "Input -> SQLite runtime -> synthetic agent port calls -> audited output -> local acceptance",
+      "real_SQLite": true,
+      "actual_Windows_and_Mac_agents": false,
+      "device_identity_evidence": "SYNTHETIC",
+      "device_signatures": "SYNTHETIC PORT VERIFIER",
+      "consent": "SYNTHETIC PORT",
+      "macos_active_upgrade_attempted": false,
+      "productionAcceptance": "NOT_GRANTED"
+    }
+  },
+  "outstanding": {
+    "DAG_predecessor_P08_real_acceptance": "PENDING",
+    "signed_attestation_port_implementation": "PENDING",
+    "real_recipient_approved_consent": "PENDING",
+    "operational_on_macOS_and_Windows": "PENDING",
+    "rollback_and_sustained_health_on_both_hosts": "PENDING",
+    "independently_signed_S03_audit": "PENDING",
+    "F01_acceptance": "NOT_AUTHORIZED"
+  },
+  "v2_unchanged": {
+    "version": "2.0.0-alpha.2",
+    "manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e"
+  },
+  "v3_progress_unchanged": {
+    "accepted": 24,
+    "total": 28,
+    "percentage": 85.71
+  },
+  "dependency_audit_warning": "npm ci reports 6 inherited advisories, 5 high, 1 critical",
+  "canonical_end_marker": "END V3 F01 LOCAL CANDIDATE 20261010"
+}
