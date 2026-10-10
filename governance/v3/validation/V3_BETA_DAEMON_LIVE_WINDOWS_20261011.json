@@ -1,0 +1,71 @@
+{
+  "schema_version": "radlina.v3.local-side-by-side-service/v1",
+  "record_id": "V3-BETA-DAEMON-LIVE-WINDOWS-20261011",
+  "source": {
+    "canonical_base": "e177db75a99c4234a025a410d12b36cd23f70533",
+    "branch": "feature/v3-beta-daemon-20261011",
+    "files": [
+      "scripts/operations/v3-beta-local-daemon.ts",
+      "tsconfig.json"
+    ]
+  },
+  "actual_windows": {
+    "physicalHost": "LAPTOP-13QINEIF",
+    "serverProcessExecutable": "Node v24.20.0",
+    "applicationGeneration": "v3-multidevice-agent-os",
+    "announcedBetaVersion": "3.0.0-alpha.1",
+    "runningPidObserved": 19028,
+    "remoteMcpProcessSession": "a4b0cd47-68c4-4783-9d05-52ebb443ef8d",
+    "bind": "127.0.0.1:7343",
+    "netstatObservedOnlyLoopback": true,
+    "mcp": "http://127.0.0.1:7343/mcp",
+    "token": "48 random bytes ephemeral in-process, NEVER logged or persisted",
+    "v3RegistrySqlite": "independent local state, empty",
+    "userExecutionEnabled": false,
+    "productionReady": false,
+    "nativeChatGPTAppConnected": false,
+    "automaticStartupInstalled": false,
+    "persistenceNote": "Live process may stop when tool session expires or Windows reboots"
+  },
+  "verified": {
+    "npm_ci": "PASS",
+    "npm_audit_reported_vulnerabilities": 0,
+    "typecheck": "PASS",
+    "full_V3_unit_suite": {
+      "passed": 168,
+      "total": 168,
+      "files": 28
+    },
+    "global_lint": "PASS",
+    "prettier": "PASS",
+    "MCP_startup_self_probed_local_auth": "PASS",
+    "external_probe": {
+      "anonymousV3HealthStatus": 401,
+      "anonymousV3McpStatus": 401,
+      "anonymousV2McpStatus": 401,
+      "isolatedTcpListening": "127.0.0.1:7343",
+      "V2_port": 7337
+    },
+    "V2": {
+      "runtimeVersion": "2.0.0-alpha.2",
+      "preservedManifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+      "notRestarted": true,
+      "noTailscaleChanges": true
+    }
+  },
+  "gates_remaining": [
+    "OpenAI ChatGPT compatible independent HTTPS/OAuth endpoint (current beta localhost only)",
+    "Trusted physical P03 enrollment for macbook-main",
+    "Live authenticated P06 exact Mac dispatch and cross-device S02E recipient consent",
+    "F01 real canary/rollback on both devices",
+    "I01 authentic multidevice composition",
+    "AC01 native ChatGPT acceptance"
+  ],
+  "officialAcceptedComponents": {
+    "count": 24,
+    "total": 28,
+    "percentage": 85.71
+  },
+  "disposition": "LOCAL_V3_BETA_ACTIVE_READONLY_ONLY_NO_PRODUCTION_ACCEPTANCE",
+  "marker": "END V3 LIVE LOCAL BETA DAEMON ACCEPTANCE 20261011"
+}
