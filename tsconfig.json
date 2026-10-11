@@ -33,7 +33,9 @@
     "scripts/operations/v3-beta-local-daemon.ts",
     "scripts/acceptance/v3-f01-fleet-local.ts",
     "scripts/operations/v3-oauth-readonly-daemon.ts",
-    "scripts/operations/v3-oauth-approve.ts"
+    "scripts/operations/v3-oauth-approve.ts",
+    "scripts/operations/v3-register-physical-pending.ts",
+    "scripts/operations/v3-verify-mac-identity-proof.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

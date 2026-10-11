@@ -1,0 +1,61 @@
+{
+  "schema_version": "radlina.v3.p03-real-device-pending-and-signed-proof-validation/v1",
+  "id": "V3-P03-MAC-WINDOWS-PENDING-KEYCHAIN-SIGNED-HB-20261011",
+  "status": "REAL_DEVICE_PENDING_SIGNED_MAC_PROOFS_VALIDATED_TRUST_NOT_ADMITTED",
+  "input": {
+    "windows_host": "LAPTOP-13QINEIF",
+    "mac_host": "amirs-MacBook-Pro.local",
+    "actual_mac_readiness_run": 38091109343,
+    "mac_keychain_identity_run": 38103607458,
+    "mac_signed_heartbeat_run": 38103667280,
+    "mac_code_sha": "de625477bbbc60d37adcc690c082df53fe5e6d6f",
+    "windows_code_baseline": "dfd6a9287bd4a216cb903956f1a4cf8319e73856"
+  },
+  "runtime": {
+    "registry": "E:\\radlina-v3-oauth-standalone\\v3-devices.sqlite3",
+    "mac_keychain": "dedicated V3-only durable macOS Runner Keychain; login Keychain preserved",
+    "github_runner": "radlina-macbook-main",
+    "live_tailnet": "rezanory.github"
+  },
+  "execution": {
+    "created_mac_real_pending": true,
+    "created_windows_real_pending": true,
+    "idempotent_replay_both_devices": true,
+    "exact_p06_route_denied_both_devices": true,
+    "dynamic_p06_route_denied": true,
+    "real_mac_device_ed25519_request_signature_verified_on_windows": true,
+    "real_mac_device_ed25519_heartbeat_signature_verified_on_windows": true,
+    "heartbeat_fresh_at_verification": true,
+    "mac_public_key_fingerprint": "f2c2e93ff120fbc5122cbb6b5a0b461a072f54bd8d226368c858fd0bd17037ea",
+    "independent_windows_tailnet_mac_peer_fingerprint": "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c",
+    "script_typecheck": "PASS",
+    "eslint": "PASS",
+    "private_mac_device_key_exfiltrated": false
+  },
+  "output": {
+    "v3_actual_registry_total": 2,
+    "mac_trust": "pending",
+    "windows_trust": "pending",
+    "mac_heartbeat_applied_to_trusted_registry": false,
+    "mac_capability_routable": false,
+    "real_fleet_canary_started": false,
+    "v2_touched": false
+  },
+  "acceptance": {
+    "independent_device_proof": "PASS",
+    "live_signed_heartbeat_cryptographic_verification": "PASS",
+    "owner_independent_signature": "BLOCKED_NEEDS_OWNER_CONTROLLED_SIGNER",
+    "mac_trusted_admission": "NOT_PROVEN",
+    "windows_agent_trusted_admission": "NOT_PROVEN",
+    "p06_real_router": "NOT_APPROVED",
+    "f01_two_host_real_canary_rollback": "NOT_EXECUTED",
+    "s02e_target_local_consent": "PENDING",
+    "s03_distributed_audit": "PENDING",
+    "note": "Never count a signed heartbeat as accepted P03 Trusted health unless P03 admits a dual-owner-and-device challenge and replay-protected live heartbeat.",
+    "official_progress": {
+      "accepted": 24,
+      "total": 28,
+      "percent": 85.71
+    }
+  }
+}

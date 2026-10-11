@@ -1,0 +1,78 @@
+{
+  "schema_version": "radlina.v3.i01-public-https-real-evidence/v1",
+  "id": "V3-I01-PUBLIC-HTTPS-SMOKE-20261011",
+  "source_commit": "5cb67cf13c2053564d72a54ca16c723e0b04aba1",
+  "input": {
+    "windows_device": "LAPTOP-13QINEIF",
+    "public_issuer": "https://v3-mcp.radlina.com",
+    "public_mcp": "https://v3-mcp.radlina.com/mcp"
+  },
+  "runtime": {
+    "oauth_service": "RadlinaV3OAuthBeta",
+    "tunnel_service": "RadlinaV3Tunnel",
+    "cloudflared_sha256": "86aee4017b26625cee8484c113558f48effa4cd47f7aa05fcf425604e5d2b23c",
+    "credential_file_acl_verified": true,
+    "credential_contents_accessed": false
+  },
+  "execution": {
+    "attempts": [
+      {
+        "attempt": 1,
+        "exit_code": 0,
+        "acceptance": "WINDOWS_PUBLIC_OAUTH_SMOKE_PASS_NOT_V3_PRODUCTION_ACCEPTANCE"
+      }
+    ],
+    "preflight_script_sha256": "7f79e7cc6a402bc2a4b35aa5b822b7fc119a1cd494584a181608b52b048d8249",
+    "actual_checks": {
+      "v2_7337_untouched": true,
+      "v3_oauth_service_running": true,
+      "v3_oauth_loopback_only": true,
+      "v3_oauth_signing": true,
+      "v3_independent_issuer": true,
+      "anonymous_mcp_rejected_401": true,
+      "admin_scope_rejected_400": true,
+      "v3_state_acl_private": true,
+      "cloudflared_vendor_sha256": true,
+      "tunnel_token_file_config_pinned": true,
+      "tunnel_token_acl_private": true,
+      "tunnel_secure_token_provisioned": true,
+      "tunnel_service_running": true,
+      "public_https_oauth_issuer_verified": true,
+      "public_anonymous_mcp_rejected_401": true,
+      "public_admin_scope_rejected_400": true
+    },
+    "test_timestamp_utc": "2026-10-11T01:12:29.1570343Z",
+    "tunnel_service_restart": {
+      "live_restart_test": "PASS",
+      "service": "RadlinaV3Tunnel",
+      "startup_type": "Automatic",
+      "public_https_restored": true,
+      "first_2second_probe_pass": true,
+      "v2_7337_unchanged": true,
+      "credential_contents_read": false,
+      "post_restart_probe_utc": "2026-10-11T01:14:35.8446374Z"
+    }
+  },
+  "output": {
+    "passed": true,
+    "checks_passed": 16,
+    "checks_total": 16,
+    "public_tls_verified": true,
+    "failed_checks": [],
+    "transient_initial_probe_failure_observed": true
+  },
+  "acceptance": {
+    "windows_public_oauth": "SMOKE_PASS_NOT_PRODUCTION_ACCEPTANCE",
+    "chatgpt_v3_app": "NOT_CONNECTED_OR_VERIFIED",
+    "P08": "OPEN",
+    "F01": "OPEN",
+    "I01": "OPEN",
+    "AC01": "OPEN",
+    "official_percent": 85.71
+  },
+  "safety": {
+    "v2_unchanged": true,
+    "main_unchanged": true,
+    "secrets_excluded": true
+  }
+}
