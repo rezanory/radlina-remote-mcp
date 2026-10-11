@@ -70,8 +70,9 @@
   },
   "validation": {
     "fullV3Tests": {
-      "pass": 203,
-      "fail": 0
+      "pass": 205,
+      "fail": 0,
+      "files": 33
     },
     "focusedP03": {
       "pass": 17,
@@ -87,7 +88,22 @@
     "deviceUsesLocalMachineDpapiWithPrivateAcl": true,
     "temporaryOwnerTasksRemoved": true,
     "mainUnchanged": true,
-    "v2Unchanged": true
+    "v2Unchanged": true,
+    "isolatedDpapiAclNegatives": {
+      "pass": 5,
+      "fail": 0,
+      "disposableTestKey": true
+    },
+    "typecheck": "PASS",
+    "changedCodeEslint": "PASS",
+    "fleet": {
+      "source": "11789c06d2924132c00014e05e25e4c0dd07ff0e",
+      "reusedAs": "4c516bcfead61e873546bf45bdd94d23ac2c51dd",
+      "testsPassed": 16,
+      "testsFailed": 0,
+      "localExercise": "LOCAL_SIMULATED_F01_PASS",
+      "physicalRollout": "NOT_EXECUTED"
+    }
   },
   "remaining": [
     "Mac runner must be online for a fresh actual challenge response",
