@@ -59,7 +59,7 @@ export function buildWatchdogState(
 function command(executable: string, args: string[]): string {
   return execFileSync(executable, args, {
     encoding: "utf8",
-    timeout: 20_000,
+    timeout: 5_000,
     maxBuffer: 4 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
