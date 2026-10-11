@@ -34,18 +34,36 @@ npm ci
 npm run typecheck
 node node_modules/vitest/vitest.mjs run \
   tests/unit/v3/macos-agent.test.ts \
+  tests/unit/v3/macos-identity.test.ts \
+  tests/unit/v3/macos-native-ports.test.ts \
+  tests/unit/v3/macos-watchdog.test.ts \
+  tests/unit/v3/owner-pinned-enrollment.test.ts \
   tests/unit/v3/macbook-readiness-policy.test.ts
 node node_modules/eslint/bin/eslint.js \
   src/v3/device/macos-agent.ts \
+  src/v3/device/macos-identity.ts \
+  src/v3/device/macos-native-ports.ts \
   tests/unit/v3/macos-agent.test.ts \
+  tests/unit/v3/macos-identity.test.ts \
+  tests/unit/v3/macos-native-ports.test.ts \
+  tests/unit/v3/macos-watchdog.test.ts \
   scripts/enrollment/macbook-readiness-policy.ts \
+  scripts/enrollment/v3-p08-mac-identity.ts \
+  scripts/operations/v3-macos-watchdog.ts \
   scripts/acceptance/v3-p08-real-macbook.ts \
   tests/unit/v3/macbook-readiness-policy.test.ts
 node node_modules/prettier/bin/prettier.cjs --check \
   src/v3/device/macos-agent.ts \
+  src/v3/device/macos-identity.ts \
+  src/v3/device/macos-native-ports.ts \
   tests/unit/v3/macos-agent.test.ts \
+  tests/unit/v3/macos-identity.test.ts \
+  tests/unit/v3/macos-native-ports.test.ts \
+  tests/unit/v3/macos-watchdog.test.ts \
   scripts/acceptance/v3-p08-macos-agent.ts \
   scripts/enrollment/macbook-readiness-policy.ts \
+  scripts/enrollment/v3-p08-mac-identity.ts \
+  scripts/operations/v3-macos-watchdog.ts \
   scripts/acceptance/v3-p08-real-macbook.ts \
   tests/unit/v3/macbook-readiness-policy.test.ts
 
