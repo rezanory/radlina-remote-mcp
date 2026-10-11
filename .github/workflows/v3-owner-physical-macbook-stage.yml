@@ -23,6 +23,7 @@ concurrency:
 jobs:
   physical-mac:
     if: ${{ github.repository == 'rezanory/radlina-remote-mcp' && github.actor == 'rezanory' && github.ref == 'refs/heads/production/controller-full-control-v1' }}
+    environment: v3-mac-runner-owner-reviewed
     runs-on: [self-hosted, macOS, X64, radlina-macbook]
     timeout-minutes: 45
 
@@ -80,7 +81,7 @@ jobs:
         if: ${{ inputs.mode == 'stage' || inputs.mode == 'readiness' }}
         shell: bash
         env:
-          V3_PINNED_COMMIT: "765072304d49108858f9ec7cfea87d9c8f4c1f3d"
+          V3_PINNED_COMMIT: "7096df9b720407bed32c6c6288497958b009c9b9"
           APPROVED_NODE_ID: ${{ secrets.RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID }}
           RADLINA_MODE: ${{ inputs.mode }}
         run: |
@@ -109,7 +110,7 @@ jobs:
           echo "mac.staging.commit=$V3_PINNED_COMMIT"
           npm ci --ignore-scripts
           npm run typecheck
-          node node_modules/vitest/vitest.mjs run tests/unit/v3/macos-agent.test.ts tests/unit/v3/macbook-readiness-policy.test.ts
+          node node_modules/vitest/vitest.mjs run tests/unit/v3/macos-agent.test.ts tests/unit/v3/macbook-readiness-policy.test.ts tests/unit/v3/owner-pinned-enrollment.test.ts tests/unit/v3/fleet-controller.test.ts tests/unit/v3/oauth-readonly-gateway.test.ts
           node node_modules/tsx/dist/cli.mjs scripts/acceptance/v3-p08-macos-agent.ts
           if [[ "$RADLINA_MODE" == "readiness" ]]; then
             export RADLINA_APPROVED_MAC_TAILSCALE_NODE_ID="$APPROVED_NODE_ID"
