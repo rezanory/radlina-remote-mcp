@@ -1,0 +1,67 @@
+name: V3 P03 Physical Mac Identity Attestation (development only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-p03-mac-identity
+  cancel-in-progress: false
+
+jobs:
+  mac-p03-identity:
+    if: ${{ github.repository == 'rezanory/radlina-remote-mcp' && github.actor == 'rezanory' && github.ref == 'refs/heads/production/controller-full-control-v1' }}
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 35
+    steps:
+      - name: Verify physical Mac and pin exact reviewed source
+        shell: bash
+        env:
+          SOURCE_SHA: "30b394673c3bde58e407d4b8155ce7c2eff471a5"
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' ]]
+          [[ "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          STAGING="$RUNNER_TEMP/radlina-v3-p03-identity-$SOURCE_SHA"
+          if [[ -e "$STAGING" && ! -d "$STAGING/.git" ]]; then
+            echo "BLOCKED: existing staging path is not a Git repository"
+            exit 21
+          fi
+          if [[ ! -d "$STAGING/.git" ]]; then
+            git clone --quiet --no-checkout --filter=blob:none --branch feature/v3-macbook-execution-recovery-20261011 https://github.com/rezanory/radlina-remote-mcp.git "$STAGING"
+          fi
+          git -C "$STAGING" fetch --quiet --no-tags origin "$SOURCE_SHA"
+          git -C "$STAGING" checkout --quiet --detach "$SOURCE_SHA"
+          [[ "$(git -C "$STAGING" rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          echo "PINNED_MAC_SOURCE_VERIFIED"
+          cd "$STAGING"
+          npm ci --ignore-scripts --no-fund
+          npm run typecheck
+          node node_modules/tsx/dist/cli.mjs scripts/enrollment/v3-p08-mac-identity.ts
+          node --import tsx --input-type=module <<'VERIFY_IDENTITY'
+          import { createPublicKey, createHash, verify } from 'node:crypto';
+          import { readFileSync, statSync } from 'node:fs';
+          import os from 'node:os';
+          import path from 'node:path';
+          import { canonicalJson } from './src/utils/json.ts';
+          const root=path.join(os.homedir(),'.local','share','radlina','v3-beta','macbook-main');
+          const statePath=path.join(root,'device-identity.json');
+          const requestPath=path.join(root,'p03-enrollment-request.json');
+          const identity=JSON.parse(readFileSync(statePath,'utf8'));
+          const envelope=JSON.parse(readFileSync(requestPath,'utf8'));
+          const req=envelope.request;
+          const fp=createHash('sha256').update(createPublicKey(req.devicePublicKeyPem).export({format:'der',type:'spki'})).digest('hex');
+          const verified=verify(null,Buffer.from(canonicalJson(req)),createPublicKey(req.devicePublicKeyPem),Buffer.from(envelope.deviceSignatureBase64,'base64'));
+          const filePermissions=[statePath,requestPath].every(p=>(statSync(p).mode & 0o077)===0);
+          if(req.deviceId!=='macbook-main'||req.hostname!==os.hostname()||req.agentInstanceId!==identity.agentInstanceId||fp!==identity.publicKeyFingerprint||!verified||!filePermissions||identity.keychainReference?.startsWith('keychain:')!==true||req.requestedTrustState!=='pending'){
+            throw new Error('REAL MAC P03 IDENTITY REQUEST FAIL_CLOSED');
+          }
+          console.log('P03_PHYSICAL_MAC_SIGNED_REQUEST_PASS');
+          console.log('MacKeychainPrivateKey=true; deviceRequestSignatureVerified=true; stateACL=0600; ownerApproved=false; trusted=false; routable=false');
+          VERIFY_IDENTITY
