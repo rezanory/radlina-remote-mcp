@@ -27,6 +27,7 @@
     "tests/**/*.ts",
     "scripts/enrollment/macbook-readiness-policy.ts",
     "scripts/enrollment/v3-p03-real-mac-pending.ts",
+    "scripts/enrollment/v3-p08-mac-identity.ts",
     "scripts/acceptance/v3-p08-macos-agent.ts",
     "scripts/acceptance/v3-p08-real-macbook.ts",
     "scripts/acceptance/v3-cross-device-consent-local.ts",
@@ -34,7 +35,8 @@
     "scripts/operations/v3-beta-local-daemon.ts",
     "scripts/acceptance/v3-f01-fleet-local.ts",
     "scripts/operations/v3-oauth-readonly-daemon.ts",
-    "scripts/operations/v3-oauth-approve.ts"
+    "scripts/operations/v3-oauth-approve.ts",
+    "scripts/operations/v3-macos-watchdog.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }
