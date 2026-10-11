@@ -187,6 +187,18 @@ function main(): void {
     throw new Error("isolated V3 watchdog state directory required");
   }
   mkdirSync(stateDirectory, { recursive: true, mode: 0o700 });
+  if (process.argv[2] === "record-test") {
+    const commit = command("/usr/bin/git", ["-C", repository, "rev-parse", "HEAD"]);
+    if (!/^[0-9a-f]{40}$/u.test(commit)) throw new Error("valid test commit required");
+    writeFileSync(
+      path.join(stateDirectory, "last-test.json"),
+      JSON.stringify({ status: "PASS", completedAt: new Date().toISOString(), commit }, null, 2) +
+        "\n",
+      { mode: 0o600 },
+    );
+    process.stdout.write(JSON.stringify({ status: "PASS", commit }) + "\n");
+    return;
+  }
   const lockDirectory = path.join(stateDirectory, "run.lock");
   try {
     mkdirSync(lockDirectory, { mode: 0o700 });
