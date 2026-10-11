@@ -28,6 +28,7 @@
     "scripts/enrollment/macbook-readiness-policy.ts",
     "scripts/enrollment/v3-p03-real-mac-pending.ts",
     "scripts/enrollment/v3-p08-mac-identity.ts",
+    "scripts/enrollment/v3-p08-headless-identity.ts",
     "scripts/acceptance/v3-p08-macos-agent.ts",
     "scripts/acceptance/v3-p08-real-macbook.ts",
     "scripts/acceptance/v3-cross-device-consent-local.ts",
