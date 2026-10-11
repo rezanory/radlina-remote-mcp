@@ -1,0 +1,53 @@
+{
+  "schema_version": "radlina.v3.f01-unknown-activation-independent-validation/v1",
+  "record_id": "V3-F01-WINDOWS-UNKNOWN-ACTIVATION-FAIL-CLOSED-20261011",
+  "status": "SOURCE_VALIDATED_NOT_PRODUCTION_ACCEPTED",
+  "canonical_input": "69bcacb6eb94cf8526c08691961c551579797e7e",
+  "scope": ["src/v3/fleet/controller.ts", "tests/unit/v3/fleet-controller.test.ts"],
+  "changes": [
+    "Do not roll back a target with unknown activation outcome or unverified signed switch receipt",
+    "Only prior independently verified targets enter reverse-order rollback",
+    "Record unresolved target in durable hash-chained F01 event journal",
+    "Require manual reconciliation of uncertain activation before release"
+  ],
+  "validation": {
+    "platform": "real Windows LAPTOP-13QINEIF, Node v24.20.0",
+    "npm_ci": "PASS 487 packages 0 reported vulnerabilities",
+    "typecheck": "PASS",
+    "focused_f01": "16/16 PASS",
+    "full_v3_unit": "202/202 PASS in 31 files",
+    "eslint_changed_files": "PASS",
+    "prettier_changed_files": "PASS",
+    "git_diff_check": "PASS",
+    "local_sqlite_fleet_scenario": "LOCAL_SIMULATED_F01_PASS",
+    "real_windows_dpapi_test": "PASS in full V3 suite"
+  },
+  "chain": {
+    "input": "exact integration head and F01 plan with macbook-main canary and windows-main target",
+    "runtime": "isolated Windows worktree on E drive with SQLite WAL and synthetic agent/consent ports",
+    "execution": "safe-success case plus unknown target activation, invalid switch receipt, health failure and consent-denied rollback",
+    "output": "verified targets revert; uncertain targets remain untouched and manual_intervention is durably recorded",
+    "acceptance": "INDEPENDENT_SOFTWARE_GATES_PASS_NOT_REAL_FLEET_ACCEPTANCE"
+  },
+  "restrictions": {
+    "production_release_activated": false,
+    "live_two_device_canary_and_rollback": "NOT_RUN",
+    "external_S03": "PENDING",
+    "main_modified": false,
+    "owner_signed_device_receipts": "PENDING",
+    "physical_mac_p03_trusted_enrollment": "PENDING",
+    "v2_manifest_modified": false,
+    "recipient_local_S02E": "PENDING"
+  },
+  "v2_health": {
+    "readiness": "PASS",
+    "version": "2.0.0-alpha.2",
+    "manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e"
+  },
+  "official_v3": {
+    "accepted": 24,
+    "percent": 85.71,
+    "total": 28
+  },
+  "end_marker": "END V3 F01 UNKNOWN ACTIVATION INDEPENDENT SOFTWARE VALIDATION 20261011"
+}
