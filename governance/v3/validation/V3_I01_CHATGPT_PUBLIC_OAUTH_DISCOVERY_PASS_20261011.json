@@ -1,0 +1,53 @@
+{
+  "schema_version": "radlina.v3.i01-chatgpt-external-oauth-discovery-receipt/v1",
+  "record_id": "V3-I01-CHATGPT-PUBLIC-OAUTH-DISCOVERY-PASS-20261011",
+  "source_sha": "e11f3b7e2816d0b8d71a3bc9aec687ceae005ea9",
+  "input": {
+    "public_origin": "https://v3-mcp.radlina.com",
+    "resource": "https://v3-mcp.radlina.com/mcp",
+    "metadata": "https://v3-mcp.radlina.com/.well-known/oauth-protected-resource/mcp"
+  },
+  "runtime": {
+    "host": "LAPTOP-13QINEIF",
+    "target": "public Cloudflare HTTPS to independent V3 OAuth gateway",
+    "tool": "scripts/operations/v3-chatgpt-oauth-discovery-conformance.ps1",
+    "v2_touched": false
+  },
+  "execution": {
+    "completed_utc": "2026-10-11T01:22:37.3823371Z",
+    "method": "real HTTPS GET/POST negative probes and OAuth metadata",
+    "check_count": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  },
+  "output": {
+    "result": "PASS_CHATGPT_OAUTH_DISCOVERY_ONLY",
+    "checks": {
+      "oauth_issuer_matches": true,
+      "resource_uri_matches_mcp": true,
+      "authorization_server_links_issuer": true,
+      "auth_endpoint_https_same_origin": true,
+      "token_endpoint_https_same_origin": true,
+      "registration_endpoint_https_same_origin": true,
+      "dynamic_registration_advertised": true,
+      "pkce_s256_advertised": true,
+      "public_oauth_client_supported": true,
+      "read_scope_advertised": true,
+      "forbidden_admin_scope_not_advertised": true,
+      "anonymous_mcp_rejected_401": true,
+      "bearer_challenge_advertises_resource_metadata": true,
+      "admin_scope_rejected_400": true
+    },
+    "verified_all": true
+  },
+  "acceptance": "PUBLIC_OAUTH_DISCOVERY_PASS_ONLY_NOT_CHATGPT_APP_INSTALLATION",
+  "restrictions": {
+    "owner_oauth_consent_not_completed": true,
+    "native_chatgpt_v3_app_not_verified": true,
+    "real_two_host_p08_f01_i01_ac01_not_accepted": true,
+    "v2_active_unmodified": true,
+    "main_untouched": true,
+    "official_acceptance": 24,
+    "total": 28,
+    "percent": 85.71
+  },
+  "end_marker": "END V3 I01 CHATGPT PUBLIC OAUTH DISCOVERY RECEIPT 20261011"
+}
