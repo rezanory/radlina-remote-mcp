@@ -50,9 +50,9 @@ export function testConfig(root: string): AppConfig {
         envAllowlist: [],
       },
     },
-    storage: { directory: path.win32.join(root, ".state") },
+    storage: { directory: path.join(root, ".state") },
     audit: {
-      directory: path.win32.join(root, ".state", "audit"),
+      directory: path.join(root, ".state", "audit"),
       rotateBytes: 64 * 1024,
       userRedactionPatterns: [],
     },
