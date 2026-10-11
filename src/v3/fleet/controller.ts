@@ -104,7 +104,10 @@ export class V3FleetController {
 
     // Every switch attempt is recorded before invoking an external agent.
     // The recipient's grant is rechecked for each operation.
-    const attempted: string[] = [];
+    // Only a verified switch receipt permits automatic rollback; otherwise
+    // the device state is unknown and must be reconciled by an operator.
+    const verifiedSwitches: string[] = [];
+    let unresolvedActivationDevice: string | undefined;
     let currentPhase: "canary" | "rolling_out" = "canary";
     try {
       for (const [index, deviceId] of ordered.entries()) {
@@ -118,8 +121,9 @@ export class V3FleetController {
           atMs: this.now(),
           detailsHash: sha256(canonicalJson({ target: plan.targetManifestSha256, deviceId })),
         });
-        attempted.push(deviceId);
-
+        // The activation may have reached the device even if the transport
+        // times out. Never automatically roll back an unverified switch.
+        unresolvedActivationDevice = deviceId;
         const switched = await this.agent.activate(deviceId, plan.targetManifestSha256);
         await this.assertSwitch(
           switched,
@@ -127,6 +131,8 @@ export class V3FleetController {
           plan.rollbackManifestSha256,
           plan.targetManifestSha256,
         );
+        verifiedSwitches.push(deviceId);
+        unresolvedActivationDevice = undefined;
         await this.owner.assertOwner(ownerSubject, "fleet.verify");
         await this.consent.require(deviceId, "fleet.verify", planId);
         const observed = await this.agent.verify(deviceId, plan.targetManifestSha256);
@@ -152,8 +158,23 @@ export class V3FleetController {
         this.now(),
         sha256(error instanceof Error ? error.message : "unknown-fleet-error"),
       );
-      let unresolved = false;
-      for (const deviceId of [...attempted].reverse()) {
+      let unresolved = unresolvedActivationDevice !== undefined;
+      if (unresolvedActivationDevice !== undefined) {
+        // Preserve the uncertain target in the tamper-evident journal. Its
+        // actual release may be either previous or target: fail closed.
+        this.store.record({
+          kind: "device.activate.unresolved",
+          planId,
+          deviceId: unresolvedActivationDevice,
+          atMs: this.now(),
+          detailsHash: sha256(
+            error instanceof Error ? error.message : "unknown-activation-outcome",
+          ),
+        });
+      }
+      // Only independently verified switches have a known rollback base.
+      // Uncertain targets require manual reconciliation, not an automatic call.
+      for (const deviceId of [...verifiedSwitches].reverse()) {
         try {
           this.requireEnrolled(deviceId);
           await this.owner.assertOwner(ownerSubject, "fleet.rollback");
