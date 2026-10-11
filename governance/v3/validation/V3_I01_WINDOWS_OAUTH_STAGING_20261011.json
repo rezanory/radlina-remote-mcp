@@ -1,0 +1,92 @@
+{
+  "schema_version": "radlina.v3.i01-windows-oauth-staging-evidence/v1",
+  "record_id": "V3-I01-WINDOWS-OAUTH-LOOPBACK-AND-TUNNEL-STAGED-20261011",
+  "status": "LOCAL_SERVICE_ACCEPTED_PUBLIC_TLS_BLOCKED_NOT_PRODUCTION",
+  "authored_from": {
+    "branch": "ops/v3-i01-windows-oauth-acceptance-20261011",
+    "base_commit": "69bcacb6eb94cf8526c08691961c551579797e7e",
+    "runtime_code_commit": "11789c06d2924132c00014e05e25e4c0dd07ff0e"
+  },
+  "input": {
+    "host": "LAPTOP-13QINEIF",
+    "v2_service": "RadlinaRemoteMCP",
+    "v2_version": "2.0.0-alpha.2",
+    "v2_manifest": "6dde7ef6d4d56ff81f630432a4b70171beaf780bdffe5525fa85973fe255aa1e",
+    "v3_oauth_issuer": "https://v3-mcp.radlina.com",
+    "tunnel_id": "f9a09a4e-2cd3-468b-ae6e-2139fb0e1810"
+  },
+  "runtime": {
+    "v3_windows_service": "RadlinaV3OAuthBeta",
+    "oauth_bind": "127.0.0.1:7344",
+    "oauth_start_type": "Automatic",
+    "v3_source_release_path": "E:\\radlina-v3-runtime\\releases\\11789c0",
+    "oauth_state": "E:\\radlina-v3-oauth-standalone",
+    "oauth_acl": ["NT AUTHORITY\\SYSTEM", "BUILTIN\\Administrators"],
+    "v3_tunnel_service": "RadlinaV3Tunnel",
+    "tunnel_start_type": "Manual",
+    "tunnel_status": "Stopped",
+    "cloudflared_version": "2026.10.0",
+    "cloudflared_sha256": "86aee4017b26625cee8484c113558f48effa4cd47f7aa05fcf425604e5d2b23c",
+    "cloudflare_hostname": "v3-mcp.radlina.com",
+    "dns_record_id": "c42ceadbf79a90c36ff81477c2a2a8f8",
+    "registered_public_tunnel_origin": "http://127.0.0.1:7344"
+  },
+  "execution": {
+    "production_dependencies": "80 installed, 0 npm audit vulnerabilities",
+    "oauth_compiled_sha256": "6f8012f248ec8b8b3ef0a46402c41acd9f5a5eacda2f99b7a8fc62424b4ebfd1",
+    "separate_v3_service_install": "PASS",
+    "separate_v3_service_restart": "PASS",
+    "oauth_jwks_public_key_identifier_stable_across_restart": true,
+    "loopback_probe": {
+      "run_utc": "2026-10-11T00:43:46Z",
+      "v2_7337_untouched": true,
+      "v3_oauth_service_running": true,
+      "v3_oauth_loopback_only": true,
+      "v3_oauth_signing": true,
+      "v3_independent_issuer": true,
+      "anonymous_mcp_rejected_401": true,
+      "admin_scope_rejected_400": true,
+      "v3_state_acl_private": true,
+      "cloudflared_vendor_sha256": true
+    },
+    "public_tls_negative_probe": {
+      "run_utc": "2026-10-11T00:44:03Z",
+      "expected_exit_code": 2,
+      "observed_exit_code": 2,
+      "token_present": false,
+      "tunnel_running": false,
+      "public_tls_verified": false,
+      "acceptance": "BLOCKED_FAIL_CLOSED"
+    }
+  },
+  "output": {
+    "local_standalone_oauth_ready": true,
+    "public_tls_ready": false,
+    "chatgpt_v3_plugin_connected": false,
+    "write_capable_remote_tools_enabled": false,
+    "credential_not_transferred_by_automation": true
+  },
+  "acceptance": {
+    "local": "WINDOWS_LOCAL_OAUTH_SERVICE_PASS_PUBLIC_TLS_PENDING",
+    "public": "BLOCKED_FAIL_CLOSED",
+    "production_i01": "NOT_ACCEPTED",
+    "remaining": [
+      "Owner-local secure provisioning of Cloudflare Tunnel connector token; not through chat or logs",
+      "Start and independently validate V3 tunnel HTTPS",
+      "External OAuth registration and native ChatGPT V3 plugin connection",
+      "P03 trusted enrollment, real P06 routes, S02E recipient consent, S03 signed audit",
+      "F01 two-host real canary and rollback",
+      "AC01 full operational security acceptance"
+    ]
+  },
+  "safeguards": {
+    "v2_unmodified": true,
+    "main_unchanged": true,
+    "no_force_push": true,
+    "public_mcp_command_execution_enabled": false,
+    "official_v3_accepted": 24,
+    "official_v3_total": 28,
+    "official_v3_percent": 85.71
+  },
+  "end_marker": "END V3 I01 WINDOWS OAUTH SERVICE STAGING 20261011"
+}
