@@ -1,0 +1,87 @@
+{
+  "schema": "radlina.v3.windows-real-dual-signature-admission/v1",
+  "input": {
+    "deviceId": "windows-main",
+    "ownerFingerprint": "6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93",
+    "ownerSidHash": "0875a0e1c547b8c0e08fbb8f504257dba6ab96308fe7a7e6d4a45a6aa9c2faae",
+    "deviceFingerprint": "fafcea842b3d0142b9cb24ff05455a09da409d44e7d08a483b39bb0596a7f5a0",
+    "networkPin": "0a18101ae7399099ee7f7bd43cde123b4d6140fc18d86ab777a534767d720640"
+  },
+  "runtime": {
+    "ownerSigner": "actual owner interactive token / DPAPI CurrentUser",
+    "deviceSigner": "SYSTEM service / DPAPI LocalMachine with private ACL",
+    "registry": "actual V3 OAuth SQLite"
+  },
+  "execution": {
+    "timestamp": "2026-10-11T02:25:10.045Z",
+    "challenge": {
+      "schema": "1.0.0",
+      "purpose": "p03.owner-approved-enrollment",
+      "challengeId": "49688ca5-e742-43c2-8ae1-9757cc7d8847",
+      "deviceId": "windows-main",
+      "hostname": "LAPTOP-13QINEIF",
+      "platform": "windows",
+      "architecture": "x64",
+      "agentVersion": "3.0.0-alpha.1",
+      "agentInstanceId": "9e4d5aa7-c317-4d28-9a43-6638aea5ce2a",
+      "deviceKeyFingerprint": "fafcea842b3d0142b9cb24ff05455a09da409d44e7d08a483b39bb0596a7f5a0",
+      "expectedTailnetNodeHash": "0a18101ae7399099ee7f7bd43cde123b4d6140fc18d86ab777a534767d720640",
+      "issuedAtMs": 1791685431142,
+      "expiresAtMs": 1791686031142
+    },
+    "deviceSignatureBase64": "ss13YSm4caJCPsYDlRpMJ5RMsabizCSru6zqX0+LMq+D9iDxqnD3bDOpsCbAA9SBRuCvY+1ClbNKPqii4bc0AQ==",
+    "ownerSignatureBase64": "lUcBDV7dqCmMvzfJPCH5aRR4A2sSoibHPMBaeviH1RsLkDrtbwUR4ylCxo4ko1lmAFvbAnLpwOdJxRJui/hrDg==",
+    "independentKeys": true,
+    "admittedTrust": "trusted",
+    "heartbeatApplied": true,
+    "heartbeatReplayDenied": true,
+    "audit": {
+      "valid": true,
+      "events": 3,
+      "head": "23119669295553c56cc44e248636192885d40640f135f57fa4ec082f46aa4ea7"
+    }
+  },
+  "output": {
+    "device": {
+      "deviceId": "windows-main",
+      "hostname": "LAPTOP-13QINEIF",
+      "platform": "windows",
+      "architecture": "x64",
+      "agentVersion": "3.0.0-alpha.1",
+      "status": "degraded",
+      "lastSeen": "2026-10-11T02:25:09.961Z",
+      "capabilities": ["device.health"],
+      "tags": [],
+      "trustState": "trusted",
+      "health": "unknown"
+    },
+    "heartbeat": {
+      "heartbeat": {
+        "schema": "radlina.v3.p03.signed-heartbeat/v1",
+        "deviceId": "windows-main",
+        "agentInstanceId": "9e4d5aa7-c317-4d28-9a43-6638aea5ce2a",
+        "agentVersion": "3.0.0-alpha.1",
+        "signedAtMs": 1791685509961,
+        "nonce": "1a63be67-cb2c-4858-b5b5-0f1a062214b5",
+        "status": "degraded",
+        "health": "unknown",
+        "capabilities": ["device.health"]
+      },
+      "deviceSignatureBase64": "bxXcvxZYp6zpX7MWugYhdqezu5+byUDmmbKfJzM+oct8Hc+A1UMfTcv30Sm3KmTNlBZ7bdApkaUueUTUuS+HBw=="
+    }
+  },
+  "acceptance": "WINDOWS_P03_TRUSTED_WITH_SIGNED_DEGRADED_HEARTBEAT_ONLY",
+  "remaining": [
+    "Mac trusted enrollment and fresh heartbeat",
+    "healthy persistent agent transport",
+    "target-local consent",
+    "distributed audit anchor",
+    "real two-host fleet canary/rollback",
+    "executable OAuth runtime"
+  ],
+  "official": {
+    "accepted": 24,
+    "total": 28,
+    "percent": 85.71
+  }
+}
