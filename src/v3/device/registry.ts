@@ -78,6 +78,11 @@ export class SqliteDeviceRegistry {
 
   heartbeat(deviceId: string, heartbeat: DeviceHeartbeat): DeviceDescriptor {
     const existing = this.require(deviceId);
+    if (existing.trustState === "trusted") {
+      throw new DeviceRegistryConflict(
+        "trusted device heartbeat requires a verified signed agent assertion",
+      );
+    }
     const updated = parseDeviceDescriptor({
       ...existing,
       lastSeen: heartbeat.lastSeen,

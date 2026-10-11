@@ -26,10 +26,14 @@
     "src/**/*.ts",
     "tests/**/*.ts",
     "scripts/enrollment/macbook-readiness-policy.ts",
+    "scripts/enrollment/v3-p03-real-mac-pending.ts",
     "scripts/acceptance/v3-p08-real-macbook.ts",
     "scripts/acceptance/v3-cross-device-consent-local.ts",
     "scripts/acceptance/v3-local-beta-gateway.ts",
-    "scripts/operations/v3-beta-local-daemon.ts"
+    "scripts/operations/v3-beta-local-daemon.ts",
+    "scripts/acceptance/v3-f01-fleet-local.ts",
+    "scripts/operations/v3-oauth-readonly-daemon.ts",
+    "scripts/operations/v3-oauth-approve.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }

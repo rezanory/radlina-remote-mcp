@@ -1,0 +1,41 @@
+{
+    "schema_version":  "radlina.v3.i01-source-integration-evidence/v1",
+    "record_id":  "V3-I01-MULTILANE-INTEGRATION-SOURCE-20261011",
+    "status":  "INDEPENDENT_SOFTWARE_CANDIDATE_NOT_PRODUCTION_ACCEPTED",
+    "source":  {
+                   "canonical_security_fast_forward":  "40042388cf948f5b4087c6a2ba47800c2884c028",
+                   "inputs":  [
+                                  "feature/v3-p03-owner-pinned-enrollment-20261011",
+                                  "feature/v3-f01-fleet-runtime-20261010",
+                                  "feature/v3-readonly-oauth-gateway-20261011"
+                              ],
+                   "branch":  "integration/v3-i01-candidate-20261011",
+                   "canonical_at_authoring":  "90188eed93efef41958e5f2cbd21f31461786590"
+               },
+    "operational_chain":  {
+                              "input":  "immutable source candidates, real Windows checkout, isolated V3 worktree",
+                              "runtime":  "Node v24.20.0, npm 487 packages, real Windows SQLite/DPAPI test runtime, independent OAuth local test client",
+                              "acceptance":  "SOFTWARE_INTEGRATION_PASS_ONLY",
+                              "execution":  "npm ci, typecheck, V3 vitest suite, ESLint, scoped Prettier, npm audit, git diff --check",
+                              "output":  "31 V3 test files 200/200 PASS; TypeScript PASS; ESLint PASS; changed-file Prettier PASS; npm audit vulnerabilities=0; git diff --check PASS"
+                          },
+    "controls":  {
+                     "s03_external_distributed_audit":  false,
+                     "f01_two_real_devices_canary_rollback":  false,
+                     "v3_native_chatgpt_app_connected":  false,
+                     "v2_production_modified":  false,
+                     "main_modified":  false,
+                     "recipient_local_s02e_consent":  false,
+                     "production_dispatch_enabled":  false,
+                     "live_mac_p03_trusted_enrollment":  false,
+                     "v3_external_oauth_tls":  false,
+                     "verified_mac_physical_readiness_run":  38091109343
+                 },
+    "baseline_notes":  "Full-repository prettier --check encountered unrelated pre-existing governance/markdown and src/mcp.ts formatting warnings; scoped changed-file check passed. Owner-reviewed Mac workflow security landed separately on canonical.",
+    "official_progress":  {
+                              "accepted":  24,
+                              "percentage":  85.71,
+                              "total":  28
+                          },
+    "end_marker":  "END V3 I01 INDEPENDENT SOFTWARE INTEGRATION CANDIDATE 20261011"
+}
