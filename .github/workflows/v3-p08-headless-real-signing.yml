@@ -1,0 +1,74 @@
+name: V3 P08 Real Mac Durable Headless Identity Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Use only protected Mac identity: ensure, sign-challenge, heartbeat"
+        required: true
+        default: ensure
+        type: choice
+        options:
+          - ensure
+          - sign-challenge
+          - heartbeat
+      challenge_base64:
+        description: "Unsigned public P03 challenge, ONLY for sign-challenge mode"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-p03-real-headless-identity
+  cancel-in-progress: false
+
+jobs:
+  mac-real-keychain:
+    if: ${{ github.repository == 'rezanory/radlina-remote-mcp' && github.actor == 'rezanory' && github.ref == 'refs/heads/production/controller-full-control-v1' }}
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 35
+    steps:
+      - name: Verify physical Mac and independently pinned V3 source
+        shell: bash
+        env:
+          SOURCE_SHA: de625477bbbc60d37adcc690c082df53fe5e6d6f
+          REQUESTED_MODE: ${{ inputs.mode }}
+          CHALLENGE_B64: ${{ inputs.challenge_base64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' ]]
+          [[ "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          [[ "$REQUESTED_MODE" == 'sign-challenge' || -z "$CHALLENGE_B64" ]]
+          [[ "$REQUESTED_MODE" != 'sign-challenge' || -n "$CHALLENGE_B64" ]]
+          TARGET="$RUNNER_TEMP/radlina-v3-headless-source-$SOURCE_SHA"
+          if [[ -e "$TARGET" && ! -d "$TARGET/.git" ]]; then exit 22; fi
+          if [[ ! -d "$TARGET/.git" ]]; then
+            git clone --quiet --no-checkout --filter=blob:none --branch fix/v3-p08-headless-identity-20261011 https://github.com/rezanory/radlina-remote-mcp.git "$TARGET"
+          fi
+          git -C "$TARGET" fetch --quiet --no-tags origin "$SOURCE_SHA"
+          git -C "$TARGET" checkout --quiet --detach "$SOURCE_SHA"
+          [[ "$(git -C "$TARGET" rev-parse HEAD)" == "$SOURCE_SHA" ]]
+          cd "$TARGET"
+          npm ci --ignore-scripts --no-fund
+          RECEIPTS="$RUNNER_TEMP/radlina-v3-p03-receipts-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          mkdir -m 700 "$RECEIPTS"
+          echo "RADLINA_V3_PUBLIC_RECEIPT_DIRECTORY=$RECEIPTS" >> "$GITHUB_ENV"
+          export RADLINA_MAC_P03_ACTION="$REQUESTED_MODE"
+          export RADLINA_MAC_P03_CHALLENGE_BASE64="$CHALLENGE_B64"
+          export RADLINA_MAC_P03_RECEIPT_DIRECTORY="$RECEIPTS"
+          node node_modules/tsx/dist/cli.mjs scripts/enrollment/v3-p08-headless-identity.ts
+          echo "MAC_KEYCHAIN_REAL_DEVICE_SIGNATURE_PASS"
+      - name: Upload only signed public identity or heartbeat receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-p03-mac-${{ inputs.mode }}-${{ github.run_id }}
+          path: ${{ env.RADLINA_V3_PUBLIC_RECEIPT_DIRECTORY }}/p03-*.json
+          if-no-files-found: error
+          retention-days: 1
