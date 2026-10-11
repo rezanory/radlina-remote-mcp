@@ -1,5 +1,17 @@
 # Radlina V3 — Windows OAuth beta and Cloudflare Tunnel handoff
 
+## Superseding operational update — 2026-10-11
+
+V3 Tunnel and public HTTPS have ALREADY been activated and verified. Do not repeat the older token provisioning steps below. The current service reads a protected token file from E:\radlina-v3-runtime\secrets\cloudflared.token. Its ACL is explicit and limited to SYSTEM and Administrators; the token contents have not been read or committed.
+
+The issuer is https://v3-mcp.radlina.com; ChatGPT custom MCP URL: https://v3-mcp.radlina.com/mcp. Public OAuth metadata and protected-resource discovery are available. Public anonymous MCP requests are HTTP 401, and admin scope is HTTP 400. The updated preflight validates the actual WinSW token-file source and sixteen security/operational checks.
+
+Evidence: governance/v3/validation/V3_I01_PUBLIC_HTTPS_SMOKE_PASS_20261011.json. Status is PUBLIC OAUTH SMOKE PASS ONLY, not I01/AC01 production acceptance.
+
+Next user-controlled step in ChatGPT: Plugins > Add > Add custom MCP server. Name: Radlina Remote MCP V3. URL: https://v3-mcp.radlina.com/mcp. Complete the real OAuth account connection and verify read-only tools. Keep V2 active. Do not mark installation complete without an actual ChatGPT host connection receipt.
+
+---
+
 ## Verified state (2026-10-11)
 
 - V2: service RadlinaRemoteMCP on 127.0.0.1:7337, version 2.0.0-alpha.2; do not touch or disable.

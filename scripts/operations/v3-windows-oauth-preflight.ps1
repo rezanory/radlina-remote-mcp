@@ -7,7 +7,7 @@ $startedAt = (Get-Date).ToUniversalTime().ToString('o')
 $expectedIssuer = 'https://v3-mcp.radlina.com'
 $origin = 'http://127.0.0.1:7344'
 $stateDirectory = 'E:\radlina-v3-oauth-standalone'
-$tokenFile = 'E:\radlina-v3-tunnel-credentials\cloudflared.token'
+$tokenFile = 'E:\radlina-v3-runtime\secrets\cloudflared.token'
 $cloudflaredFile = 'E:\radlina-v3-runtime\cloudflared-2026.10.0.exe'
 $cloudflaredHash = '86aee4017b26625cee8484c113558f48effa4cd47f7aa05fcf425604e5d2b23c'
 
@@ -36,6 +36,7 @@ function HttpCode([string]$url, [string]$method = 'GET', [string]$body = '') {
 function PrivateAcl([string]$location) {
   if (-not (Test-Path -LiteralPath $location)) { return $false }
   $acl = Get-Acl -LiteralPath $location
+  if (-not $acl.AreAccessRulesProtected) { return $false }
   foreach ($entry in $acl.Access) {
     $principal = $entry.IdentityReference.Value
     if ($entry.IsInherited -or $entry.AccessControlType -ne 'Allow' -or
@@ -76,6 +77,14 @@ try {
   Check 'cloudflared_vendor_sha256' ($actualHash -eq $cloudflaredHash) 'Tunnel binary checksum incorrect'
 
   $tunnelService = Get-Service -Name 'RadlinaV3Tunnel' -ErrorAction Stop
+  [xml]$tunnelManifest = Get-Content -LiteralPath 'E:\radlina-v3-runtime\RadlinaV3Tunnel.xml' -Raw
+  $tunnelArguments = [string]$tunnelManifest.service.arguments
+  $declaredTokenFile = ''
+  if ($tunnelArguments -match '--token-file\s+("[^"]+"|\S+)') {
+    $declaredTokenFile = $Matches[1].Trim('"')
+  }
+  $tokenSourcePinned = ($declaredTokenFile -eq $tokenFile) -and ($tunnelArguments -notmatch '(?:^|\s)--token(?:\s|=)')
+  Check 'tunnel_token_file_config_pinned' $tokenSourcePinned 'Tunnel manifest token source changed or includes inline credentials'
   $tokenPresent = Test-Path -LiteralPath $tokenFile
   $tokenAclGood = if ($tokenPresent) { PrivateAcl $tokenFile } else { $false }
   if ($tokenPresent) { Check 'tunnel_token_acl_private' $tokenAclGood 'Tunnel token file has unsafe ACL' }
@@ -84,13 +93,17 @@ try {
   if ($RequirePublicTls) {
     Check 'tunnel_secure_token_provisioned' $tokenPresent 'Tunnel token is not provisioned locally'
     Check 'tunnel_service_running' ($tunnelService.Status -eq 'Running') 'Tunnel connector service is not running'
-    if ($tokenPresent -and $tunnelService.Status -eq 'Running') {
+    if ($tokenSourcePinned -and $tokenPresent -and $tokenAclGood -and $tunnelService.Status -eq 'Running') {
       try {
         $public = Invoke-RestMethod -Uri ($expectedIssuer + '/.well-known/oauth-authorization-server') -TimeoutSec 12
         $liveTls = $public.issuer -eq $expectedIssuer
       } catch { $liveTls = $false }
     }
     Check 'public_https_oauth_issuer_verified' $liveTls 'External HTTPS tunnel and OAuth metadata are not validated'
+    $publicAnonymous = HttpCode ($expectedIssuer + '/mcp') 'POST' '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+    Check 'public_anonymous_mcp_rejected_401' ($publicAnonymous -eq 401) 'Public anonymous MCP execution was not denied'
+    $publicAdmin = HttpCode ($expectedIssuer + '/authorize?scope=admin')
+    Check 'public_admin_scope_rejected_400' ($publicAdmin -eq 400) 'Public admin OAuth scope was not denied'
   }
 
   $complete = $failures.Count -eq 0
