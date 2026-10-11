@@ -1,0 +1,17 @@
+{
+  "schema": "radlina.v3.windows-protected-identity-negative-real/v1",
+  "timestamp": "2026-10-11T02:27:34.686Z",
+  "checks": {
+    "wrongHost": true,
+    "tamperedPublicFingerprint": true,
+    "wrongDevice": true,
+    "corruptCiphertext": true,
+    "broadFileAcl": true
+  },
+  "testsPassed": 5,
+  "testsFailed": 0,
+  "productionIdentityModified": false,
+  "productionIdentityRead": false,
+  "disposableTestKey": true,
+  "acceptance": "REAL_NEGATIVE_KEY_STORAGE_CHECKS_ONLY"
+}

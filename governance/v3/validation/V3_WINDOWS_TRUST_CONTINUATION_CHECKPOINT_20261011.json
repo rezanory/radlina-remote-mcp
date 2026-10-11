@@ -1,0 +1,115 @@
+{
+  "schema": "radlina.v3.windows-trust-continuation-checkpoint/v1",
+  "input": {
+    "repo": "rezanory/radlina-remote-mcp",
+    "base": "c0daccd8549ea86e4d99c4ef8262b3f7740e85f7",
+    "canonicalObserved": "40042388cf948f5b4087c6a2ba47800c2884c028"
+  },
+  "execution": {
+    "liveMcpRegistry": {
+      "result": {
+        "devices": [
+          {
+            "deviceId": "macbook-main",
+            "hostname": "amirs-MacBook-Pro.local",
+            "platform": "macos",
+            "architecture": "x64",
+            "agentVersion": "3.0.0-alpha.1",
+            "status": "unknown",
+            "lastSeen": "2026-10-11T01:53:17.164Z",
+            "capabilities": [],
+            "tags": [],
+            "trustState": "pending",
+            "health": "unknown"
+          },
+          {
+            "deviceId": "windows-main",
+            "hostname": "LAPTOP-13QINEIF",
+            "platform": "windows",
+            "architecture": "x64",
+            "agentVersion": "3.0.0-alpha.1",
+            "status": "degraded",
+            "lastSeen": "2026-10-11T02:25:09.961Z",
+            "capabilities": ["device.health"],
+            "tags": [],
+            "trustState": "trusted",
+            "health": "unknown"
+          }
+        ]
+      }
+    },
+    "liveGateway": {
+      "result": {
+        "generation": "v3",
+        "mode": "oauth-readonly-pre-enrollment",
+        "productionReady": false,
+        "remoteExecutionEnabled": false,
+        "deviceCount": 2
+      }
+    },
+    "v2Readiness": {
+      "result": {
+        "ready": true,
+        "killSwitch": "false",
+        "emergencyReadOnly": "false"
+      },
+      "correlationId": "d73983e2-0791-4ec6-8df0-d9ee9f75df54",
+      "replayed": false
+    }
+  },
+  "acceptance": {
+    "windows": "TRUSTED, signed heartbeat accepted; health Unknown/Degraded, not executable",
+    "mac": "Pending; dedicated runner ID 21 Offline",
+    "P08": "OPEN",
+    "F01": "OPEN",
+    "I01": "OPEN",
+    "AC01": "OPEN",
+    "accepted": 24,
+    "total": 28,
+    "percent": 85.71
+  },
+  "validation": {
+    "fullV3Tests": {
+      "pass": 205,
+      "fail": 0,
+      "files": 33
+    },
+    "focusedP03": {
+      "pass": 17,
+      "fail": 0
+    },
+    "physicalWindowsIdentity": {
+      "pass": 10,
+      "fail": 0
+    },
+    "ownerSignerSystemAccountRejected": true,
+    "independentOwnerKeyInitializedUnderActualRadlinaInteractiveToken": true,
+    "ownerUsesCurrentUserDpapi": true,
+    "deviceUsesLocalMachineDpapiWithPrivateAcl": true,
+    "temporaryOwnerTasksRemoved": true,
+    "mainUnchanged": true,
+    "v2Unchanged": true,
+    "isolatedDpapiAclNegatives": {
+      "pass": 5,
+      "fail": 0,
+      "disposableTestKey": true
+    },
+    "typecheck": "PASS",
+    "changedCodeEslint": "PASS",
+    "fleet": {
+      "source": "11789c06d2924132c00014e05e25e4c0dd07ff0e",
+      "reusedAs": "4c516bcfead61e873546bf45bdd94d23ac2c51dd",
+      "testsPassed": 16,
+      "testsFailed": 0,
+      "localExercise": "LOCAL_SIMULATED_F01_PASS",
+      "physicalRollout": "NOT_EXECUTED"
+    }
+  },
+  "remaining": [
+    "Mac runner must be online for a fresh actual challenge response",
+    "persistent healthy native agents and authenticated transport",
+    "target-local S02E and external S03 audit",
+    "two-host signed manifest canary/rollback",
+    "executable OAuth integration and independent final acceptance"
+  ]
+}

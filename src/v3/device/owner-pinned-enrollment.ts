@@ -23,7 +23,7 @@ export type P03EnrollmentChallenge = {
   challengeId: string;
   deviceId: string;
   hostname: string;
-  platform: "macos";
+  platform: DeviceDescriptor["platform"];
   architecture: DeviceDescriptor["architecture"];
   agentVersion: string;
   agentInstanceId: string;
@@ -61,6 +61,8 @@ export interface PinnedEnrollmentAuthorityConfig {
   approvedOwnerPublicKeyPem: string;
   approvedDeviceId: string;
   approvedHostname: string;
+  /** Defaults to macOS for existing owner pins; Windows requires an explicit pin. */
+  approvedPlatform?: DeviceDescriptor["platform"];
   approvedTailnetNodeHash: string;
   /** Must independently read Windows' live Tailscale peer inventory. */
   observeLivePeerNodeHash(): string | undefined;
@@ -181,7 +183,7 @@ export class SqliteOwnerPinnedEnrollmentAuthority {
     if (
       candidate.deviceId !== this.config.approvedDeviceId ||
       candidate.hostname !== this.config.approvedHostname ||
-      candidate.platform !== "macos" ||
+      candidate.platform !== (this.config.approvedPlatform ?? "macos") ||
       identity.deviceId !== candidate.deviceId ||
       identity.agentVersion !== candidate.agentVersion ||
       candidate.trustState !== "pending"
@@ -342,7 +344,7 @@ export class SqliteOwnerPinnedEnrollmentAuthority {
       if (
         current.trustState !== "pending" ||
         current.hostname !== challenge.hostname ||
-        current.platform !== "macos" ||
+        current.platform !== (this.config.approvedPlatform ?? "macos") ||
         current.agentVersion !== challenge.agentVersion
       ) {
         throw new P03EnrollmentDenied("pending descriptor changed during enrollment");

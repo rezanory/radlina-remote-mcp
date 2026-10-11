@@ -1,0 +1,82 @@
+{
+  "schema": "radlina.v3.windows-protected-device-real-proof/v1",
+  "input": {
+    "host": "LAPTOP-13QINEIF",
+    "privateDirectory": "E:\\radlina-v3-runtime\\windows-device-identity",
+    "V2CredentialsUsed": false
+  },
+  "runtime": {
+    "node": "v24.20.0",
+    "platform": "win32",
+    "protection": "DPAPI-LocalMachine plus SYSTEM/Administrators ACL"
+  },
+  "execution": {
+    "timestamp": "2026-10-11T02:20:30.996Z",
+    "identityPersisted": true,
+    "challengeSignatureVerified": true,
+    "negativeChecks": {
+      "expired": true,
+      "future": true,
+      "wrongDevice": true,
+      "wrongKey": true,
+      "wrongInstance": true,
+      "wrongPlatform": true,
+      "overlong": true
+    },
+    "signedHeartbeatVerified": true
+  },
+  "output": {
+    "publicIdentity": {
+      "schema": "radlina.v3.windows-protected-identity/v1",
+      "deviceId": "windows-main",
+      "hostname": "LAPTOP-13QINEIF",
+      "agentInstanceId": "9e4d5aa7-c317-4d28-9a43-6638aea5ce2a",
+      "agentVersion": "3.0.0-alpha.1",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAb3TvaHkzuG19CojqUziGtR+rRZpcA1jOxZPLd22YHkU=\n-----END PUBLIC KEY-----\n",
+      "fingerprint": "fafcea842b3d0142b9cb24ff05455a09da409d44e7d08a483b39bb0596a7f5a0"
+    },
+    "challenge": {
+      "schema": "1.0.0",
+      "purpose": "p03.owner-approved-enrollment",
+      "challengeId": "3a3f02c5-6fe9-4be5-b657-ee28a3467003",
+      "deviceId": "windows-main",
+      "hostname": "LAPTOP-13QINEIF",
+      "platform": "windows",
+      "architecture": "x64",
+      "agentVersion": "3.0.0-alpha.1",
+      "agentInstanceId": "9e4d5aa7-c317-4d28-9a43-6638aea5ce2a",
+      "deviceKeyFingerprint": "fafcea842b3d0142b9cb24ff05455a09da409d44e7d08a483b39bb0596a7f5a0",
+      "expectedTailnetNodeHash": "81612efbf5c09bab92e1483cc6ed24e8930536b3595e94d47bd601c7f530ca14",
+      "issuedAtMs": 1791685230991,
+      "expiresAtMs": 1791685290991
+    },
+    "deviceSignatureBase64": "Z0dfOc+ZBv2avbaHuKzy5TYCE5pWFyHx1tOkjKuMH6Iuott2Wxw5+3qQhYGZDUzZ6YfWA6RVQFS7lgjkdEU3Ag==",
+    "heartbeat": {
+      "heartbeat": {
+        "schema": "radlina.v3.p03.signed-heartbeat/v1",
+        "deviceId": "windows-main",
+        "agentInstanceId": "9e4d5aa7-c317-4d28-9a43-6638aea5ce2a",
+        "agentVersion": "3.0.0-alpha.1",
+        "signedAtMs": 1791685230994,
+        "nonce": "71c8f344-b1a7-4835-8839-4f717540dc23",
+        "status": "degraded",
+        "health": "unknown",
+        "capabilities": ["device.health"]
+      },
+      "deviceSignatureBase64": "s4SMhzivzB/v0574F28s5XPxeaN9DDxvkhAOZhozywrXxly1BPYOx6dIMYQB+Xb38U76jSR4K2uwLBOU2DjZBA=="
+    }
+  },
+  "acceptance": "REAL_WINDOWS_DEVICE_PROOF_ONLY_NOT_TRUSTED_ENROLLMENT",
+  "remaining": [
+    "independent owner identity pin and owner signature",
+    "live independent Tailnet observation",
+    "P03 dual-signature admission",
+    "accepted fresh heartbeat",
+    "target consent and distributed audit"
+  ],
+  "official": {
+    "accepted": 24,
+    "total": 28,
+    "percent": 85.71
+  }
+}

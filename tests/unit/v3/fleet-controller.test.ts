@@ -275,26 +275,24 @@ describe("F01 fleet plan / preflight / canary / rollout / rollback (dormant cand
     expect(h.events).not.toContain("activate:windows-main");
   });
 
-  it("rolls back canary and later target in reverse order when second switch evidence fails", async () => {
+  it("quarantines an unverified second switch while safely reverting the proven canary", async () => {
     const h = await harness();
     const p = plan();
     await h.control.plan(p);
     h.invalidateSwitch("windows-main");
     const outcome = await h.control.run(p.planId, p.ownerSubject);
-    expect(outcome.state).toBe("rolled_back");
-    expect(h.events.filter((v) => v.startsWith("rollback:"))).toEqual([
-      "rollback:windows-main",
-      "rollback:macbook-main",
-    ]);
-    expect(h.state.get("windows-main")).toBe(PREVIOUS);
+    expect(outcome.state).toBe("manual_intervention");
+    expect(h.events.filter((v) => v.startsWith("rollback:"))).toEqual(["rollback:macbook-main"]);
+    expect(h.state.get("windows-main")).toBe(TARGET);
     expect(h.state.get("macbook-main")).toBe(PREVIOUS);
+    expect(h.store.verifyAuditChain().valid).toBe(true);
   });
 
   it("records manual intervention when recipient denies consent to critical rollback", async () => {
     const h = await harness();
     const p = plan();
     await h.control.plan(p);
-    h.invalidateSwitch("macbook-main");
+    h.invalidateHealth("macbook-main");
     h.denyConsent("fleet.rollback:macbook-main");
     expect((await h.control.run(p.planId, p.ownerSubject)).state).toBe("manual_intervention");
     expect(h.state.get("macbook-main")).toBe(TARGET);
@@ -308,9 +306,37 @@ describe("F01 fleet plan / preflight / canary / rollout / rollback (dormant cand
     const outcome = await h.control.run(p.planId, p.ownerSubject);
     expect(outcome.state).toBe("manual_intervention");
     expect(h.events.filter((v) => v === "activate:macbook-main")).toHaveLength(1);
+    expect(h.events).not.toContain("rollback:macbook-main");
+    expect(h.state.get("macbook-main")).toBe(PREVIOUS);
+    expect(h.store.verifyAuditChain().valid).toBe(true);
     await expect(h.control.run(p.planId, p.ownerSubject)).rejects.toThrow(FleetStoreConflict);
   });
 
+  it("refuses to roll back a canary after an invalid activation receipt", async () => {
+    const h = await harness();
+    const p = plan();
+    await h.control.plan(p);
+    h.invalidateSwitch("macbook-main");
+    const outcome = await h.control.run(p.planId, p.ownerSubject);
+    expect(outcome.state).toBe("manual_intervention");
+    expect(h.state.get("macbook-main")).toBe(TARGET);
+    expect(h.events).not.toContain("rollback:macbook-main");
+    expect(h.events).not.toContain("activate:windows-main");
+    expect(h.store.verifyAuditChain().valid).toBe(true);
+  });
+
+  it("isolates an unknown second activation while reverting only a verified canary", async () => {
+    const h = await harness();
+    const p = plan();
+    await h.control.plan(p);
+    h.failActivation("windows-main");
+    const outcome = await h.control.run(p.planId, p.ownerSubject);
+    expect(outcome.state).toBe("manual_intervention");
+    expect(h.events.filter((v) => v.startsWith("rollback:"))).toEqual(["rollback:macbook-main"]);
+    expect(h.events.filter((v) => v === "activate:windows-main")).toHaveLength(1);
+    expect(h.state.get("macbook-main")).toBe(PREVIOUS);
+    expect(h.store.verifyAuditChain().valid).toBe(true);
+  });
   it("keeps startup-interrupted canary in durable non-replay state", async () => {
     const h = await harness();
     const p = plan();
