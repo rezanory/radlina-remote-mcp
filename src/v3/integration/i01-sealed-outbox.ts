@@ -215,5 +215,22 @@ export class I01DurableSealedOutbox implements I01BoundDeviceTransport {
       throw new I01OutboxDenied("original signed recipient result CAS conflicted");
     // S03/owner manual reconcilers must still independently anchor the result.
   }
+  async readOriginalReturned(requestId:string):Promise<{
+    envelope:I01OwnerSignedEnvelope;response:I01SignedDeviceResponse;
+  }|null>{
+    const row=this.row(requestId);
+    if(!row||row.state!=="returned"||!row.sealed_result)return null;
+    const original=await this.crypt.unseal(row.sealed_message);
+    const result=await this.crypt.unseal(row.sealed_result);
+    if(original.length>262144||result.length>262144)
+      throw new I01OutboxDenied("original sealed manual-reconcile evidence oversized");
+    const envelope=i01SignedOwnerEnvelopeSchema.parse(JSON.parse(Buffer.from(original).toString("utf8")));
+    const response=i01SignedDeviceResponseSchema.parse(JSON.parse(Buffer.from(result).toString("utf8")));
+    if(envelope.operation.requestId!==requestId||response.requestId!==requestId||
+      envelope.operation.targetDeviceId!==row.device_id||
+      sha256(canonicalJson(envelope))!==row.operation_hash)
+      throw new I01OutboxDenied("sealed original result/owner command mismatch");
+    return{envelope,response};
+  }
   close():void{this.db.close();}
 }

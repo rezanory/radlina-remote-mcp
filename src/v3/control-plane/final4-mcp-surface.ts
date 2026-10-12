@@ -161,6 +161,32 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
       return ok(result);
     }catch(error){return denied(error);}
   });
+  server.registerTool("v3_exact_device_reconcile",{
+    description:"Explicitly reconcile one previously unknown native operation using the ORIGINAL device-signed result and independent S03 witness. Never repeat native execution.",
+    inputSchema:z.object({
+      workflowExecutionId:z.string().uuid(),
+      idempotencyKey:z.string().uuid(),
+      sourceDeviceId:z.enum(["macbook-main","windows-main"]),
+      targetDeviceId:z.enum(["macbook-main","windows-main"]),
+    }).strict(),
+    annotations:WRITE,
+  },async(input,context)=>{
+    try{
+      const auth=ownerAuth(context,"device:execute",ports);
+      const bound=await ports.authenticatedPlugin.bindOwner({
+        auth,workflowExecutionId:input.workflowExecutionId,
+        requestedSourceDeviceId:input.sourceDeviceId,
+      });
+      if(bound.sourceDeviceId===input.targetDeviceId)
+        throw Error("exact physical device source and target must differ");
+      return ok(await ports.execution.reconcileUnknown({
+        workflowExecutionId:input.workflowExecutionId,
+        nodeId:"direct-"+input.idempotencyKey,
+        subject:bound.subject,sourceDeviceId:bound.sourceDeviceId,
+        targetDeviceId:input.targetDeviceId,
+      }));
+    }catch(error){return denied(error);}
+  });
   server.registerTool("v3_fleet_plan",{
     description:"Create a two-physical-device F01 release plan without activating any release.",
     inputSchema:z.object({
@@ -202,6 +228,23 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
         auth,workflowExecutionId:input.operationId,
       });
       return ok(await ports.fleet.run(input.planId,bound.subject));
+    }catch(error){return denied(error);}
+  });
+  server.registerTool("v3_fleet_reconcile",{
+    description:"Recover the original recipient-signed F01 receipt and independent S03 ACK for one UNKNOWN fleet operation. Never resumes Canary or Rollback.",
+    inputSchema:z.object({
+      planId:z.string().uuid(),operationId:z.string().uuid(),
+      ownerOperationId:z.string().uuid(),
+    }).strict(),annotations:WRITE,
+  },async(input,context)=>{
+    try{
+      const auth=ownerAuth(context,"fleet:control",ports);
+      const owner=await ports.authenticatedPlugin.bindOwner({
+        auth,workflowExecutionId:input.ownerOperationId,
+      });
+      if(!ports.fleet.reconcileUnknown)
+        throw Error("physical F01 signed manual receipt reconciliation unavailable");
+      return ok(await ports.fleet.reconcileUnknown(input.planId,input.operationId,owner.subject));
     }catch(error){return denied(error);}
   });
   server.registerTool("v3_release_acceptance_status",{

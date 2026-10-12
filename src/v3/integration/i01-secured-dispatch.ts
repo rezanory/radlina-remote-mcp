@@ -93,6 +93,11 @@ export interface I01OwnerSigner {
 export interface I01PinnedTransport {
   /** Target must verify controller signature, P03 identity and local grant anew. */
   sendExact(targetId: string, envelope: I01OwnerSignedEnvelope): Promise<I01SignedDeviceResponse>;
+  /** Read-only original sealed transport evidence for explicit OAuth-owner
+   * reconciliation. Must NEVER claim or execute another native operation. */
+  readOriginalReturned?(requestId:string):Promise<{
+    envelope:I01OwnerSignedEnvelope;response:I01SignedDeviceResponse;
+  }|null>;
 }
 export interface I01ExternalAuditAnchor {
   /** External durable S03 anchor is mandatory to return a completed workflow. */
@@ -147,6 +152,28 @@ export class I01DurableDispatchJournal {
       "WHERE operation_key=? AND state='pending'"
     ).run(receipt, audit, Date.now(), key);
     if (Number(result.changes) !== 1) throw new I01DispatchDenied("journal CAS mismatch");
+  }
+  getForManualReconciliation(key:string):{
+    requestId:string;requestHash:string;targetDeviceId:string;state:string;
+  }|undefined{
+    const row=this.db.prepare(
+      "SELECT request_id,request_hash,target_device_id,state "+
+      "FROM v3_i01_operations WHERE operation_key=?",
+    ).get(key) as {
+      request_id:string;request_hash:string;target_device_id:string;state:string;
+    }|undefined;
+    return row?{requestId:row.request_id,requestHash:row.request_hash,
+      targetDeviceId:row.target_device_id,state:row.state}:undefined;
+  }
+  completeManually(key:string,receipt:string,anchor:string):void{
+    if(!/^[a-f0-9]{64}$/u.test(receipt)||!anchor||anchor.length>256)
+      throw new I01DispatchDenied("independent signed I01 recovery evidence required");
+    const result=this.db.prepare(
+      "UPDATE v3_i01_operations SET state='completed',receipt_hash=?,"+
+      "audit_anchor_id=?,completed_at_ms=? WHERE operation_key=? AND state='uncertain'",
+    ).run(receipt,anchor,Date.now(),key);
+    if(Number(result.changes)!==1)
+      throw new I01DispatchDenied("unknown exact I01 operation cannot be reconciled twice");
   }
   uncertain(key: string): void {
     this.db.prepare("UPDATE v3_i01_operations SET state='uncertain' WHERE operation_key=? AND state='pending'").run(key);
@@ -279,6 +306,71 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
       this.journal.uncertain(key);
       throw error;
     }
+  }
+  /** Explicit OAuth-owner recovery: ONLY the previously persisted original
+   * P03-signed result may be externally witnessed. Never sends a command. */
+  async reconcileUnknown(input:{workflowExecutionId:string;nodeId:string;
+    subject:string;sourceDeviceId:string;targetDeviceId:string;
+  }):Promise<WorkflowDispatchResult>{
+    const origin=this.origins.resolve({
+      workflowExecutionId:input.workflowExecutionId,subject:input.subject,
+    });
+    if(!origin?.attested||origin.deviceId!==input.sourceDeviceId||
+      origin.deviceId===input.targetDeviceId)
+      throw new I01DispatchDenied("exact OAuth-bound reconciliation owner/source required");
+    const key=sha256(canonicalJson({
+      workflow:input.workflowExecutionId,node:input.nodeId,attempt:1,
+    }));
+    const saved=this.journal.getForManualReconciliation(key);
+    if(!saved||saved.state!=="uncertain"||
+      saved.targetDeviceId!==input.targetDeviceId||
+      !this.transport.readOriginalReturned)
+      throw new I01DispatchDenied("no exact unknown I01 receipt ready for manual reconciliation");
+    const original=await this.transport.readOriginalReturned(saved.requestId);
+    if(!original)throw new I01DispatchDenied("original signed recipient receipt not yet delivered");
+    const {envelope,response}=original,op=envelope.operation,receipt=response.receipt;
+    if(saved.requestHash!==sha256(canonicalJson(op))||
+      op.requestId!==saved.requestId||op.workflowExecutionId!==input.workflowExecutionId||
+      op.nodeId!==input.nodeId||op.sourceDeviceId!==input.sourceDeviceId||
+      op.targetDeviceId!==input.targetDeviceId||op.subject!==input.subject||
+      op.attempt!==1||response.requestId!==op.requestId)
+      throw new I01DispatchDenied("original owner operation is not the same unknown workflow");
+    const enrolled=this.devices.resolve(input.targetDeviceId,op.capability);
+    await this.owner.authorize(origin,op.capability,input.targetDeviceId);
+    const approval=envelope.recipientApproval;
+    if(op.recipientApprovalHash!==sha256(canonicalJson(approval))||
+      !validSignature(enrolled.devicePublicKeyPem,approval.approval,approval.deviceSignatureBase64))
+      throw new I01DispatchDenied("original recipient Ed25519 consent proof invalid");
+    const signedReceipt={schema:response.schema,requestId:response.requestId,
+      receipt:response.receipt,outputSha256:response.outputSha256};
+    if(receipt.resolvedDeviceId!==op.targetDeviceId||
+      receipt.agentInstanceId!==enrolled.agentInstanceId||
+      receipt.workflowExecutionId!==op.workflowExecutionId||
+      receipt.nodeId!==op.nodeId||receipt.attempt!==op.attempt||
+      receipt.capability!==op.capability||receipt.inputSha256!==op.inputSha256||
+      receipt.globalCorrelationId!==op.globalCorrelationId||receipt.traceId!==op.traceId||
+      receipt.outputSha256!==response.outputSha256||
+      (response.output===undefined?null:sha256(canonicalJson(response.output)))!==response.outputSha256||
+      !validSignature(enrolled.devicePublicKeyPem,signedReceipt,response.deviceSignatureBase64))
+      throw new I01DispatchDenied("original device-signed execution receipt invalid");
+    const distributed=createDistributedAuditRecord({
+      globalCorrelationId:op.globalCorrelationId,traceId:op.traceId,
+      subject:input.subject,profile:"v3-exact",workflowExecutionId:op.workflowExecutionId,
+      nodeId:op.nodeId,attempt:op.attempt,resolvedDeviceId:op.targetDeviceId,
+      capability:op.capability,policyDecision:{
+        allowed:true,reason:"verified owner scope, S02E consent, target-local Ed25519 approval",
+        requiredScope:"device:execute",risk:"high",
+      },
+      inputSha256:op.inputSha256,outputSha256:response.outputSha256,
+      localAuditReceiptHash:receipt.localAuditReceiptHash,
+      requestedAt:receipt.startedAt,endedAt:receipt.endedAt,terminalState:receipt.terminalState,
+    },this.auditSigner);
+    const anchor=await this.auditAnchor.anchor(distributed,envelope,response,
+      enrolled.devicePublicKeyPem);
+    if(!anchor.accepted||anchor.recordHash!==distributed.recordHash||!anchor.anchorId)
+      throw new I01DispatchDenied("independent S03 recovery ACK missing or signed hash changed");
+    this.journal.completeManually(key,sha256(canonicalJson(receipt)),anchor.anchorId);
+    return{receipt,...(response.output===undefined?{}:{output:response.output})};
   }
   async cancel(): Promise<void> {
     throw new I01DispatchDenied("unsigned/unbound cancellation cannot be dispatched");

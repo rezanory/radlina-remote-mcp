@@ -25,6 +25,10 @@ import {
 export interface V3FleetControlPort {
   plan(raw: FleetPlan): Promise<{snapshot:FleetPlanSnapshot;replayed:boolean}>;
   run(planId:string, ownerSubject:string): Promise<FleetPlanSnapshot>;
+  reconcileUnknown?(planId:string,operationId:string,ownerSubject:string):Promise<{
+    operationId:string;anchorId:string;deviceId:string;
+    manualReceiptReconciled:true;fleetPlanAccepted:false;
+  }>;
 }
 export interface V3PhysicalFleetComposition {
   registry: SqliteDeviceRegistry;
@@ -59,7 +63,7 @@ export class V3PhysicalFleetOrchestrator implements V3FleetControlPort {
         new V3ExactFleetDeviceReader(this.config.registry),
         agent,this.config.owner,this.config.consent,agent,
       ),
-      journal,
+      journal,agent,
     };
   }
   async plan(raw:FleetPlan):Promise<{snapshot:FleetPlanSnapshot;replayed:boolean}> {
@@ -75,5 +79,17 @@ export class V3PhysicalFleetOrchestrator implements V3FleetControlPort {
     try{
       return await bound.controller.run(planId,ownerSubject);
     } finally {bound.journal.close();}
+  }
+  async reconcileUnknown(planId:string,operationId:string,ownerSubject:string){
+    const snapshot=this.config.store.require(planId);
+    if(snapshot.plan.ownerSubject!==ownerSubject||
+      !["blocked","preflighting","canary","rolling_out",
+        "rollback_pending","manual_intervention"].includes(snapshot.state))
+      throw Error("only unresolved exact owner fleet plan may reconcile historical receipts");
+    await this.config.owner.assertOwner(ownerSubject,"fleet.verify");
+    const bound=this.controller(snapshot.plan);
+    try{
+      return await bound.agent.reconcileUnknown(operationId);
+    }finally{bound.journal.close();}
   }
 }

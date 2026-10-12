@@ -146,5 +146,22 @@ export class F01SealedFleetTransport implements F01PhysicalTransport {
       throw new F01FleetQueueDenied("original physical F01 receipt durable CAS failed");
     // F01 controller still independently verifies owner command and S03 anchor.
   }
+  async readOriginalReturned(operationId:string):Promise<{
+    command:F01SignedCommand;reply:F01SignedReply<unknown>;
+  }|null>{
+    const row=this.row(operationId);
+    if(!row||row.state!=="returned"||!row.sealed_reply)return null;
+    const original=await this.crypt.unseal(row.sealed_command);
+    const result=await this.crypt.unseal(row.sealed_reply);
+    if(original.length>262144||result.length>262144)
+      throw new F01FleetQueueDenied("original sealed manual F01 evidence too large");
+    const command=f01SignedCommandSchema.parse(JSON.parse(Buffer.from(original).toString("utf8")));
+    const reply=JSON.parse(Buffer.from(result).toString("utf8")) as F01SignedReply<unknown>;
+    if(command.command.operationId!==operationId||reply.operationId!==operationId||
+      command.command.deviceId!==row.device_id||reply.deviceId!==row.device_id||
+      sha256(canonicalJson(command))!==row.command_hash)
+      throw new F01FleetQueueDenied("original F01 owner command/recipient reply changed");
+    return{command,reply};
+  }
   close():void{this.db.close();}
 }
