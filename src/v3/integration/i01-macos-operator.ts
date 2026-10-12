@@ -220,9 +220,9 @@ export async function runPhysicalMacOperatorOnce(policyFile:string):Promise<{
       const validUntilMs=confirmed
         ?Math.min(issuedAtMs+10*60*1000,Number(prompt["requestExpiresAtMs"])+9*60*1000)
         :null;
-      const unsigned={
+      const unsigned:Parameters<typeof buildApprovalMessage>[1]={
         requestId:String(prompt["requestId"]),
-        decision:(confirmed?"approve":"deny") as "approve"|"deny",
+        decision:(confirmed?"approve":"deny"),
         duration,validUntilMs,signedAtMs:issuedAtMs,nonce:randomUUID(),
       };
       const signedMessage=buildApprovalMessage(prompt as Parameters<typeof buildApprovalMessage>[0],unsigned);

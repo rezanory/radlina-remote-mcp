@@ -3,7 +3,6 @@
  * Owner-approved configuration file and a physical local user token required.
  */
 import { readFile } from "node:fs/promises";
-import { createPublicKey } from "node:crypto";
 import { sha256 } from "../../src/utils/json.js";
 import { runPhysicalWindowsFleetOnce } from "../../src/v3/fleet/windows-fleet-operator.js";
 

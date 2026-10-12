@@ -11,7 +11,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import * as z from "zod/v4";
-import { canonicalJson, sha256 } from "../../utils/json.js";
+import { canonicalJson } from "../../utils/json.js";
 import {
   i01RecipientApprovalSchema, type I01SignedRecipientApproval,
   type I01TargetLocalConsent,

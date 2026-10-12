@@ -84,7 +84,6 @@ export class WindowsV3NativeReleaseHost implements LocalV3ReleaseHost {
     const next=await exactRelease(this.dedicatedV3ReleaseRoot,manifest);
     const config=await readFile(this.xml,"utf8");
     const previous=await this.currentlyConfiguredDir();
-    const oldTag="<workingdirectory>"+previous+"</workingdirectory>";
     const matches=[...config.matchAll(/<workingdirectory>([^<]+)<\/workingdirectory>/gu)];
     if(matches.length!==1||!matches[0]||path.win32.normalize(matches[0][1]??"").toLowerCase()!==
       path.win32.normalize(previous).toLowerCase())

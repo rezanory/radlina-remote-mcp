@@ -4,7 +4,6 @@
  * S03 writer credentials are explicitly injected into the V3-only process.
  */
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -179,7 +178,7 @@ export function createV3FinalFourPhysicalComposition(input:{
         assertOwner:async(subject)=>{
           if(!subject||!origins.requireNativeV3Client)throw Error("physical fleet owner unbound");
           // Fleet plan ownership is checked independently by native MCP OAuth binder.
-          if(subject!==JSON.parse(readFileSync(config.ownerOAuthClientPolicyPath,"utf8")).ownerSubject)
+          if(!origins.isAuthorizedOwnerSubject(subject))
             throw Error("physical V3 owner subject mismatch");
         },
       },

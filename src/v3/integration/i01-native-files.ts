@@ -7,7 +7,7 @@ import { constants } from "node:fs";
 import { mkdir, lstat, open, readFile, realpath, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { canonicalJson, sha256 } from "../../utils/json.js";
+import { sha256 } from "../../utils/json.js";
 import type { I01TargetNativeCapabilities } from "./i01-recipient-agent.js";
 
 export class I01NativeCapabilityDenied extends Error {

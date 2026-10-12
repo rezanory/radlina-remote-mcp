@@ -97,7 +97,7 @@ export class ExistingPhysicalMacP03Signer {
     const consent=record["schema"]==="1.0.0"&&record["action"]==="consent.decision"&&
       record["targetDeviceId"]==="macbook-main"&&
       record["decision"]!==undefined&&
-      ["approve","deny"].includes(String(record["decision"]))&&
+      (record["decision"]==="approve"||record["decision"]==="deny")&&
       record["duration"]==="once";
     if (typeof record["schema"] !== "string" || (!allowedSchemas.has(record["schema"])&&!consent) ||
       canonicalJson(value) !== payload) {

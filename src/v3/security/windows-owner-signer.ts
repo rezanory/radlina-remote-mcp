@@ -7,7 +7,6 @@ import { execFile as execCallback } from "node:child_process";
 import { createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import os from "node:os";
-import path from "node:path";
 import { promisify } from "node:util";
 import * as z from "zod/v4";
 import { canonicalJson, sha256 } from "../../utils/json.js";

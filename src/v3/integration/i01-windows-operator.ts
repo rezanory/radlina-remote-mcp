@@ -113,9 +113,9 @@ export async function runWindowsI01RecipientOnce(ownerPublicKeyPem:string):Promi
       expiresAtMs:Number(r["requestExpiresAtMs"]),
     });
     const now=Date.now();
-    const unsigned={
+    const unsigned:Parameters<typeof buildApprovalMessage>[1]={
       requestId:String(r["requestId"]),
-      decision:(confirmed?"approve":"deny") as "approve"|"deny",
+      decision:(confirmed?"approve":"deny"),
       duration:"once" as const,
       validUntilMs:confirmed?now+10*60*1000:null,
       signedAtMs:now,nonce:randomUUID(),
@@ -155,7 +155,7 @@ export async function runWindowsI01RecipientOnce(ownerPublicKeyPem:string):Promi
     }
     const now=Date.now();
     const approval={
-      schema:"radlina.v3.i01.recipient-approval/v1",
+      schema:"radlina.v3.i01.recipient-approval/v1" as const,
       operationSha256:String(r["operationSha256"]),
       sourceDeviceId:"macbook-main",
       targetDeviceId:"windows-main",

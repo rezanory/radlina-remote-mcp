@@ -3,8 +3,8 @@
  * supervisor (different LaunchAgent from V3 operator and heartbeat sender).
  */
 import { execFile as execCallback } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -20,7 +20,6 @@ import { i01AgentSessionSchema } from "../integration/i01-physical-session.js";
 
 const run=promisify(execCallback);
 const endpoint="https://v3-mcp.radlina.com";
-const label="com.radlina.remote-mcp.v3.mac-fleet-agent";
 const allowedCommands=new Set(["fleet.preflight","fleet.activate","fleet.verify","fleet.rollback"]);
 const fleetLeaseSchema=z.object({
   schema:z.literal("radlina.v3.f01.leased-fleet-command/v1"),
@@ -28,7 +27,6 @@ const fleetLeaseSchema=z.object({
   command:f01SignedCommandSchema,
 }).strict();
 const expectedOwnerFingerprint="6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93";
-const expectedWindowsTailnetHash="b7bfc7b8c91c6085911f5de9cf079db4433f0b7a4e8e3df0438f0ab58925a6";
 // Expected exact Windows Tailnet hash MUST come from the owner-signed F01 rollout
 // configuration; the constant above must never be used as an identity fallback.
 async function observeWindowsPeer():Promise<string|undefined>{

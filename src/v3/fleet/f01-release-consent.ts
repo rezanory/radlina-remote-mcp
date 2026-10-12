@@ -8,7 +8,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import * as z from "zod/v4";
-import { canonicalJson, sha256 } from "../../utils/json.js";
+import { canonicalJson } from "../../utils/json.js";
 import type { F01RecipientLocalReleaseConsent } from "./physical-adapters.js";
 import type { FleetRecipientConsentPort, FleetOperation } from "./contracts.js";
 import type { I01PhysicalDeviceSession, I01SignedPull } from "../integration/i01-sealed-outbox.js";

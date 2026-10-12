@@ -129,8 +129,8 @@ export class V3ExactFleetRecipientConsent implements FleetRecipientConsentPort {
     }
   }
 }
-function signedReplyMatches<T extends {deviceId:string}>(
-  reply: F01SignedReply<T>,
+function signedReplyMatches(
+  reply: F01SignedReply<unknown>,
   operation:F01PhysicalCommand,
   identity:{agentInstanceId:string;publicKeyPem:string},
 ):boolean {
@@ -138,6 +138,8 @@ function signedReplyMatches<T extends {deviceId:string}>(
     reply.operationId!==operation.operationId ||
     reply.deviceId!==operation.deviceId ||
     reply.agentInstanceId!==identity.agentInstanceId ||
+    typeof reply.payload!=="object"||reply.payload===null||
+    !("deviceId" in reply.payload)||
     reply.payload.deviceId!==operation.deviceId) return false;
   const bound = {
     schema:reply.schema,operationId:reply.operationId,
@@ -308,7 +310,7 @@ export class V3PhysicalSignedFleetAgent implements FleetDeviceAgentPort, FleetRe
       throw new F01PhysicalBlocked("no unresolved original fleet command available");
     const original=await this.transport.readOriginalReturned(operationId);
     if(!original)throw new F01PhysicalBlocked("original signed F01 receipt not yet delivered");
-    const {command,signedReply}=original;
+    const {command,reply:signedReply}=original;
     const op=command.command;
     if(op.operationId!==operationId||op.planId!==this.plan.planId||
       op.deviceId!==record.deviceId||op.action!==record.action||

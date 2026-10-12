@@ -15,7 +15,7 @@ import * as z from "zod/v4";
 
 import { sha256 } from "../../src/utils/json.js";
 import { openMacKeychainS03WitnessSigner } from "../../src/v3/audit/s03-macos-signer.js";
-import { S03MacIndependentWitnessJournal, type S03WitnessTrustPolicy } from "../../src/v3/audit/s03-mac-witness.js";
+import { S03MacIndependentWitnessJournal } from "../../src/v3/audit/s03-mac-witness.js";
 import { S03AuthenticatedMacWireService } from "../../src/v3/audit/s03-mac-wire.js";
 
 const POLICY_PATH=process.env["RADLINA_V3_S03_WITNESS_POLICY_PATH"];
@@ -59,7 +59,7 @@ const policy=z.object({
       agentInstanceId:z.string().uuid(),
     }).strict(),
   }).strict(),
-}).strict().parse(JSON.parse(policyBytes.toString("utf8"))) as S03WitnessTrustPolicy;
+}).strict().parse(JSON.parse(policyBytes.toString("utf8")));
 const bearerBytes=await privateFile(TOKEN_FILE,4096);
 const token=bearerBytes.toString("utf8").trim();
 const hmacBytes=await privateFile(HMAC_FILE,4096);

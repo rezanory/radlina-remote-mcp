@@ -3,7 +3,7 @@
  * No caller controls approvalPublicKeyPem or the independently trusted devices.
  */
 import { SqliteCrossDeviceConsentAuthority } from "../security/device-consent.js";
-import { buildApprovalMessage, consentDecisionSchema,
+import { consentDecisionSchema,
   type ConsentDeviceTrustPort,type SignedConsentDecision,
   type VerifiedDevicePrincipal } from "../security/consent-contracts.js";
 import type { SqliteDeviceRegistry } from "../device/registry.js";

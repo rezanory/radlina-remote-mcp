@@ -98,7 +98,9 @@ function independentlyVerify(event:S03AnchorEvent,policy:S03WitnessTrustPolicy):
     const response=input.reply;
     const receipt=response.receipt;
     const record=input.record;
-    const expectedHash=sha256(canonicalJson((({recordHash,signature,...rest})=>rest)(record)));
+    const expectedHash=sha256(canonicalJson(Object.fromEntries(
+      Object.entries(record).filter(([key])=>key!=="recordHash"&&key!=="signature"),
+    )));
     if(event.recordHash!==record.recordHash||record.recordHash!==expectedHash||
       !exactSignature(policy.ownerPublicKeyPem,op,input.ownerEnvelope.ownerSignatureBase64)){
       throw new S03WitnessDenied("owner signed command / distributed record mismatch");

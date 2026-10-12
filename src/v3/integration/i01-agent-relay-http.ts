@@ -10,7 +10,7 @@ import type { I01S02EConsentController } from "./i01-s02e-consent.js";
 import type { F01SealedFleetTransport } from "../fleet/f01-sealed-transport.js";
 import type { F01SignedReleaseConsentMailbox } from "../fleet/f01-release-consent.js";
 import { consentDecisionSchema } from "../security/consent-contracts.js";
-import type { I01DurableSealedOutbox, I01SignedPull } from "./i01-sealed-outbox.js";
+import type { I01DurableSealedOutbox } from "./i01-sealed-outbox.js";
 
 export type I01PhysicalRelayPorts = {
   outbox: I01DurableSealedOutbox;
@@ -85,7 +85,7 @@ export function installV3PhysicalAgentRelayRoutes(
     res.setHeader("cache-control","no-store");
     try{
       const request=claim.parse(req.body);
-      const work=await ports.outbox.claimNext(request.session as I01SignedPull);
+      const work=await ports.outbox.claimNext(request.session);
       if(work===null) {
         res.status(204).end();
         return;
@@ -205,7 +205,7 @@ export function installV3PhysicalAgentRelayRoutes(
     try{
       const request=report.parse(req.body);
       await ports.outbox.deliverSignedResult(
-        request.session as I01SignedPull,
+        request.session,
         request.leaseId,
         request.response,
       );

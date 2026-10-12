@@ -95,7 +95,7 @@ async function main(): Promise<void> {
       typeof record["deviceSignatureBase64"] !== "string" ||
       record["deviceSignatureBase64"].length !== 88
     ) fail("Mac signing output violated pinned P03 contract");
-    signedAt = heartbeat["signedAtMs"] as number;
+    signedAt = heartbeat["signedAtMs"];
     const url = new URL(endpoint);
     if (url.protocol !== "https:" || url.hostname !== "v3-mcp.radlina.com") {
       fail("only independent production V3 TLS origin allowed");

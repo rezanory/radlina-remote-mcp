@@ -5,6 +5,8 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      // Local operator-owned Cloudflare draft is untracked and not part of this repo.
+      "cloudflare/**",
       "node_modules/**",
       "reports/**",
       "evidence/**",

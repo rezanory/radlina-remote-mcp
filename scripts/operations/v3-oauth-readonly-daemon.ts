@@ -63,9 +63,7 @@ if(finalFourEnabled&&!approvedOperatorPolicy){
 const finalFourFactory=finalFourEnabled
   ? finalFourFactoryFromOwnerEnvironment()
   : undefined;
-let gateway:Awaited<ReturnType<typeof startV3ReadOnlyOAuthGateway>>;
-try {
-  gateway=await startV3ReadOnlyOAuthGateway({
+const gateway=await startV3ReadOnlyOAuthGateway({
   baseConfig,
   publicUrl,
   stateDirectory,
@@ -86,9 +84,6 @@ try {
       }
     : {}),
   });
-} catch(error) {
-  throw error;
-}
 try {
   const auth = await fetch("http://127.0.0.1:7344/auth-health", {
     signal: AbortSignal.timeout(5000),

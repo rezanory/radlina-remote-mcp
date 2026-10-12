@@ -10,7 +10,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import * as z from "zod/v4";
 import { protectBytes, unprotectBytes } from "../../auth/dpapi.js";
-import { canonicalJson, sha256 } from "../../utils/json.js";
+import { canonicalJson } from "../../utils/json.js";
 import { ed25519PublicKeyFingerprint } from "../device/owner-pinned-enrollment.js";
 import type { SqliteDeviceRegistry } from "../device/registry.js";
 import type { I01PhysicalDeviceSession, I01SealedOutboxData } from "./i01-sealed-outbox.js";
