@@ -1,0 +1,70 @@
+{
+  "schema": "radlina.v3.p03-real-mac-owner-and-device-attested-20261012/v1",
+  "checkpoint": "2026-10-12T09:47:03Z",
+  "repository": "rezanory/radlina-remote-mcp",
+  "branch": "feature/v3-mac-owner-attested-20261012",
+  "input": {
+    "requestedPhysicalMac": "macbook-main",
+    "windowsHost": "LAPTOP-13QINEIF",
+    "macHost": "amirs-MacBook-Pro.local",
+    "existingMacEnsureRun": 38189747769,
+    "freshDeviceChallengeRun": 38231683137,
+    "freshSignedHeartbeatRun": 38232048871,
+    "challengeId": "1307f5bc-b1ee-47a4-bd06-251b3d128e5e",
+    "ownerKeyFingerprint": "6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93",
+    "macKeyFingerprint": "f2c2e93ff120fbc5122cbb6b5a0b461a072f54bd8d226368c858fd0bd17037ea",
+    "windowsIndependentlyObservedMacTailnetPin": "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c"
+  },
+  "runtime": {
+    "ownerSignature": "Owner's interactive Windows token using existing DPAPI CurrentUser protected Ed25519 key; temporary task removed",
+    "macSignature": "Physical self-hosted Mac runner using dedicated durable V3 macOS Keychain",
+    "registry": "E:\\radlina-v3-oauth-standalone\\v3-devices.sqlite3",
+    "verification": "Signed exact P03 stage/challenge/admit and signed heartbeat with freshness, nonce replay prevention, live Windows-observed Tailscale identity",
+    "v2ServiceChanged": false,
+    "v2OAuthKeysChanged": false,
+    "githubMainChanged": false,
+    "macPrivateKeyExported": false
+  },
+  "execution": {
+    "ownerPreflightPassed": true,
+    "macEnrollmentRequestEd25519SignatureVerifiedOnWindows": true,
+    "macWasPendingBeforeAdmission": true,
+    "freshChallengeStaged": true,
+    "macChallengeSignatureRunConclusion": "success",
+    "ownerInteractiveChallengeSignaturePresent": true,
+    "ownerIndependentSignatureVerified": true,
+    "macIndependentSignatureVerified": true,
+    "challengeAndTailnetExactMatch": true,
+    "macAdmittedToTrustedRegistry": true,
+    "auditChainValid": true,
+    "freshHeartbeatRunConclusion": "success",
+    "freshMacHeartbeatApplied": true,
+    "signedHeartbeatTimestamp": "2026-10-12T09:47:02.726Z",
+    "nativeChatGPTV3RegistryReadbackVerified": true,
+    "temporaryOwnerSigningTasksDeleted": true
+  },
+  "output": {
+    "macTrust": "trusted",
+    "macHealthAtSignedHeartbeat": "healthy",
+    "macStatusAtSignedHeartbeat": "online",
+    "macCapabilitiesAtSignedHeartbeat": ["device.health"],
+    "windowsTrust": "trusted",
+    "deviceCount": 2,
+    "signedHeartbeatPersistentTransportNotYetVerified": true,
+    "crossHostCommandExecutionEnabled": false,
+    "crossHostConsentAndExternalAuditVerified": false,
+    "nativeChatGPTV3ExecutionProof": false
+  },
+  "acceptance": {
+    "P03OwnerDeviceDualSignature": "PASS_REAL",
+    "P03LiveMacSignedHeartbeat": "PASS_REAL",
+    "P08FullPersistentMacAgent": "OPEN",
+    "I01ProductionCrossHostTransport": "OPEN",
+    "F01PhysicalTwoDeviceCanaryRollback": "OPEN",
+    "AC01NativeChatGPTE2E": "OPEN",
+    "officialComponentsAccepted": 24,
+    "officialComponentsTotal": 28,
+    "officialPercent": 85.71,
+    "note": "Do not count P08/I01/F01/AC01 acceptance until persistent target agent, explicit recipient consent, signed cross-host execution audit, live canary/rollback and independent owner/reviewer evidence complete."
+  }
+}
