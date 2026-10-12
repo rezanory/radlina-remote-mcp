@@ -1,0 +1,48 @@
+name: V3 P08 Install Persistent Signed Mac Agent (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      installation_action:
+        description: "Install the versioned per-user LaunchAgent. Does not execute a fleet test."
+        type: choice
+        options: [stage-install]
+        default: stage-install
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-macos-install
+  cancel-in-progress: false
+
+jobs:
+  stage-persistent-agent:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      inputs.installation_action == 'stage-install'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 25
+    steps:
+      - name: Checkout selected immutable source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install only versioned V3 signed heartbeat LaunchAgent
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(uname -m)" == 'x86_64' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          bash scripts/operations/v3-mac-launchagent-install.sh --install
+      - name: Summarize installation, not acceptance
+        shell: bash
+        run: |
+          echo "P08 persistent sender installation requested."
+          echo "No P08, I01, F01, or AC01 release gate is closed by this workflow."
+          echo "Real signed heartbeat and receipt review belong to a separately authorized acceptance run."
