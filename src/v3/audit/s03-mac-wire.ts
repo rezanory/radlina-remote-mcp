@@ -73,6 +73,34 @@ export class S03AuthenticatedMacWireService {
       "BEGIN SELECT RAISE(ABORT,'append_only'); END;"
     );
   }
+  /** Authenticated read-only recovery of an already persisted original ACK. */
+  lookup(raw:Uint8Array,authHeader:string,hmacHeader:string,idempotencyKey:string):
+    {witness:S03WitnessWireAck;signatureBase64:string}|null{
+    if(raw.length===0||raw.length>128*1024)
+      throw new S03WitnessWireDenied("bounded exact witness request required");
+    const body=Buffer.from(raw).toString("utf8");
+    if(!bearer(authHeader,this.controllerBearer)||!mac(hmacHeader,this.controllerHmac,body))
+      throw new S03WitnessWireDenied("independent S03 writer credentials invalid");
+    const wire=s03WireAppendSchema.parse(JSON.parse(body));
+    if(canonicalJson(wire)!==body||idempotencyKey!==sha256(body))
+      throw new S03WitnessWireDenied("exact immutable S03 lookup digest required");
+    const existing=this.db.prepare(
+      "SELECT record_hash,ack_json,signature_base64 FROM v3_s03_wire_acks WHERE request_hash=?",
+    ).get(idempotencyKey) as {
+      record_hash:string;ack_json:string;signature_base64:string;
+    }|undefined;
+    if(!existing)return null;
+    if(existing.record_hash!==wire.recordHash)
+      throw new S03WitnessWireDenied("S03 signed ACK record conflict");
+    const witness=JSON.parse(existing.ack_json) as S03WitnessWireAck;
+    const proof=Buffer.from(existing.signature_base64,"base64");
+    if(witness.recordHash!==wire.recordHash||proof.length!==64||
+      proof.toString("base64")!==existing.signature_base64||
+      !verify(null,Buffer.from(canonicalJson(witness)),
+        createPublicKey(this.signing.publicKeyPem),proof))
+      throw new S03WitnessWireDenied("stored S03 witness receipt integrity failed");
+    return{witness,signatureBase64:existing.signature_base64};
+  }
   async accept(raw:Uint8Array,authHeader:string,hmacHeader:string,idempotencyKey:string):
     Promise<{witness:S03WitnessWireAck;signatureBase64:string}>{
     if(raw.length===0||raw.length>128*1024)throw new S03WitnessWireDenied("bounded witness request required");
@@ -107,10 +135,27 @@ export class S03AuthenticatedMacWireService {
       event:wire.payload,
       issuedAt:new Date(this.now()).toISOString(),
     };
-    // This method validates the independent Ed25519 owner and target device
-    // signatures and persists the Mac append-only audit chain.
-    const proof=await this.journal.anchor(event);
-    const persisted=proof.receipt;
+    // If the Mac committed the chain but failed before inserting the wire
+    // ACK, recover that SAME chain record; never append a duplicate event.
+    const previous=this.db.prepare(
+      "SELECT sequence,prev_hash,chain_head,event_json,ack_json FROM v3_s03_external_chain "+
+      "WHERE record_hash=? ORDER BY sequence",
+    ).all(wire.recordHash) as Array<{
+      sequence:number;prev_hash:string;chain_head:string;event_json:string;ack_json:string;
+    }>;
+    const existing=previous.filter(row=>{
+      const value=JSON.parse(row.event_json) as S03AnchorEvent;
+      return value.kind===event.kind&&canonicalJson(value.event)===canonicalJson(event.event);
+    });
+    if(existing.length>1||previous.length!==existing.length)
+      throw new S03WitnessWireDenied("S03 prior anchor hash collision or duplicate chain requires review");
+    // This method independently verifies P03 signatures before its first
+    // append; older persisted evidence is recovered without re-signing a
+    // time-expired owner command or creating another chain link.
+    const proof=existing.length===1?null:await this.journal.anchor(event);
+    const persisted=proof?.receipt??(JSON.parse(existing[0]!.ack_json) as {
+      eventHash:string;chainHead:string;sequence:number;anchoredAt:string;
+    });
     const row=this.db.prepare(
       "SELECT prev_hash,chain_head FROM v3_s03_external_chain WHERE event_hash=?"
     ).get(persisted.eventHash) as {prev_hash:string;chain_head:string}|undefined;

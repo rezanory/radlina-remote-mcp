@@ -98,6 +98,24 @@ app.post("/api/v1/anchor",express.raw({
     response.status(403).json({error:"mac_witness_signed_receipt_denied"});
   }
 });
+// Authenticated retrieval ONLY; never invokes witness.anchor() or modifies
+// the independent Mac chain. A lost POST ACK is reconciled by request hash.
+app.post("/api/v1/anchor/lookup",express.raw({
+  type:"application/json",limit:"128kb",
+}),async(request,response)=>{
+  try{
+    if(!Buffer.isBuffer(request.body)){
+      response.status(415).json({error:"json_body_required"});return;
+    }
+    const found=wire.lookup(request.body,
+      request.get("authorization")??"",
+      request.get("x-radlina-s03-hmac")??"",
+      request.get("idempotency-key")??"",
+    );
+    if(!found){response.status(404).json({error:"original_signed_witness_ack_not_found"});return;}
+    response.status(200).json(found);
+  }catch{response.status(403).json({error:"mac_witness_lookup_denied"});}
+});
 app.use((_req,res)=>res.status(404).json({error:"not_found"}));
 const server=createServer(app);
 server.listen(7444,"127.0.0.1");

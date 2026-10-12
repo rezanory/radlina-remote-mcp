@@ -150,7 +150,8 @@ function independentlyVerify(event:S03AnchorEvent,policy:S03WitnessTrustPolicy):
       input.commandHash!==sha256(canonicalJson(command))||
       input.deviceReceiptHash!==sha256(canonicalJson(reply.payload))||
       command.issuedAtMs>Date.now()||
-      command.expiresAtMs<=Date.now()){
+      command.expiresAtMs<=command.issuedAtMs||
+      command.expiresAtMs-command.issuedAtMs>90000){
       throw new S03WitnessDenied("owner/recipient signed physical fleet manifest receipt mismatch");
     }
   }

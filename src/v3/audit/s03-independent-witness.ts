@@ -58,9 +58,8 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       throw new S03ExternalAuditUnavailable("bounded independent S03 append only");
     const signature=createHmac("sha256",this.requestHmacKey).update(serialized).digest("hex");
     const requestId=createHash("sha256").update(serialized).digest("hex");
-    const result=await fetch(this.endpoint,{
-      method:"POST",
-      redirect:"error",
+    const request={
+      method:"POST" as const,redirect:"error" as const,
       headers:{
         "content-type":"application/json",
         "accept":"application/json",
@@ -70,7 +69,23 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       },
       body:serialized,
       signal:AbortSignal.timeout(15000),
-    });
+    };
+    let result:Response;
+    try{
+      result=await fetch(this.endpoint,request);
+    }catch{
+      // The original POST might already have durably committed at the Mac.
+      // Lookup is read-only: never replay an audit append on an unknown ACK.
+      try{
+        result=await fetch(this.endpoint+"/lookup",{
+          ...request,signal:AbortSignal.timeout(15000),
+        });
+      }catch{
+        throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; manual reconcile");
+      }
+      if(result.status!==200)
+        throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; no signed ACK");
+    }
     if(result.status!==201&&result.status!==200) {
       throw new S03ExternalAuditUnavailable("S03 witness append HTTP_"+result.status);
     }
@@ -136,8 +151,14 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       !verify(null,Buffer.from(canonicalJson(bound)),key,proof)){
       throw new S03ExternalAuditUnavailable("physical P03 device signed fleet audit record invalid");
     }
-    const hash=sha256(canonicalJson(input));
-    const ack=await this.submit("f01",input,hash);
+    // The independent Mac witness requires the exact versioned F01 evidence
+    // discriminant. Hash the very same object it independently verifies.
+    const evidence={
+      schema:"radlina.v3.f01.audit-witness-request/v1" as const,
+      ...input,
+    };
+    const hash=sha256(canonicalJson(evidence));
+    const ack=await this.submit("f01",evidence,hash);
     return {durable:ack.accepted,anchorId:ack.anchorId};
   }
 }
