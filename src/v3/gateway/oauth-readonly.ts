@@ -26,6 +26,7 @@ import {
   type P08HeartbeatPins,
 } from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
+import { registerV3FinalFourTools, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 
 const V3_SCOPES = new Set(["device:read", "filesystem:read", "filesystem:write", "offline_access"]);
 const WRITE_ANNOTATIONS = {
@@ -48,6 +49,8 @@ export type V3ReadOnlyGatewayOptions = {
   port: number;
   windowsFileRoot?: string;
   macHeartbeatPins?: P08HeartbeatPins;
+  /** Never inferred from environment: inject only after real physical adapters exist. */
+  finalFour?: V3FinalFourMcpPorts;
 };
 
 export type V3ReadOnlyGateway = {
@@ -71,17 +74,20 @@ function independentState(stateDirectory: string, productionDirectory: string): 
 }
 
 class ScopedV3AuthService extends AuthService {
+  constructor(config: AppConfig, store: Store, private readonly acceptedScopes: ReadonlySet<string>) {
+    super(config, store);
+  }
   override oauthMetadata() {
-    return { ...super.oauthMetadata(), scopes_supported: [...V3_SCOPES] };
+    return { ...super.oauthMetadata(), scopes_supported: [...this.acceptedScopes] };
   }
 }
 
-function verifiedScopedTokenVerifier(auth: AuthService): OAuthTokenVerifier {
+function verifiedScopedTokenVerifier(auth: AuthService, acceptedScopes: ReadonlySet<string>): OAuthTokenVerifier {
   return {
     verifyAccessToken: async (token: string) => {
       const info = await auth.verifyAccessToken(token);
       const scopes = info.scopes ?? [];
-      if (!scopes.includes("device:read") || scopes.some((s) => !V3_SCOPES.has(s))) {
+      if (!scopes.includes("device:read") || scopes.some((s) => !acceptedScopes.has(s))) {
         throw new OAuthError(OAuthErrorCode.InsufficientScope, "V3 OAuth scope is not allowed");
       }
       return info;
@@ -93,6 +99,7 @@ function buildScopedV3Server(
   registry: SqliteDeviceRegistry,
   windowsFiles?: V3WindowsScopedFiles,
   macIngress?: V3MacSignedHeartbeatIngress,
+  finalFour?: V3FinalFourMcpPorts,
 ): McpServer {
   const server = new McpServer({
     name: "radlina-remote-mcp-v3-readonly",
@@ -119,6 +126,7 @@ function buildScopedV3Server(
           "get_device",
           "v3_admin_status",
           ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
+          ...(finalFour ? ["v3_exact_device_execute", "v3_fleet_plan", "v3_fleet_run", "v3_release_acceptance_status"] : []),
         ],
       }),
   );
@@ -150,7 +158,7 @@ function buildScopedV3Server(
   server.registerTool(
     "v3_admin_status",
     {
-      description: "Return transparent V3 readiness; this gateway cannot execute remote commands.",
+      description: "Return transparent V3 readiness; final-four operations need independent physical port injection.",
       inputSchema: z.object({}),
       annotations: READ_ANNOTATIONS,
     },
@@ -158,11 +166,12 @@ function buildScopedV3Server(
       success({
         generation: "v3",
         mode: windowsFiles ? "oauth-scoped-local-windows" : "oauth-readonly-pre-enrollment",
-        productionReady: false,
-        remoteExecutionEnabled: false,
+        productionReady: finalFour?.acceptance.readiness().productionReady ?? false,
+        remoteExecutionEnabled: Boolean(finalFour),
         deviceCount: registry.list().length,
         localWindowsFileOperationsEnabled: Boolean(windowsFiles),
         macSignedHeartbeatIngressEnabled: Boolean(macIngress),
+        finalFourPortsBound: Boolean(finalFour),
       }),
   );
   if (windowsFiles) {
@@ -196,6 +205,7 @@ function buildScopedV3Server(
       async (input, context) => success(await windowsFiles.read(input, context.http?.authInfo)),
     );
   }
+  if (finalFour) registerV3FinalFourTools(server, finalFour);
   return server;
 }
 
@@ -250,8 +260,13 @@ export async function startV3ReadOnlyOAuthGateway(
   let server: Server | undefined;
   let windowsFiles: V3WindowsScopedFiles | undefined;
   let macIngress: V3MacSignedHeartbeatIngress | undefined;
+  const acceptedScopes = new Set(V3_SCOPES);
+  if (options.finalFour) {
+    acceptedScopes.add("device:execute");
+    acceptedScopes.add("fleet:control");
+  }
   try {
-    const auth = new ScopedV3AuthService(cfg, store);
+    const auth = new ScopedV3AuthService(cfg, store, acceptedScopes);
     await auth.initialize();
     if (options.macHeartbeatPins) {
       macIngress = new V3MacSignedHeartbeatIngress(registry, options.macHeartbeatPins);
@@ -282,7 +297,7 @@ export async function startV3ReadOnlyOAuthGateway(
         raw
           .trim()
           .split(/\s+/u)
-          .some((scope) => !V3_SCOPES.has(scope))
+          .some((scope) => !acceptedScopes.has(scope))
       ) {
         response
           .status(400)
@@ -315,14 +330,14 @@ export async function startV3ReadOnlyOAuthGateway(
       });
     }
     const mcpHandler = createMcpHandler(
-      () => buildScopedV3Server(registry, windowsFiles, macIngress),
+      () => buildScopedV3Server(registry, windowsFiles, macIngress, options.finalFour),
       {
         legacy: "reject",
       },
     );
     const nodeHandler = toNodeHandler(mcpHandler);
     const bearer = requireBearerAuth({
-      verifier: verifiedScopedTokenVerifier(auth),
+      verifier: verifiedScopedTokenVerifier(auth, acceptedScopes),
       resourceMetadataUrl: auth.resourceMetadataUrl(),
     });
     app.all("/mcp", bearer, (request, response) => {
