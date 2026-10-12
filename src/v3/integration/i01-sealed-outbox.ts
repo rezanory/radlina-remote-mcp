@@ -14,7 +14,7 @@ import { canonicalJson, sha256 } from "../../utils/json.js";
 import {
   i01SignedOwnerEnvelopeSchema,
   i01SignedDeviceResponseSchema,
-  type I01BoundDeviceTransport,
+  type I01PinnedTransport as I01BoundDeviceTransport,
   type I01OwnerSignedEnvelope,
   type I01SignedDeviceResponse,
 } from "./i01-secured-dispatch.js";

@@ -83,6 +83,7 @@ export interface I01TargetLocalConsent {
   approveExact(input: {
     operationSha256: string; source: VerifiedDevicePrincipal;
     targetDeviceId: string; subject: string;
+    capability: string; inputSha256: string; resourceDescription: string;
   }): Promise<I01SignedRecipientApproval>;
 }
 export interface I01OwnerSigner {
@@ -95,7 +96,8 @@ export interface I01PinnedTransport {
 }
 export interface I01ExternalAuditAnchor {
   /** External durable S03 anchor is mandatory to return a completed workflow. */
-  anchor(record: SignedDistributedAuditRecord): Promise<{
+  anchor(record: SignedDistributedAuditRecord, ownerEnvelope: I01OwnerSignedEnvelope,
+    reply: I01SignedDeviceResponse, targetPublicKeyPem: string): Promise<{
     accepted: true; recordHash: string; anchorId: string;
   }>;
 }
@@ -193,6 +195,9 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
     }));
     const local = await this.recipient.approveExact({
       operationSha256:operationHash,source:origin,targetDeviceId:target,subject:input.subject,
+      capability:input.node.capability,inputSha256:inputHash,
+      resourceDescription: typeof input.node.input["name"]==="string" ?
+        String(input.node.input["name"]).slice(0,150) : "exact input SHA256: "+inputHash,
     });
     const approval = i01RecipientApprovalSchema.parse(local.approval);
     if (approval.operationSha256 !== operationHash ||
@@ -231,7 +236,8 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
     }
     this.journal.reserve(key,sha256(canonical),target,request.requestId);
     try {
-      const raw = await this.transport.sendExact(target,{operation:request,ownerSignatureBase64:signature,recipientApproval:local});
+      const ownerEnvelope: I01OwnerSignedEnvelope={operation:request,ownerSignatureBase64:signature,recipientApproval:local};
+      const raw = await this.transport.sendExact(target,ownerEnvelope);
       const response = i01SignedDeviceResponseSchema.parse(raw);
       const receipt = response.receipt;
       const actualOutputHash = response.output === undefined ? null : sha256(canonicalJson(response.output));
@@ -263,7 +269,7 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
         localAuditReceiptHash:receipt.localAuditReceiptHash,
         requestedAt:receipt.startedAt,endedAt:receipt.endedAt,terminalState:receipt.terminalState,
       },this.auditSigner);
-      const anchor = await this.auditAnchor.anchor(distributed);
+      const anchor = await this.auditAnchor.anchor(distributed,ownerEnvelope,response,enrolled.devicePublicKeyPem);
       if (!anchor.accepted || anchor.recordHash !== distributed.recordHash || !anchor.anchorId) {
         throw new I01DispatchDenied("external S03 immutable audit anchor missing");
       }

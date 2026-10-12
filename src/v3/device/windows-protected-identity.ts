@@ -175,6 +175,40 @@ if($a.Access.Count -lt 2){throw 'identity ACL incomplete'}
     return { heartbeat, deviceSignatureBase64: this.sign(heartbeat) };
   }
 
+  /**
+   * P03 Windows-only signed target receipts and sessions.
+   * No generic signing escape hatch and never signs Mac device messages.
+   */
+  signExactV3Receipt(payload: string): string {
+    if (Buffer.byteLength(payload,"utf8") > 256*1024) {
+      throw new Error("bounded Windows P03 V3 receipt required");
+    }
+    const value:unknown=JSON.parse(payload);
+    if(!value||typeof value!=="object"||canonicalJson(value)!==payload) {
+      throw new Error("canonical structured Windows P03 receipt required");
+    }
+    const document=value as Record<string,unknown>;
+    const schema=document["schema"];
+    const allowed=new Set([
+      "radlina.v3.i01.device-session/v1",
+      "radlina.v3.i01.recipient-approval/v1",
+      "radlina.v3.i01.signed-device-response/v1",
+      "radlina.v3.f01.signed-fleet-reply/v1",
+      "radlina.v3.f01.recipient-release-consent/v1",
+    ]);
+    const s02e=schema==="1.0.0"&&document["action"]==="consent.decision";
+    if((typeof schema!=="string"||(!allowed.has(schema)&&!s02e))||
+      (document["deviceId"]!==undefined&&document["deviceId"]!=="windows-main")||
+      (document["targetDeviceId"]!==undefined&&document["targetDeviceId"]!=="windows-main")||
+      (document["resolvedDeviceId"]!==undefined&&document["resolvedDeviceId"]!=="windows-main")) {
+      throw new Error("Windows P03 signer limited to exact Windows device-local receipts");
+    }
+    if(s02e&&document["targetDeviceId"]!=="windows-main") {
+      throw new Error("S02E Windows P03 owner consent cannot target Mac");
+    }
+    return this.sign(value);
+  }
+
   private sign(payload: unknown): string {
     const bytes = Buffer.from(canonicalJson(payload));
     const signature = sign(null, bytes, this.key);

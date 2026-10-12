@@ -82,7 +82,9 @@ export interface F01IndependentAuditPort {
     deviceId: string;
     commandHash: string;
     deviceReceiptHash: string;
-    deviceSignature: string;
+    devicePublicKeyPem: string;
+    ownerSignedCommand: F01SignedCommand;
+    signedReply: F01SignedReply<unknown>;
   }): Promise<{durable:true; anchorId:string}>;
 }
 export class F01PhysicalBlocked extends Error {
@@ -242,13 +244,17 @@ export class V3PhysicalSignedFleetAgent implements FleetDeviceAgentPort, FleetRe
     }));
     this.journal.reserve(key,command.operationId,this.plan.planId,id,action,sha256(canonical));
     try{
-      const received=await this.transport.perform<T>({command,ownerSignatureBase64:signature});
+      const signedCommand:F01SignedCommand={command,ownerSignatureBase64:signature};
+      const received=await this.transport.perform<T>(signedCommand);
       if(!signedReplyMatches(received,command,identity))
         throw new F01PhysicalBlocked("P03 signed physical switch receipt invalid");
       const receiptHash=sha256(canonicalJson(received.payload));
       const anchored=await this.audit.anchorPhysicalReceipt({
         planId:this.plan.planId,deviceId:id,commandHash:sha256(canonical),
-        deviceReceiptHash:receiptHash,deviceSignature:received.deviceSignatureBase64,
+        deviceReceiptHash:receiptHash,
+        devicePublicKeyPem:identity.publicKeyPem,
+        ownerSignedCommand:signedCommand,
+        signedReply:received,
       });
       if(!anchored.durable||!anchored.anchorId)
         throw new F01PhysicalBlocked("missing independently persisted S03 fleet audit");

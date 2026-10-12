@@ -5,9 +5,11 @@
  * No side effects occur before the opt-in V3 gateway startup.
  */
 import { readFile } from "node:fs/promises";
+import { createPublicKey } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { unprotectBytes } from "../../auth/dpapi.js";
+import { sha256 } from "../../utils/json.js";
 import { requireOwnerApprovedMacOperatorPolicy } from "../device/p08-mac-operator-policy.js";
 import {
   createV3FinalFourPhysicalComposition,
@@ -85,13 +87,34 @@ export function finalFourFactoryFromOwnerEnvironment():
       !context.stateRoot.toLowerCase().startsWith("e:\\")) {
       throw new Error("V3 issuer, host and state isolation requirements not met");
     }
+    // Resolve the one authoritative, owner-hashed binding BEFORE allocating
+    // any physical relay or OAuth execution ports. The lower-level bootstrap
+    // performs the complete strict schema validation of this same byte stream.
+    const bindingBytes=await readFile(binding);
+    if(!bindingBytes.length||bindingBytes.length>32768||
+      sha256(bindingBytes)!==bindingHash){
+      throw new Error("immutable final-four physical binding hash mismatch");
+    }
+    const approvedBinding=JSON.parse(bindingBytes.toString("utf8")) as V3FinalFourBindingConfig;
+    if(approvedBinding.schema!=="radlina.v3.final-four-production-binding/v1"){
+      throw new Error("unexpected final-four binding contract");
+    }
     const bytes=await readFile(signedPolicyPath);
-    const {sha256}=await import("../../utils/json.js");
-    if(bytes.length>16384||sha256(bytes)!==macPolicyHash)
+    if(!bytes.length||bytes.length>16384||sha256(bytes)!==macPolicyHash)
       throw new Error("explicit owner-approved Mac capability policy hash changed");
     const signedMacPolicy=requireOwnerApprovedMacOperatorPolicy(
       JSON.parse(bytes.toString("utf8")),
     );
+    const fingerprint=(publicPem:string)=>sha256(
+      createPublicKey(publicPem).export({type:"spki",format:"der"}),
+    );
+    if(approvedBinding.macDeviceFingerprint!==signedMacPolicy.macPublicKeyFingerprint||
+      approvedBinding.windowsTailnetNodeHash!==signedMacPolicy.windowsTailnetNodeHash||
+      fingerprint(approvedBinding.ownerPublicKeyPem)!==fingerprint(signedMacPolicy.ownerPublicKeyPem)||
+      approvedBinding.ownerOAuthClientPolicyPath.toLowerCase().includes("\\v2\\")||
+      !path.win32.isAbsolute(approvedBinding.ownerOAuthClientPolicyPath)){
+      throw new Error("Mac, owner, Tailnet and native ChatGPT binding are not one signed trust domain");
+    }
     const token=await privateSecret("RADLINA_V3_S03_WRITER_TOKEN_FILE","utf8",2048);
     const hmac=await privateSecret("RADLINA_V3_S03_HMAC_DPAPI_FILE","dpapi",4096);
     try{
@@ -99,6 +122,7 @@ export function finalFourFactoryFromOwnerEnvironment():
         configPath:binding,
         configFileSha256:bindingHash,
         stateDirectory:context.stateRoot,
+        registry:context.registry,
         signedMacPolicy,
         s03WriterToken:token.toString("utf8"),
         s03HmacKeyBase64:hmac.toString("base64"),
