@@ -41,10 +41,43 @@ $signer=Join-Path $release 'dist\scripts\operations\v3-owner-interactive-cycle.j
 foreach ($file in @($operator,$fleet,$signer)) {
   if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "V3 agent missing: $file" }
 }
+# Task actions MUST NOT pin their JS entrypoint to the initial release.
+# Only the owner-installed, V3-only launcher has a stable path; it resolves
+# the verified active release from RadlinaV3OAuthBeta.xml on every cycle.
+$supervisor='E:\radlina-v3-runtime\supervisor'
+$sourceLauncher=Join-Path $release 'scripts\operations\v3-final4-windows-task-launch.ps1'
+$launcher=Join-Path $supervisor 'v3-final4-windows-task-launch.ps1'
+if (-not (Test-Path -LiteralPath $sourceLauncher -PathType Leaf)) {
+  throw 'Version-safe V3 Windows task launcher not staged'
+}
+# Fail before making any filesystem/ACL changes when an existing scheduled
+# task could require an owner-authorized migration instead of replacement.
+foreach ($taskName in @('RadlinaV3OwnerSigning','RadlinaV3WindowsRecipient','RadlinaV3WindowsFleet')) {
+  if (Get-ScheduledTask -TaskName $taskName -TaskPath '\RadlinaV3\' -ErrorAction SilentlyContinue) {
+    throw ('Existing V3 task requires explicit version-safe migration: '+$taskName)
+  }
+}
+New-Item -Path $supervisor -ItemType Directory -Force | Out-Null
+if ((Get-Item -LiteralPath $supervisor).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) {
+  throw 'V3 supervisor cannot be a symlink'
+}
+$aclExe=Join-Path $env:WINDIR 'System32\icacls.exe'
+& $aclExe $supervisor '/inheritance:r' '/grant:r' 'LAPTOP-13QINEIF\Radlina:(OI)(CI)F' 'BUILTIN\Administrators:(OI)(CI)F' 'NT AUTHORITY\SYSTEM:(OI)(CI)F' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'Unable to protect V3 supervisor directory ACL' }
+if (Test-Path -LiteralPath $launcher -PathType Leaf) {
+  if ((Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash.ToLowerInvariant() -ne
+      (Get-FileHash -LiteralPath $sourceLauncher -Algorithm SHA256).Hash.ToLowerInvariant()) {
+    throw 'Existing protected V3 launcher changed: explicit owner migration required'
+  }
+} elseif (-not (Test-Path -LiteralPath $launcher)) {
+  Copy-Item -LiteralPath $sourceLauncher -Destination $launcher -ErrorAction Stop
+} else {
+  throw 'Unexpected V3 launcher filesystem object'
+}
 $tasks=@(
-  [pscustomobject]@{Name='RadlinaV3OwnerSigning';Script=$signer;Prefix=''},
-  [pscustomobject]@{Name='RadlinaV3WindowsRecipient';Script=$operator;Prefix='$env:RADLINA_V3_WINDOWS_OWNER_OPERATOR=''1''; '},
-  [pscustomobject]@{Name='RadlinaV3WindowsFleet';Script=$fleet;Prefix=('$env:RADLINA_V3_FLEET_SUPERVISOR=''1''; $env:RADLINA_V3_FINAL4_CONFIG_PATH='''+$config+'''; $env:RADLINA_V3_FINAL4_CONFIG_SHA256='''+$FinalFourConfigSha256+'''; ')}
+  [pscustomobject]@{Name='RadlinaV3OwnerSigning';Role='OwnerSigning'},
+  [pscustomobject]@{Name='RadlinaV3WindowsRecipient';Role='WindowsRecipient'},
+  [pscustomobject]@{Name='RadlinaV3WindowsFleet';Role='WindowsFleet'}
 )
 foreach ($task in $tasks) {
   if (Get-ScheduledTask -TaskName $task.Name -TaskPath '\RadlinaV3\' -ErrorAction SilentlyContinue) {
@@ -55,9 +88,8 @@ $principal=New-ScheduledTaskPrincipal -UserId 'LAPTOP-13QINEIF\Radlina' -LogonTy
 $trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 3650)
 $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -StartWhenAvailable:$false -MultipleInstances IgnoreNew
 foreach ($task in $tasks) {
-  $command=$task.Prefix + "& '" + $node + "' '" + $task.Script + "'"
-  $argument='-NoProfile -NonInteractive -Command "' + $command + '"'
-  $action=New-ScheduledTaskAction -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -Argument $argument -WorkingDirectory $release
+  $argument='-NoProfile -NonInteractive -File "'+$launcher+'" -Role '+$task.Role+' -FinalFourConfigFile "'+$config+'" -FinalFourConfigSha256 '+$FinalFourConfigSha256
+  $action=New-ScheduledTaskAction -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -Argument $argument -WorkingDirectory $supervisor
   Register-ScheduledTask -TaskName $task.Name -TaskPath '\RadlinaV3\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings | Out-Null
 }
 Write-Output 'V3_WINDOWS_FINAL4_INTERACTIVE_TASKS_INSTALLED'
