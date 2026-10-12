@@ -50,6 +50,15 @@ async function execute(program:string,args:string[]):Promise<string>{
     fail("V3 target supervisor native service action failed; reconcile uncertain outcome");
   }
 }
+async function awaitWindowsV3Service(expected:"STOPPED"|"RUNNING"):Promise<void>{
+  for(let attempt=0;attempt<24;attempt++){
+    const status=await execute("C:\\Windows\\System32\\sc.exe",["query","RadlinaV3OAuthBeta"]);
+    const match=/STATE\s*:\s*(\d+)\s+(STOPPED|RUNNING|STOP_PENDING|START_PENDING)/u.exec(status);
+    if(match?.[2]===expected)return;
+    await new Promise<void>(resolve=>setTimeout(resolve,500));
+  }
+  fail("exact V3 service state did not reach "+expected);
+}
 export class WindowsV3NativeReleaseHost implements LocalV3ReleaseHost {
   readonly deviceId="windows-main" as const;
   readonly dedicatedV3ReleaseRoot="E:\\radlina-v3-runtime\\releases";
@@ -89,15 +98,35 @@ export class WindowsV3NativeReleaseHost implements LocalV3ReleaseHost {
       path.win32.normalize(previous).toLowerCase())
       fail("Windows release XML CAS violated");
     const newText=config.replace(matches[0][0],"<workingdirectory>"+next.directory+"</workingdirectory>");
-    const temp=this.xml+"."+randomUUID()+".pending";
-    // Independent supervisor (not V3 OAuth process) controls service lifecycle.
+    const operationId=randomUUID();
+    const temp=this.xml+"."+operationId+".pending";
+    // Local restoration is bounded to this explicitly approved V3 service;
+    // a failed restart never destroys its last known-good configuration.
+    const backup=this.xml+"."+expectedPreviousHash+"."+operationId+".f01-backup.xml";
     await writeFile(temp,newText,{flag:"wx"});
     await execute("C:\\Windows\\System32\\sc.exe",["stop","RadlinaV3OAuthBeta"]);
-    // Preserve exact old XML with a durable rollback file; no destructive reset.
-    const backup=this.xml+"."+expectedPreviousHash+".f01-pre-switch.xml";
+    await awaitWindowsV3Service("STOPPED");
     await rename(this.xml,backup);
-    await rename(temp,this.xml);
-    await execute("C:\\Windows\\System32\\sc.exe",["start","RadlinaV3OAuthBeta"]);
+    let movedCandidate=false;
+    try {
+      await rename(temp,this.xml);
+      movedCandidate=true;
+      await execute("C:\\Windows\\System32\\sc.exe",["start","RadlinaV3OAuthBeta"]);
+      await awaitWindowsV3Service("RUNNING");
+    } catch {
+      // Keep the failed candidate as forensic evidence, do not delete/clean it.
+      if(movedCandidate){
+        await rename(this.xml,this.xml+"."+operationId+".failed-activation.xml");
+      }
+      await rename(backup,this.xml);
+      try {
+        await execute("C:\\Windows\\System32\\sc.exe",["start","RadlinaV3OAuthBeta"]);
+        await awaitWindowsV3Service("RUNNING");
+      } catch {
+        fail("V3 failed restart, previous config restored but service requires manual recovery");
+      }
+      fail("V3 activation failed; exact previous release configuration restored");
+    }
   }
   async verifyActiveRelease(manifest:string):Promise<{
     health:"healthy"|"degraded"|"unhealthy"|"unknown";
@@ -131,9 +160,13 @@ export class MacV3NativeReleaseHost implements LocalV3ReleaseHost {
     const xml=await readFile(this.plist,"utf8");
     if(!xml.includes("<string>"+this.label+"</string>")||
       xml.includes("com.radlina.remote-mcp.v2"))fail("exact Mac V3 LaunchAgent label required");
-    const parts=[...xml.matchAll(/<string>([^<]+\/releases\/[a-f0-9]{64})<\/string>/gu)];
+    const parts=[...xml.matchAll(
+      /<key>RADLINA_V3_RELEASE_ROOT<\/key>\s*<string>([^<]+\/releases\/[a-f0-9]{64})<\/string>/gu
+    )];
     if(parts.length!==1||!parts[0]?.[1])fail("unique Mac V3 release pointer required");
-    return await safeReleaseDir(this.dedicatedV3ReleaseRoot,parts[0][1]);
+    const escaped=parts[0][1];
+    const decoded=escaped.replace(/&amp;/gu,"&").replace(/&lt;/gu,"<").replace(/&gt;/gu,">");
+    return await safeReleaseDir(this.dedicatedV3ReleaseRoot,decoded);
   }
   async verifyStagedManifest(manifest:string):Promise<boolean>{
     try{await exactRelease(this.dedicatedV3ReleaseRoot,manifest);return true;}
@@ -149,19 +182,41 @@ export class MacV3NativeReleaseHost implements LocalV3ReleaseHost {
     const next=await exactRelease(this.dedicatedV3ReleaseRoot,manifest);
     const current=await this.configuredDir();
     const oldXml=await readFile(this.plist,"utf8");
-    const expected="<string>"+current+"</string>";
-    if(oldXml.split(expected).length!==2)
-      fail("Mac LaunchAgent exact release pointer changed");
-    const replacement=oldXml.replace(expected,"<string>"+next.directory+"</string>");
-    const temp=this.plist+"."+randomUUID()+".pending";
+    const encodeXml=(value:string)=>value.replace(/&/gu,"&amp;")
+      .replace(/</gu,"&lt;").replace(/>/gu,"&gt;");
+    const currentXml=encodeXml(current);
+    const nextXml=encodeXml(next.directory);
+    // The launchd command has two release-scoped arguments (tsx and the
+    // executable entrypoint) plus one environment release pointer.
+    const occurrences=oldXml.split(currentXml).length-1;
+    if(occurrences!==3)
+      fail("Mac V3 LaunchAgent executable and environment release pointers diverged");
+    const replacement=oldXml.split(currentXml).join(nextXml);
+    const operationId=randomUUID();
+    const temp=this.plist+"."+operationId+".pending";
     await writeFile(temp,replacement,{flag:"wx",mode:0o600});
     const domain="gui/"+String(process.getuid?.()??-1);
     if(domain.endsWith("/-1"))fail("logged-in Mac GUI session required");
     await execute("/bin/launchctl",["bootout",domain+"/"+this.label]);
-    const backup=this.plist+"."+previousHash+".f01-pre-switch.plist";
+    const backup=this.plist+"."+previousHash+"."+operationId+".f01-backup.plist";
     await rename(this.plist,backup);
-    await rename(temp,this.plist);
-    await execute("/bin/launchctl",["bootstrap",domain,this.plist]);
+    let movedCandidate=false;
+    try {
+      await rename(temp,this.plist);
+      movedCandidate=true;
+      await execute("/bin/launchctl",["bootstrap",domain,this.plist]);
+    } catch {
+      if(movedCandidate){
+        await rename(this.plist,this.plist+"."+operationId+".failed-activation.plist");
+      }
+      await rename(backup,this.plist);
+      try {
+        await execute("/bin/launchctl",["bootstrap",domain,this.plist]);
+      } catch {
+        fail("Mac V3 restore pointer persisted; LaunchAgent requires manual recovery");
+      }
+      fail("Mac V3 activation failed; previously approved LaunchAgent restored");
+    }
   }
   async verifyActiveRelease(manifest:string):Promise<{
     health:"healthy"|"degraded"|"unhealthy"|"unknown";
