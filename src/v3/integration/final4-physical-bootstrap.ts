@@ -93,111 +93,125 @@ export function createV3FinalFourPhysicalComposition(input:{
   }
   const config=configSchema.parse(JSON.parse(raw.toString("utf8")));
   const hmacKey=Buffer.from(input.s03HmacKeyBase64,"base64");
-  if(hmacKey.length<32||input.s03WriterToken.length<32)
+  if(hmacKey.length<32||input.s03WriterToken.length<32){
+    hmacKey.fill(0);
     throw new V3PhysicalPortsNotConfigured("independently provisioned S03 secrets required");
+  }
   const state=input.stateDirectory;
   const registry=input.registry;
   // The V3 gateway controls this connection and remains the only P03 registry
   // owner for heartbeat admission, authenticated tools and physical relays.
-  const peer={
-    observeExactTailnetNodeHash:(deviceId:"windows-main"|"macbook-main")=>
-      deviceId==="macbook-main"?observeLiveMacTailnetPeer():windowsNodeHash(),
+  // Constructor rollback is mandatory: a failed later port must never leave
+  // earlier SQLite connections open or an S03 signing key in memory.
+  const created:Array<{close():void}>=[];
+  let closed=false;
+  const close=()=>{
+    if(closed)return;
+    closed=true;
+    for(const resource of [...created].reverse()){
+      try{resource.close();}catch{/* Isolate cleanup errors to release all ports. */}
+    }
+    hmacKey.fill(0);
   };
-  const physical=new V3PhysicalP03Reader(
-    registry,peer,config.windowsDeviceFingerprint,config.macDeviceFingerprint,
-    input.signedMacPolicy,
-  );
-  const origins=new PinnedNativeV3OwnerBinder(
-    config.ownerOAuthClientPolicyPath,physical,config.ownerOAuthClientPolicyHash,
-    path.join(state,"final4","owner-origins.sqlite3"),
-  );
-  const physicalSession=new I01ActualP03SessionAuthority(
-    registry,path.join(state,"final4","p03-sessions.sqlite3"),peer,
-  );
-  const crypt=new I01WindowsDpapiSealer();
-  const consent=new SqliteCrossDeviceConsentAuthority(
-    path.join(state,"final4","s02e-consent.sqlite3"),new I01P03ConsentTrust(registry),
-  );
-  const s02e=new I01S02EConsentController(consent,physicalSession,physical,origins);
-  const outbox=new I01DurableSealedOutbox(
-    path.join(state,"final4","i01-relay.sqlite3"),crypt,physicalSession,
-  );
-  const mailbox=new I01SqliteTargetLocalConsentMailbox(
-    path.join(state,"final4","target-local-consent.sqlite3"),
-    physicalSession,physical,
-  );
-  const fleetTransport=new F01SealedFleetTransport(
-    path.join(state,"final4","fleet-relay.sqlite3"),crypt,physicalSession,
-  );
-  const fleetApprovals=new F01SignedReleaseConsentMailbox(
-    path.join(state,"final4","fleet-recipient-consent.sqlite3"),physicalSession,physical,
-  );
-  const ownerSigner=new V3OwnerProtectedSigningBroker(
-    path.join(state,"final4","owner-signing.sqlite3"),
-  );
-  const external=new S03ExternalAuditClient(
-    config.s03.endpoint,input.s03WriterToken,hmacKey,
-    config.s03.witnessPublicKeyPem,config.s03.witnessFingerprint,
-  );
-  const dispatchJournal=new I01DurableDispatchJournal(
-    path.join(state,"final4","i01-intents.sqlite3"),
-  );
-  const dispatch=new I01ConsentAndAuditDispatcher(
-    dispatchJournal,
-    physical,origins,origins,consent,mailbox,ownerSigner,outbox,
-    new HmacDistributedAuditSigner(hmacKey),external,
-  );
-  const fleetStore=new SqliteFleetStore(path.join(state,"final4","fleet-plans.sqlite3"));
-  const fleet=new V3PhysicalFleetOrchestrator({
-    registry,store:fleetStore,
-    owner:{
-      assertOwner:async(subject)=>{
-        if(!subject||!origins.requireNativeV3Client)throw Error("physical fleet owner unbound");
-        // Fleet plan ownership is checked independently by native MCP OAuth binder.
-        if(subject!==JSON.parse(readFileSync(config.ownerOAuthClientPolicyPath,"utf8")).ownerSubject)
-          throw Error("physical V3 owner subject mismatch");
-      },
-    },
-    consent:fleetApprovals,
-    recipientLocal:fleetApprovals,
-    identities:{
-      requireFreshTrusted:(id:string)=>{
-        const d=physical.resolve(id,"device.health");
-        return {
-          deviceId:d.deviceId,agentInstanceId:d.agentInstanceId,
-          publicKeyPem:d.devicePublicKeyPem,signedHeartbeatFresh:true as const,
-        };
-      },
-    },
-    protectedSigner:ownerSigner,
-    physicalTransport:fleetTransport,
-    externalAudit:external,
-    isolatedStateRoot:path.join(state,"final4"),
-  });
-  const acceptance=new V3IndependentPhysicalAcceptanceLedger(
-    path.join(state,"final4","acceptance.sqlite3"),
-    config.ownerPublicKeyPem,config.independentReviewerPublicKeyPem,
-  );
-  const objects=[
-    origins,physicalSession,consent,outbox,mailbox,dispatchJournal,
-    fleetTransport,fleetApprovals,ownerSigner,fleetStore,acceptance,
-  ];
-  // The shared registry belongs to the gateway and must be closed exactly
-  // once by gateway shutdown, AFTER the physical ports are released.
-  return{
-    finalFour:{
-      authenticatedPlugin:origins,
-      execution:dispatch,
-      fleet,
-      acceptance,
-      s02e,
-    },
-    relay:{outbox,consent:mailbox,s02e,fleet:fleetTransport,fleetApprovals},
-    close:()=>{
-      for(const object of [...objects].reverse()){
-        try{object.close();}catch{/* Continue closing isolated resources. */}
-      }
-      hmacKey.fill(0);
-    },
+  const own=<T extends {close():void}>(resource:T):T=>{
+    created.push(resource);
+    return resource;
   };
+  try{
+    const peer={
+      observeExactTailnetNodeHash:(deviceId:"windows-main"|"macbook-main")=>
+        deviceId==="macbook-main"?observeLiveMacTailnetPeer():windowsNodeHash(),
+    };
+    const physical=new V3PhysicalP03Reader(
+      registry,peer,config.windowsDeviceFingerprint,config.macDeviceFingerprint,
+      input.signedMacPolicy,
+    );
+    const origins=own(new PinnedNativeV3OwnerBinder(
+      config.ownerOAuthClientPolicyPath,physical,config.ownerOAuthClientPolicyHash,
+      path.join(state,"final4","owner-origins.sqlite3"),
+    ));
+    const physicalSession=own(new I01ActualP03SessionAuthority(
+      registry,path.join(state,"final4","p03-sessions.sqlite3"),peer,
+    ));
+    const crypt=new I01WindowsDpapiSealer();
+    const consent=own(new SqliteCrossDeviceConsentAuthority(
+      path.join(state,"final4","s02e-consent.sqlite3"),new I01P03ConsentTrust(registry),
+    ));
+    const s02e=new I01S02EConsentController(consent,physicalSession,physical,origins);
+    const outbox=own(new I01DurableSealedOutbox(
+      path.join(state,"final4","i01-relay.sqlite3"),crypt,physicalSession,
+    ));
+    const mailbox=own(new I01SqliteTargetLocalConsentMailbox(
+      path.join(state,"final4","target-local-consent.sqlite3"),
+      physicalSession,physical,
+    ));
+    const fleetTransport=own(new F01SealedFleetTransport(
+      path.join(state,"final4","fleet-relay.sqlite3"),crypt,physicalSession,
+    ));
+    const fleetApprovals=own(new F01SignedReleaseConsentMailbox(
+      path.join(state,"final4","fleet-recipient-consent.sqlite3"),physicalSession,physical,
+    ));
+    const ownerSigner=own(new V3OwnerProtectedSigningBroker(
+      path.join(state,"final4","owner-signing.sqlite3"),
+    ));
+    const external=new S03ExternalAuditClient(
+      config.s03.endpoint,input.s03WriterToken,hmacKey,
+      config.s03.witnessPublicKeyPem,config.s03.witnessFingerprint,
+    );
+    const dispatchJournal=own(new I01DurableDispatchJournal(
+      path.join(state,"final4","i01-intents.sqlite3"),
+    ));
+    const dispatch=new I01ConsentAndAuditDispatcher(
+      dispatchJournal,
+      physical,origins,origins,consent,mailbox,ownerSigner,outbox,
+      new HmacDistributedAuditSigner(hmacKey),external,
+    );
+    const fleetStore=own(new SqliteFleetStore(path.join(state,"final4","fleet-plans.sqlite3")));
+    const fleet=new V3PhysicalFleetOrchestrator({
+      registry,store:fleetStore,
+      owner:{
+        assertOwner:async(subject)=>{
+          if(!subject||!origins.requireNativeV3Client)throw Error("physical fleet owner unbound");
+          // Fleet plan ownership is checked independently by native MCP OAuth binder.
+          if(subject!==JSON.parse(readFileSync(config.ownerOAuthClientPolicyPath,"utf8")).ownerSubject)
+            throw Error("physical V3 owner subject mismatch");
+        },
+      },
+      consent:fleetApprovals,
+      recipientLocal:fleetApprovals,
+      identities:{
+        requireFreshTrusted:(id:string)=>{
+          const d=physical.resolve(id,"device.health");
+          return {
+            deviceId:d.deviceId,agentInstanceId:d.agentInstanceId,
+            publicKeyPem:d.devicePublicKeyPem,signedHeartbeatFresh:true as const,
+          };
+        },
+      },
+      protectedSigner:ownerSigner,
+      physicalTransport:fleetTransport,
+      externalAudit:external,
+      isolatedStateRoot:path.join(state,"final4"),
+    });
+    const acceptance=own(new V3IndependentPhysicalAcceptanceLedger(
+      path.join(state,"final4","acceptance.sqlite3"),
+      config.ownerPublicKeyPem,config.independentReviewerPublicKeyPem,
+    ));
+    // The shared registry belongs to the gateway and must be closed exactly
+    // once by gateway shutdown, AFTER the physical ports are released.
+    return{
+      finalFour:{
+        authenticatedPlugin:origins,
+        execution:dispatch,
+        fleet,
+        acceptance,
+        s02e,
+      },
+      relay:{outbox,consent:mailbox,s02e,fleet:fleetTransport,fleetApprovals},
+      close,
+    };
+  }catch(error){
+    close();
+    throw error;
+  }
 }
