@@ -52,6 +52,7 @@
     "scripts/operations/v3-p03-mac-signed-heartbeat-20261012.ts",
     "scripts/acceptance/v3-windows-identity-negatives.ts",
     "scripts/operations/v3-final4-native-switch-reconcile.ts",
+    "scripts/operations/v3-final4-stage-windows-release.ts",
     "scripts/operations/v3-final4-native-switch-status.ts",
     "scripts/operations/v3-final4-owner-policies.ts",
     "scripts/operations/v3-mac-heartbeat-sender.ts",
