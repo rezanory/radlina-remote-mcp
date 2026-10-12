@@ -105,6 +105,47 @@ export class I01TargetReplayLedger{
       "response_json TEXT NOT NULL,response_sha256 TEXT NOT NULL,"+
       "created_at_ms INTEGER NOT NULL);"
     );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_i01_target_delivery_leases("+
+      "request_id TEXT PRIMARY KEY,lease_id TEXT NOT NULL UNIQUE,"+
+      "reported_at_ms INTEGER);"
+    );
+  }
+  recordLease(requestId:string,leaseId:string):void{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId)||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(leaseId))
+      throw new I01TargetDenied("exact original physical lease UUID required");
+    this.db.prepare(
+      "INSERT OR IGNORE INTO v3_i01_target_delivery_leases(request_id,lease_id) VALUES(?,?)",
+    ).run(requestId,leaseId);
+    const saved=this.db.prepare(
+      "SELECT lease_id FROM v3_i01_target_delivery_leases WHERE request_id=?",
+    ).get(requestId) as {lease_id:string}|undefined;
+    if(saved?.lease_id!==leaseId)
+      throw new I01TargetDenied("different target lease replay denied");
+  }
+  nextUndelivered():{requestId:string;leaseId:string;reply:I01SignedDeviceResponse}|undefined{
+    const row=this.db.prepare(
+      "SELECT l.request_id,l.lease_id FROM v3_i01_target_delivery_leases l "+
+      "JOIN v3_i01_target_operations o ON o.request_id=l.request_id "+
+      "JOIN v3_i01_target_signed_replies r ON r.request_id=l.request_id "+
+      "WHERE l.reported_at_ms IS NULL AND o.state='completed' "+
+      "ORDER BY o.created_at_ms LIMIT 1",
+    ).get() as {request_id:string;lease_id:string}|undefined;
+    if(!row)return undefined;
+    const reply=this.getCompletedSigned(row.request_id);
+    if(!reply)throw new I01TargetDenied("original signed receipt is missing");
+    return{requestId:row.request_id,leaseId:row.lease_id,reply};
+  }
+  markReported(requestId:string):void{
+    const result=this.db.prepare(
+      "UPDATE v3_i01_target_delivery_leases SET reported_at_ms=? "+
+      "WHERE request_id=? AND reported_at_ms IS NULL",
+    ).run(Date.now(),requestId);
+    if(Number(result.changes)!==1){
+      const row=this.db.prepare("SELECT reported_at_ms FROM v3_i01_target_delivery_leases WHERE request_id=?").get(requestId) as {reported_at_ms:number|null}|undefined;
+      if(!row?.reported_at_ms)throw new I01TargetDenied("recipient report ACK not durably bound");
+    }
   }
   reserve(requestId:string,nonce:string,operationHash:string):void{
     // Unique constraints serialize duplicate arrivals in SQLite; no network retry.

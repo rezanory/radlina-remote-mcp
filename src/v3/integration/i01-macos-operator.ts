@@ -181,6 +181,16 @@ export async function runPhysicalMacOperatorOnce(policyFile:string):Promise<{
       signCanonical:async(message)=>signer.signCanonical(message),
     },grants,replays);
   try{
+    const pending=replays.nextUndelivered();
+    if(pending){
+      const recovered=await boundedPost(endpoint+"/v3/agent/report",{
+        session:signedSession(signer),leaseId:pending.leaseId,response:pending.reply,
+      });
+      if(recovered.status!==202)
+        throw Error("previous signed Mac receipt remains uncertain; native command not retried");
+      replays.markReported(pending.requestId);
+      return{status:"command",executionEnabled:false};
+    }
     const s02e=await boundedPost(endpoint+"/v3/agent/s02e-claim",{
       session:signedSession(signer),
     });
@@ -270,12 +280,14 @@ export async function runPhysicalMacOperatorOnce(policyFile:string):Promise<{
     if(!allowed.has(leased.envelope.operation.capability)) {
       throw Error("physical target did not install requested capability");
     }
+    replays.recordLease(leased.envelope.operation.requestId,leased.leaseId);
     const response=i01SignedDeviceResponseSchema.parse(await agent.receive(leased.envelope));
     const delivered=await boundedPost(endpoint+"/v3/agent/report",{
       session:signedSession(signer),
       leaseId:leased.leaseId,response,
     });
     if(delivered.status!==202)throw Error("physical operation receipt delivery uncertain");
+    replays.markReported(response.requestId);
     return{status:"command",executionEnabled:true};
   }finally{
     grants.close();

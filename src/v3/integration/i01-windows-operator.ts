@@ -78,6 +78,21 @@ export async function runWindowsI01RecipientOnce(ownerPublicKeyPem:string):Promi
       signatureBase64:agent.signExactV3Receipt(canonicalJson(claim)),
     };
   }
+  const recovery=new I01TargetReplayLedger(path.join(
+    "E:\\radlina-v3-oauth-standalone","windows-owner-agent","target-once-operations.sqlite3",
+  ));
+  try{
+    const pending=recovery.nextUndelivered();
+    if(pending){
+      const reported=await post("/v3/agent/report",{
+        session:session(),leaseId:pending.leaseId,response:pending.reply,
+      });
+      if(reported.status!==202)
+        throw Error("previous Windows signed receipt uncertain; never repeat native operation");
+      recovery.markReported(pending.requestId);
+      return"execution";
+    }
+  }finally{recovery.close();}
   const gui=new I01WindowsPhysicalApprovalDialog();
   const s02e=await post("/v3/agent/s02e-claim",{session:session()});
   if(s02e.status===200){
@@ -198,6 +213,7 @@ export async function runWindowsI01RecipientOnce(ownerPublicKeyPem:string):Promi
     signCanonical:async(payload)=>agent.signExactV3Receipt(payload),
   },grants,replay);
   try{
+    replay.recordLease(exact.envelope.operation.requestId,exact.leaseId);
     const reply=i01SignedDeviceResponseSchema.parse(
       await recipient.receive(exact.envelope),
     );
@@ -206,6 +222,7 @@ export async function runWindowsI01RecipientOnce(ownerPublicKeyPem:string):Promi
     });
     if(result.status!==202)
       throw Error("physical Windows mutation may have completed; receipt uncertain");
+    replay.markReported(reply.requestId);
     return"execution";
   }finally{grants.close();replay.close();}
 }

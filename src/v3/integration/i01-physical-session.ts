@@ -91,6 +91,28 @@ export class I01ActualP03SessionAuthority implements I01PhysicalDeviceSession {
       "INSERT INTO v3_i01_p03_session_nonces(nonce,device_id,authenticated_at_ms) VALUES(?,?,?)"
     ).run(session.nonce,session.deviceId,this.now());
   }
+  trustedDeviceReceiptKey(deviceId:string):{
+    devicePublicKeyPem:string;agentInstanceId:string;
+  }{
+    if(deviceId!=="windows-main"&&deviceId!=="macbook-main")
+      throw new I01PhysicalSessionDenied("known enrolled P03 target required");
+    const trusted=this.registry.require(deviceId);
+    const age=this.now()-Date.parse(trusted.lastSeen);
+    if(trusted.trustState!=="trusted"||trusted.status!=="online"||
+      !Number.isFinite(age)||age<0||age>120000)
+      throw new I01PhysicalSessionDenied("target P03 device liveness stale");
+    const row=this.registry.db.prepare(
+      "SELECT identity_json,device_public_key_pem FROM v3_p03_trusted_identities WHERE device_id=?",
+    ).get(deviceId) as {identity_json:string;device_public_key_pem:string}|undefined;
+    if(!row)throw new I01PhysicalSessionDenied("enrolled target signed key unavailable");
+    const identity=z.object({agentInstanceId:z.string().uuid(),
+      publicKeyFingerprint:z.string().regex(/^[a-f0-9]{64}$/u)}).passthrough().parse(
+        JSON.parse(row.identity_json),
+      );
+    if(ed25519PublicKeyFingerprint(row.device_public_key_pem)!==identity.publicKeyFingerprint)
+      throw new I01PhysicalSessionDenied("enrolled P03 target public key modified");
+    return{devicePublicKeyPem:row.device_public_key_pem,agentInstanceId:identity.agentInstanceId};
+  }
   close():void{this.db.close();}
 }
 

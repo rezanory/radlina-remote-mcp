@@ -9,7 +9,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { randomUUID } from "node:crypto";
+import { createPublicKey, randomUUID, verify } from "node:crypto";
 import { canonicalJson, sha256 } from "../../utils/json.js";
 import {
   i01SignedOwnerEnvelopeSchema,
@@ -29,6 +29,10 @@ export interface I01PhysicalDeviceSession {
   assertPhysicalAgent(input:{
     deviceId:string;nonce:string;signedAtMs:number;signatureBase64:string;
   }):Promise<void>;
+  /** Trusted P03 registry identity, never supplied by an HTTP caller. */
+  trustedDeviceReceiptKey?(deviceId:string):{
+    devicePublicKeyPem:string;agentInstanceId:string;
+  };
 }
 export type I01SignedPull = {
   deviceId:string;
@@ -151,33 +155,65 @@ export class I01DurableSealedOutbox implements I01BoundDeviceTransport {
     }
     return {leaseId,targetDeviceId:session.deviceId,envelope};
   }
+  /** Re-delivery of the SAME signed original is safe even after the lease
+   * expires; never claim or execute a new native operation on replay. */
   async deliverSignedResult(
     session:I01SignedPull,leaseId:string,response:I01SignedDeviceResponse,
   ):Promise<void>{
     if(!leaseId||!response.requestId||
       !["macbook-main","windows-main"].includes(session.deviceId)||
-      Math.abs(this.now()-session.signedAtMs)>60000){
-      throw new I01OutboxDenied("delivery requires a fresh physical signed session");
-    }
+      Math.abs(this.now()-session.signedAtMs)>60000)
+      throw new I01OutboxDenied("fresh P03-signed target delivery session required");
     await this.authenticate.assertPhysicalAgent(session);
-    const signedResult=i01SignedDeviceResponseSchema.parse(response);
-    const row=this.row(signedResult.requestId);
-    if(!row||row.device_id!==session.deviceId||row.state!=="leased"||
-      row.lease_id!==leaseId||row.expires_at_ms<=this.now())
-      throw new I01OutboxDenied("signed target receipt does not bind to active exact lease");
-    if(signedResult.receipt.resolvedDeviceId!==session.deviceId||
-      signedResult.schema!=="radlina.v3.i01.signed-device-response/v1")
-      throw new I01OutboxDenied("physical device signed result changed its target");
-    const sealed=await this.crypt.seal(Buffer.from(canonicalJson(signedResult),"utf8"));
+    const reply=i01SignedDeviceResponseSchema.parse(response);
+    const row=this.row(reply.requestId);
+    if(!row||row.device_id!==session.deviceId||row.lease_id!==leaseId||
+      !["leased","unknown","returned"].includes(row.state))
+      throw new I01OutboxDenied("original exact leased operation not found");
+    const owner=i01SignedOwnerEnvelopeSchema.parse(JSON.parse(
+      Buffer.from(await this.crypt.unseal(row.sealed_message)).toString("utf8"),
+    ));
+    if(sha256(canonicalJson(owner))!==row.operation_hash||
+      owner.operation.requestId!==reply.requestId||
+      owner.operation.targetDeviceId!==session.deviceId)
+      throw new I01OutboxDenied("recovered original owner-signed command changed");
+    const pinned=this.authenticate.trustedDeviceReceiptKey?.(session.deviceId);
+    if(!pinned)throw new I01OutboxDenied("enrolled P03 device signing key missing");
+    const receipt=reply.receipt,op=owner.operation;
+    const signedData={schema:reply.schema,requestId:reply.requestId,
+      receipt,outputSha256:reply.outputSha256};
+    const proof=Buffer.from(reply.deviceSignatureBase64,"base64");
+    if(reply.schema!=="radlina.v3.i01.signed-device-response/v1"||
+      receipt.resolvedDeviceId!==session.deviceId||
+      receipt.agentInstanceId!==pinned.agentInstanceId||
+      receipt.workflowExecutionId!==op.workflowExecutionId||
+      receipt.nodeId!==op.nodeId||receipt.attempt!==op.attempt||
+      receipt.capability!==op.capability||receipt.inputSha256!==op.inputSha256||
+      receipt.globalCorrelationId!==op.globalCorrelationId||
+      receipt.traceId!==op.traceId||
+      (reply.output===undefined?null:sha256(canonicalJson(reply.output)))!==reply.outputSha256||
+      proof.length!==64||proof.toString("base64")!==reply.deviceSignatureBase64||
+      !verify(null,Buffer.from(canonicalJson(signedData)),
+        createPublicKey(pinned.devicePublicKeyPem),proof))
+      throw new I01OutboxDenied("original P03 target-signed receipt invalid");
+    const canonical=canonicalJson(reply);
+    if(row.state==="returned"){
+      if(!row.sealed_result||
+        canonicalJson(JSON.parse(Buffer.from(await this.crypt.unseal(row.sealed_result)).toString("utf8")))!==canonical)
+        throw new I01OutboxDenied("conflicting original signed recipient receipt");
+      return; // Idempotent ACK; never re-execute a native capability.
+    }
+    const sealed=await this.crypt.seal(Buffer.from(canonical,"utf8"));
     if(sealed.byteLength>262144)
-      throw new I01OutboxDenied("sealed result exceeds bounded transport");
+      throw new I01OutboxDenied("sealed exact recipient receipt exceeds bound");
     const written=this.db.prepare(
       "UPDATE v3_i01_outbox SET state='returned',sealed_result=?,completed_at_ms=? "+
-      "WHERE request_id=? AND lease_id=? AND state='leased'"
-    ).run(sealed,this.now(),response.requestId,leaseId);
+      "WHERE request_id=? AND lease_id=? AND state IN ('leased','unknown') "+
+      "AND sealed_result IS NULL",
+    ).run(sealed,this.now(),reply.requestId,leaseId);
     if(Number(written.changes)!==1)
-      throw new I01OutboxDenied("durable physical receipt CAS mismatch");
-    // Controller verifies P03 response signature and S03 anchor independently.
+      throw new I01OutboxDenied("original signed recipient result CAS conflicted");
+    // S03/owner manual reconcilers must still independently anchor the result.
   }
   close():void{this.db.close();}
 }
