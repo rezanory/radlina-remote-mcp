@@ -2,7 +2,7 @@
  * F01 sealed two-device fleet operation queue. Separate from I01 task queue:
  * a fleet command is not a generic process execution and is never retried.
  */
-import { randomUUID } from "node:crypto";
+import { createPublicKey, randomUUID, verify } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -101,25 +101,50 @@ export class F01SealedFleetTransport implements F01PhysicalTransport {
       throw new F01FleetQueueDenied("fleet command target or sealed input changed");
     return{leaseId,command};
   }
+  /** Idempotent receipt re-delivery of the ORIGINAL signed fleet result.
+   * Never retries or restages native fleet commands after expiry. */
   async report(session:I01SignedPull,leaseId:string,reply:F01SignedReply<unknown>):Promise<void>{
     await this.session.assertPhysicalAgent(session);
     const row=this.row(reply.operationId);
     if(!row||row.device_id!==session.deviceId||
-      row.state!=="leased"||row.lease_id!==leaseId||
-      row.expires_at_ms<=this.now()||
+      !["leased","uncertain","returned"].includes(row.state)||row.lease_id!==leaseId||
       reply.schema!=="radlina.v3.f01.signed-fleet-reply/v1"||
-      reply.deviceId!==session.deviceId||
-      Buffer.from(reply.deviceSignatureBase64??"","base64").length!==64)
-      throw new F01FleetQueueDenied("physical signed fleet reply does not bind exact lease");
-    const bytes=await this.crypt.seal(Buffer.from(canonicalJson(reply),"utf8"));
-    if(bytes.length>262144)throw new F01FleetQueueDenied("fleet reply too large");
-    const update=this.db.prepare(
+      reply.deviceId!==session.deviceId)
+      throw new F01FleetQueueDenied("original physical F01 lease mismatch");
+    const pinned=this.session.trustedDeviceReceiptKey?.(session.deviceId);
+    if(!pinned||reply.agentInstanceId!==pinned.agentInstanceId)
+      throw new F01FleetQueueDenied("enrolled target P03 signer unavailable");
+    const issued=f01SignedCommandSchema.parse(JSON.parse(
+      Buffer.from(await this.crypt.unseal(row.sealed_command)).toString("utf8"),
+    ));
+    if(issued.command.operationId!==reply.operationId||
+      issued.command.deviceId!==session.deviceId||
+      sha256(canonicalJson(issued))!==row.command_hash)
+      throw new F01FleetQueueDenied("original sealed owner release command changed");
+    const signedData={schema:reply.schema,operationId:reply.operationId,
+      deviceId:reply.deviceId,agentInstanceId:reply.agentInstanceId,payload:reply.payload};
+    const proof=Buffer.from(reply.deviceSignatureBase64??"","base64");
+    if(proof.length!==64||proof.toString("base64")!==reply.deviceSignatureBase64||
+      !verify(null,Buffer.from(canonicalJson(signedData)),
+        createPublicKey(pinned.devicePublicKeyPem),proof))
+      throw new F01FleetQueueDenied("P03 signed original F01 receipt invalid");
+    const payload=canonicalJson(reply);
+    if(row.state==="returned"){
+      if(!row.sealed_reply||canonicalJson(JSON.parse(
+        Buffer.from(await this.crypt.unseal(row.sealed_reply)).toString("utf8"),
+      ))!==payload)throw new F01FleetQueueDenied("conflicting signed F01 report");
+      return; // Repeated original receipt only; no additional native action.
+    }
+    const bytes=await this.crypt.seal(Buffer.from(payload,"utf8"));
+    if(bytes.length>262144)throw new F01FleetQueueDenied("F01 signed report exceeds bound");
+    const changed=this.db.prepare(
       "UPDATE v3_f01_commands SET state='returned',sealed_reply=? "+
-      "WHERE operation_id=? AND lease_id=? AND state='leased'"
+      "WHERE operation_id=? AND lease_id=? AND state IN ('leased','uncertain') "+
+      "AND sealed_reply IS NULL",
     ).run(bytes,reply.operationId,leaseId);
-    if(Number(update.changes)!==1)
-      throw new F01FleetQueueDenied("fleet report CAS failed");
-    // Fleet controller must still validate device signature and S03 witness ACK.
+    if(Number(changed.changes)!==1)
+      throw new F01FleetQueueDenied("original physical F01 receipt durable CAS failed");
+    // F01 controller still independently verifies owner command and S03 anchor.
   }
   close():void{this.db.close();}
 }

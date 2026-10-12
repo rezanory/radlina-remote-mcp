@@ -70,6 +70,49 @@ export class F01LocalReplayStore {
       "operation_id TEXT PRIMARY KEY REFERENCES v3_f01_target_switches(operation_id),"+
       "response_json TEXT NOT NULL,response_sha256 TEXT NOT NULL,created_at_ms INTEGER NOT NULL);"
     );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_f01_target_delivery_leases("+
+      "operation_id TEXT PRIMARY KEY,lease_id TEXT NOT NULL UNIQUE,reported_at_ms INTEGER);"
+    );
+  }
+  recordLease(operationId:string,leaseId:string):void{
+    const check=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+    if(!check.test(operationId)||!check.test(leaseId))
+      throw new F01RecipientDenied("exact original fleet lease UUID required");
+    this.db.prepare(
+      "INSERT OR IGNORE INTO v3_f01_target_delivery_leases(operation_id,lease_id) VALUES(?,?)",
+    ).run(operationId,leaseId);
+    const saved=this.db.prepare(
+      "SELECT lease_id FROM v3_f01_target_delivery_leases WHERE operation_id=?",
+    ).get(operationId) as {lease_id:string}|undefined;
+    if(saved?.lease_id!==leaseId)
+      throw new F01RecipientDenied("different native fleet lease replay denied");
+  }
+  nextUndelivered():{operationId:string;leaseId:string;reply:F01SignedReply<NativeFleetResult>}|undefined{
+    const row=this.db.prepare(
+      "SELECT l.operation_id,l.lease_id FROM v3_f01_target_delivery_leases l "+
+      "JOIN v3_f01_target_switches o ON o.operation_id=l.operation_id "+
+      "JOIN v3_f01_target_signed_replies r ON r.operation_id=l.operation_id "+
+      "WHERE l.reported_at_ms IS NULL AND o.state='anchored' "+
+      "ORDER BY o.created_at_ms LIMIT 1",
+    ).get() as {operation_id:string;lease_id:string}|undefined;
+    if(!row)return undefined;
+    const reply=this.getAnchoredSigned(row.operation_id);
+    if(!reply)throw new F01RecipientDenied("original signed release reply missing");
+    return{operationId:row.operation_id,leaseId:row.lease_id,reply};
+  }
+  markReported(operationId:string):void{
+    const updated=this.db.prepare(
+      "UPDATE v3_f01_target_delivery_leases SET reported_at_ms=? "+
+      "WHERE operation_id=? AND reported_at_ms IS NULL",
+    ).run(Date.now(),operationId);
+    if(Number(updated.changes)!==1){
+      const saved=this.db.prepare(
+        "SELECT reported_at_ms FROM v3_f01_target_delivery_leases WHERE operation_id=?",
+      ).get(operationId) as {reported_at_ms:number|null}|undefined;
+      if(!saved?.reported_at_ms)
+        throw new F01RecipientDenied("fleet signed report acceptance not durably recorded");
+    }
   }
   reserve(command:F01PhysicalCommand):void{
     this.db.prepare(

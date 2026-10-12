@@ -82,6 +82,22 @@ export async function runPhysicalWindowsFleetOnce(config:{
       signatureBase64:device.signExactV3Receipt(canonicalJson(payload)),
     };
   };
+  // Flush only an already-escrowed P03-signed fleet receipt; never re-run sc.exe.
+  const recoveryDir="E:\\radlina-v3-oauth-standalone\\windows-owner-agent\\fleet";
+  await mkdir(recoveryDir,{recursive:true});
+  const recovery=new F01LocalReplayStore(path.join(recoveryDir,"fleet-once.sqlite3"));
+  try{
+    const pending=recovery.nextUndelivered();
+    if(pending){
+      const reported=await request("/v3/fleet/report",{
+        session:session(),leaseId:pending.leaseId,response:pending.reply,
+      });
+      if(reported.status!==202)
+        throw Error("previous P03-signed Windows fleet receipt unknown; release switch cannot retry");
+      recovery.markReported(pending.operationId);
+      return"fleet-receipt-delivered";
+    }
+  }finally{recovery.close();}
   const local=new I01WindowsPhysicalApprovalDialog();
   const consent=await request("/v3/fleet/consent-claim",{session:session()});
   if(consent.status===200){
@@ -162,12 +178,14 @@ export async function runPhysicalWindowsFleetOnce(config:{
         observer.observeExactTailnetNodeHash("macbook-main")===config.macTailnetNodeHash,
       signReceipt:async(payload:string)=>device.signExactV3Receipt(payload),
     },config.ownerPublicKeyPem,ownerPin,ownerDecision,audit,journal);
+    journal.recordLease(command.command.operationId,leaseId);
     const signed=await agent.execute(command);
     const delivered=await request("/v3/fleet/report",{
       session:session(),leaseId,response:signed,
     });
     if(delivered.status!==202)
       throw Error("physical Windows release may have completed; manual reconciliation required");
+    journal.markReported(command.command.operationId);
     return"fleet-receipt-delivered";
   }finally{audit.close();journal.close();}
 }

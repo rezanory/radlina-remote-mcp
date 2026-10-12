@@ -86,6 +86,24 @@ export async function runV3MacFleetOnce(config:{
       signatureBase64:signer.signCanonical(canonicalJson(claim)),
     };
   };
+  // Before polling fresh fleet work, deliver only an already signed,
+  // durable local result. No native release command is reissued here.
+  const fleetDir=path.join(os.homedir(),".local","share","radlina","v3-beta",
+    "macbook-main-agent","fleet");
+  await mkdir(fleetDir,{recursive:true,mode:0o700});
+  const recovery=new F01LocalReplayStore(path.join(fleetDir,"physical-release-replay.sqlite3"));
+  try{
+    const outstanding=recovery.nextUndelivered();
+    if(outstanding){
+      const recorded=await post("/v3/fleet/report",{
+        session:session(),leaseId:outstanding.leaseId,response:outstanding.reply,
+      });
+      if(recorded.status!==202)
+        throw Error("previous signed F01 Mac response unknown; never reexecute release change");
+      recovery.markReported(outstanding.operationId);
+      return"fleet-receipt-delivered";
+    }
+  }finally{recovery.close();}
   const approvalCall=await post("/v3/fleet/consent-claim",{session:session()});
   if(approvalCall.status===200){
     const parsed=approvalCall.data as {schema?:string;prompt?:Record<string,unknown>};
@@ -171,6 +189,7 @@ export async function runV3MacFleetOnce(config:{
     signReceipt:async(message:string)=>signer.signCanonical(message),
   },config.ownerPublicKeyPem,config.ownerFingerprint,approval,audit,journal);
   try{
+    journal.recordLease(command.operationId,leased.leaseId);
     const reply=await agent.execute(leased.command);
     const acknowledgement=await post("/v3/fleet/report",{
       session:session(),leaseId:leased.leaseId,response:reply,
@@ -178,6 +197,7 @@ export async function runV3MacFleetOnce(config:{
     if(acknowledgement.status!==202){
       throw Error("Mac F01 physical execution may have completed; receipt delivery unknown");
     }
+    journal.markReported(command.operationId);
     return"fleet-receipt-delivered";
   }finally{audit.close();journal.close();}
 }
