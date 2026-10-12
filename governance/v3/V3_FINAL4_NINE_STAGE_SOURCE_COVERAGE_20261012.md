@@ -9,7 +9,7 @@ All source paths relative to the repository root. Evidence denotes a source impl
 - **Agent lifecycle:** `scripts/operations/v3-mac-launchagent-install.sh`, `scripts/operations/v3-final4-mac-install.sh`. `.gitattributes` now enforces LF on operations Shell sources.
 - **Capability / identity:** `src/v3/device/p08-mac-operator-policy.ts`, `src/v3/integration/i01-macos-operator.ts`.
 - **Retry and receipts:** sender writes `heartbeat-events.jsonl`; outbound polling is launchd-owned. Signed post/receipt is fail-closed; physical acknowledgment not verified during this code-only turn.
-- **Outstanding source:** enforce a documented signed-heartbeat receipt retention and independently recoverable identity record across restart, not merely the latest JSONL line; architecture pin `x64` must be reconciled against real device before Mac runtime acceptance.
+- **P08 signed receipt persistence source completed:** `v3-mac-heartbeat-sender.ts` saves the exact signed envelope plus accepted TLS gateway response to `heartbeat-latest-ack.json`; `i01-macos-operator.ts` independently verifies enrolled-Keychain Ed25519 signature, agent instance and 120-second freshness before work. Runtime acceptance remains deferred; physical architecture pin x64 must still match the enrolled Mac.
 
 ## Stage 05 — Windows owner agent
 - **Owner-only signing:** `src/v3/security/windows-owner-signer.ts`, `src/v3/security/windows-owner-broker.ts`, `scripts/operations/v3-owner-interactive-cycle.ts`.
@@ -23,12 +23,12 @@ All source paths relative to the repository root. Evidence denotes a source impl
 - **Target-local grant:** `src/v3/integration/i01-s02e-consent.ts`, `src/v3/security/device-consent.ts`, `src/v3/integration/i01-local-consent-mailbox.ts`.
 - **Sealed owner dispatch:** `src/v3/integration/i01-secured-dispatch.ts`, `src/v3/integration/i01-sealed-outbox.ts`, `src/v3/integration/i01-agent-relay-http.ts`.
 - **Native file execution / protected receipts:** `src/v3/integration/i01-native-files.ts`, `src/v3/integration/i01-recipient-agent.ts`.
-- **Outstanding:** explicit signed reconciliation endpoint for an already-executed but undelivered I01 receipt; never make automatic execution retry the workaround.
+- **Recipient receipts now durable:** `i01-recipient-agent.ts` atomically saves the signed exact reply and completed state before HTTP delivery. Outstanding: independently authorized external re-submission/re-anchoring of the stored reply; never re-execute a completed command.
 
 ## Stage 07 — persistent idempotency and manual unknown outcome
 - SQLite command and recipient replay ledgers: `src/v3/integration/i01-secured-dispatch.ts`, `src/v3/integration/i01-recipient-agent.ts`, `src/v3/integration/i01-sealed-outbox.ts`, `src/v3/fleet/f01-sealed-transport.ts`, `src/v3/fleet/local-release-agent.ts`.
 - These sources use unique exact-request keys, compare-and-swap transitions, `unknown`/`uncertain` states and no automatic remote retry.
-- **Outstanding:** owner/reviewer signed manual recovery of unknown outcomes with durable, independently verified receipt proof.
+- **Signed native receipts now escrowed:** `i01-recipient-agent.ts` and `fleet/local-release-agent.ts` persist signed results before network acknowledgement. Remaining source: owner/reviewer verified manual export/re-anchor of original receipt, never native execution retry.
 
 ## Stage 08 — S03 independent audit witness
 - `src/v3/audit/s03-independent-witness.ts`: exact HTTPS witness URL, HMAC bearer, bounded append, pinned Ed25519 signed ACK.
