@@ -39,6 +39,7 @@
     "scripts/acceptance/v3-windows-protected-identity.ts",
     "scripts/operations/v3-owner-signing.ts",
     "scripts/operations/v3-windows-live-enrollment.ts",
+    "scripts/operations/v3-windows-signed-heartbeat.ts",
     "scripts/acceptance/v3-windows-identity-negatives.ts"
   ],
   "exclude": ["dist", "node_modules"]

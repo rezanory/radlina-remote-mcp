@@ -2,7 +2,7 @@ import { loadConfig } from "../../src/config/index.js";
 import { startV3ReadOnlyOAuthGateway } from "../../src/v3/gateway/oauth-readonly.js";
 
 /**
- * Separate V3 pre-enrollment OAuth MCP process; no write-capable tool is registered.
+ * Independent V3 OAuth MCP process; scoped local Windows file operations are opt-in.
  * Requires a real owner-controlled public HTTPS origin and isolated state directory.
  * TLS is provided by a separately validated ingress; never expose localhost directly.
  */
@@ -15,11 +15,19 @@ if (new URL(publicUrl).protocol !== "https:") {
   throw new Error("V3 public MCP ingress must have HTTPS before daemon startup");
 }
 const baseConfig = await loadConfig();
+const enabled = process.env["RADLINA_V3_LOCAL_WINDOWS_FILES"] === "1";
+const configuredRoot = process.env["RADLINA_V3_WINDOWS_FILE_ROOT"];
+if (enabled && !configuredRoot) {
+  throw new Error(
+    "explicit RADLINA_V3_WINDOWS_FILE_ROOT required when enabling V3 local file operations",
+  );
+}
 const gateway = await startV3ReadOnlyOAuthGateway({
   baseConfig,
   publicUrl,
   stateDirectory,
   port: 7344,
+  ...(enabled && configuredRoot ? { windowsFileRoot: configuredRoot } : {}),
 });
 try {
   const auth = await fetch("http://127.0.0.1:7344/auth-health", {
@@ -43,12 +51,13 @@ try {
 process.stdout.write(
   JSON.stringify({
     version: "3.0.0-alpha.1",
-    mode: "oauth-readonly-pre-enrollment",
+    mode: enabled ? "oauth-scoped-windows-files" : "oauth-readonly-pre-enrollment",
     port: gateway.port,
     loopbackEndpoint: gateway.url,
     publicOriginConfigured: new URL(publicUrl).origin,
     publicTlsVerified: false,
-    executableTools: 0,
+    executableTools: enabled ? 1 : 0,
+    localWindowsFileOperationsEnabled: enabled,
     deviceEnrollmentLive: false,
     v2Service: "UNTOUCHED",
   }) + "\n",
