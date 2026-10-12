@@ -10,6 +10,8 @@ import { McpServer, type AuthInfo } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import type { I01ConsentAndAuditDispatcher } from "../integration/i01-secured-dispatch.js";
 import type { V3FleetControlPort } from "../fleet/physical-composition.js";
+import type { I01S02EConsentController } from "../integration/i01-s02e-consent.js";
+import { canonicalJson, sha256 } from "../../utils/json.js";
 import { fleetPlanSchema } from "../fleet/contracts.js";
 import type { V3IndependentPhysicalAcceptanceLedger } from "../acceptance/ac01-final-gates.js";
 import { workflowNodeSchema } from "../workflow/contracts.js";
@@ -21,6 +23,7 @@ export interface V3NativePluginAuthenticator {
   bindOwner(input:{
     auth: AuthInfo;
     workflowExecutionId: string;
+    requestedSourceDeviceId?: string;
   }): Promise<{subject: string; sourceDeviceId: string; attested: true}>;
 }
 export interface V3FinalFourMcpPorts {
@@ -28,6 +31,7 @@ export interface V3FinalFourMcpPorts {
   execution: I01ConsentAndAuditDispatcher;
   fleet: V3FleetControlPort;
   acceptance: V3IndependentPhysicalAcceptanceLedger;
+  s02e: I01S02EConsentController;
 }
 const WRITE={readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false};
 const READ={readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false};
@@ -55,10 +59,61 @@ function denied(error:unknown){
   };
 }
 export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPorts):void{
+  server.registerTool("v3_consent_request",{
+    description:"Request bounded once-only, recipient-signed S02E consent for a specified V3 device, capability and exact input.",
+    inputSchema:z.object({
+      workflowExecutionId:z.string().uuid(),
+      targetDeviceId:z.enum(["macbook-main","windows-main"]),
+      sourceDeviceId:z.enum(["macbook-main","windows-main"]),
+      capability:z.string().regex(/^[a-z][a-z0-9.-]{0,127}$/u),
+      input:z.record(z.string(),z.unknown()),
+      idempotencyKey:z.string().uuid(),
+    }).strict(),
+    annotations:WRITE,
+  },async(input,context)=>{
+    try{
+      const auth=ownerAuth(context,"device:execute",ports);
+      const bound=await ports.authenticatedPlugin.bindOwner({
+        auth,workflowExecutionId:input.workflowExecutionId,
+        requestedSourceDeviceId:input.sourceDeviceId,
+      });
+      if(bound.sourceDeviceId!==input.sourceDeviceId||bound.sourceDeviceId===input.targetDeviceId)
+        throw Error("cross-device S02E source and target must differ");
+      const inputSha256=sha256(canonicalJson(input.input));
+      const record=await ports.s02e.create({
+        executionId:input.workflowExecutionId,
+        subject:bound.subject,targetDeviceId:input.targetDeviceId,
+        capability:input.capability,
+        resourceKey:"exact-input:"+inputSha256,inputSha256,
+        idempotencyKey:input.idempotencyKey,
+      });
+      return ok({
+        requestId:record.requestId,targetDeviceId:record.targetDeviceId,
+        state:record.state,expiresAtMs:record.requestExpiresAtMs,
+        exactInputSha256:inputSha256,
+      });
+    }catch(e){return denied(e);}
+  });
+  server.registerTool("v3_consent_status",{
+    description:"Read exact owner S02E recipient-consent decision without exposing device private keys.",
+    inputSchema:z.object({requestId:z.string().uuid(),workflowExecutionId:z.string().uuid(),
+      sourceDeviceId:z.enum(["macbook-main","windows-main"])}).strict(),
+    annotations:READ,
+  },async(input,context)=>{
+    try{
+      const auth=ownerAuth(context,"device:read",ports);
+      const owner=await ports.authenticatedPlugin.bindOwner({
+        auth,workflowExecutionId:input.workflowExecutionId,
+        requestedSourceDeviceId:input.sourceDeviceId,
+      });
+      return ok(ports.s02e.status(input.requestId,owner.subject));
+    }catch(e){return denied(e);}
+  });
   server.registerTool("v3_exact_device_execute",{
     description:"Execute a bounded exact-device V3 capability after live P03 trust, owner OAuth, independent recipient-local consent and S03 audit.",
     inputSchema:z.object({
       targetDeviceId:z.enum(["macbook-main","windows-main"]),
+      sourceDeviceId:z.enum(["macbook-main","windows-main"]),
       capability:z.string().min(1).max(128),
       input:z.record(z.string(),z.unknown()).default({}),
       idempotencyKey:z.string().uuid(),
@@ -70,8 +125,9 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
       const auth=ownerAuth(context,"device:execute",ports);
       const bound=await ports.authenticatedPlugin.bindOwner({
         auth,workflowExecutionId:input.idempotencyKey,
+        requestedSourceDeviceId:input.sourceDeviceId,
       });
-      if(!bound.attested||bound.sourceDeviceId===input.targetDeviceId)
+      if(!bound.attested||bound.sourceDeviceId!==input.sourceDeviceId||bound.sourceDeviceId===input.targetDeviceId)
         throw new Error("exact remote source must be verified and distinct");
       const node=workflowNodeSchema.parse({
         id:"direct",

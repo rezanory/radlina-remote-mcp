@@ -11,6 +11,7 @@ import {
   signedAgentHeartbeatSchema,
 } from "./owner-pinned-enrollment.js";
 import type { SqliteDeviceRegistry } from "./registry.js";
+import type { V3MacOperatorPolicy } from "./p08-mac-operator-policy.js";
 
 const macHeartbeatEnvelope = z
   .object({
@@ -27,6 +28,7 @@ export type P08HeartbeatPins = {
   macTailnetNodeHash: string;
   observeLiveMacTailnetNodeHash: () => string | undefined;
   clock?: () => number;
+  approvedOperatorPolicy?: V3MacOperatorPolicy;
 };
 
 export function observeLiveMacTailnetPeer(): string | undefined {
@@ -113,8 +115,10 @@ export class V3MacSignedHeartbeatIngress {
     if (
       heartbeat.deviceId !== "macbook-main" ||
       heartbeat.agentVersion !== "3.0.0-alpha.1" ||
-      heartbeat.capabilities.length !== 1 ||
-      heartbeat.capabilities[0] !== "device.health" ||
+      (heartbeat.capabilities.length !== 1 || heartbeat.capabilities[0] !== "device.health") &&
+      (!this.pins.approvedOperatorPolicy ||
+       this.clock() >= Date.parse(this.pins.approvedOperatorPolicy.expiresAt) ||
+       JSON.stringify(heartbeat.capabilities) !== JSON.stringify(this.pins.approvedOperatorPolicy.allowedCapabilities)) ||
       heartbeat.status !== "online"
     ) {
       throw new V3MacHeartbeatDenied("only enrolled Mac health capability is allowed");
