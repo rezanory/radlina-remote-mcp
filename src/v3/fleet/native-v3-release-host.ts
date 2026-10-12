@@ -133,7 +133,21 @@ export class MacV3NativeReleaseHost implements LocalV3ReleaseHost {
       xml.includes("com.radlina.remote-mcp.v2"))fail("exact Mac V3 LaunchAgent label required");
     const parts=[...xml.matchAll(/<string>([^<]+\/releases\/[a-f0-9]{64})<\/string>/gu)];
     if(parts.length!==1||!parts[0]?.[1])fail("unique Mac V3 release pointer required");
-    return await safeReleaseDir(this.dedicatedV3ReleaseRoot,parts[0][1]);
+    const directory=await safeReleaseDir(this.dedicatedV3ReleaseRoot,parts[0][1]);
+    // LaunchAgent has three version-pinned references: the tsx loader,
+    // the operator script and its RADLINA_V3_RELEASE_ROOT environment value.
+    // Reject mixed releases rather than silently treating one pointer as truth.
+    const required=[
+      `<string>${directory}/node_modules/tsx/dist/cli.mjs</string>`,
+      `<string>${directory}/scripts/operations/v3-mac-operator-cycle.ts</string>`,
+      `<string>${directory}</string>`,
+    ];
+    if(required.some(tag=>xml.split(tag).length!==2))
+      fail("Mac V3 LaunchAgent references must match one exact release");
+    const ids=[...xml.matchAll(/\/releases\/([a-f0-9]{64})(?=\/|<)/gu)].map(match=>match[1]);
+    if(ids.length!==3||new Set(ids).size!==1)
+      fail("mixed Mac V3 LaunchAgent release paths");
+    return directory;
   }
   async verifyStagedManifest(manifest:string):Promise<boolean>{
     try{await exactRelease(this.dedicatedV3ReleaseRoot,manifest);return true;}
@@ -149,10 +163,24 @@ export class MacV3NativeReleaseHost implements LocalV3ReleaseHost {
     const next=await exactRelease(this.dedicatedV3ReleaseRoot,manifest);
     const current=await this.configuredDir();
     const oldXml=await readFile(this.plist,"utf8");
-    const expected="<string>"+current+"</string>";
-    if(oldXml.split(expected).length!==2)
-      fail("Mac LaunchAgent exact release pointer changed");
-    const replacement=oldXml.replace(expected,"<string>"+next.directory+"</string>");
+    const suffixes=[
+      "/node_modules/tsx/dist/cli.mjs",
+      "/scripts/operations/v3-mac-operator-cycle.ts",
+      "",
+    ];
+    let replacement=oldXml;
+    for(const suffix of suffixes){
+      const previousTag="<string>"+current+suffix+"</string>";
+      if(replacement.split(previousTag).length!==2)
+        fail("Mac LaunchAgent exact versioned entrypoint changed");
+      replacement=replacement.replace(previousTag,
+        "<string>"+next.directory+suffix+"</string>");
+    }
+    const versionReferences=[...replacement.matchAll(
+      /\/releases\/([a-f0-9]{64})(?=\/|<)/gu,
+    )].map(match=>match[1]);
+    if(versionReferences.length!==3||versionReferences.some(id=>id!==manifest))
+      fail("Mac release switch left stale or mixed entrypoints");
     const temp=this.plist+"."+randomUUID()+".pending";
     await writeFile(temp,replacement,{flag:"wx",mode:0o600});
     const domain="gui/"+String(process.getuid?.()??-1);
