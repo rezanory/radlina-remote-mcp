@@ -65,6 +65,11 @@ export class F01LocalReplayStore {
       "state TEXT NOT NULL CHECK(state IN ('pending','anchored','uncertain')),"+
       "local_receipt_hash TEXT, created_at_ms INTEGER NOT NULL);"
     );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_f01_target_signed_replies("+
+      "operation_id TEXT PRIMARY KEY REFERENCES v3_f01_target_switches(operation_id),"+
+      "response_json TEXT NOT NULL,response_sha256 TEXT NOT NULL,created_at_ms INTEGER NOT NULL);"
+    );
   }
   reserve(command:F01PhysicalCommand):void{
     this.db.prepare(
@@ -72,13 +77,38 @@ export class F01LocalReplayStore {
       " VALUES(?,?,?,'pending',?)"
     ).run(command.operationId,command.nonce,sha256(canonicalJson(command)),Date.now());
   }
-  anchored(id:string,receiptHash:string):void{
+  anchoredSigned(id:string,receiptHash:string,reply:F01SignedReply<NativeFleetResult>):void{
+    if(!/^[a-f0-9]{64}$/u.test(receiptHash)||reply.operationId!==id)
+      throw new F01RecipientDenied("exact F01 local receipt and operation id required");
+    const serialized=canonicalJson(reply);
+    if(Buffer.byteLength(serialized,"utf8")>256*1024)
+      throw new F01RecipientDenied("bounded physical fleet signed receipt required");
+    this.db.exec("BEGIN IMMEDIATE");
+    try{
+      const saved=this.db.prepare(
+        "INSERT INTO v3_f01_target_signed_replies(operation_id,response_json,response_sha256,created_at_ms) "+
+        "VALUES(?,?,?,?)",
+      ).run(id,serialized,sha256(serialized),Date.now());
+      const row=this.db.prepare(
+        "UPDATE v3_f01_target_switches SET state='anchored',local_receipt_hash=? "+
+        "WHERE operation_id=? AND state='pending'",
+      ).run(receiptHash,id);
+      if(Number(saved.changes)!==1||Number(row.changes)!==1)
+        throw new F01RecipientDenied("target switch signed receipt durable CAS conflict");
+      this.db.exec("COMMIT");
+    }catch(error){this.db.exec("ROLLBACK");throw error;}
+  }
+  /** Owner-local recovery reads signed evidence; no native service execution. */
+  getAnchoredSigned(id:string):F01SignedReply<NativeFleetResult>|undefined{
     const row=this.db.prepare(
-      "UPDATE v3_f01_target_switches SET state='anchored',local_receipt_hash=? "+
-      "WHERE operation_id=? AND state='pending'"
-    ).run(receiptHash,id);
-    if(Number(row.changes)!==1)
-      throw new F01RecipientDenied("target switch receipt commit conflict");
+      "SELECT r.response_json,r.response_sha256,o.state FROM v3_f01_target_signed_replies r "+
+      "JOIN v3_f01_target_switches o ON o.operation_id=r.operation_id "+
+      "WHERE r.operation_id=? LIMIT 1",
+    ).get(id) as {response_json:string;response_sha256:string;state:string}|undefined;
+    if(!row)return undefined;
+    if(row.state!=="anchored"||sha256(row.response_json)!==row.response_sha256)
+      throw new F01RecipientDenied("signed target fleet response integrity changed");
+    return JSON.parse(row.response_json) as F01SignedReply<NativeFleetResult>;
   }
   uncertain(id:string):void{
     this.db.prepare(
@@ -186,8 +216,9 @@ export class F01PhysicalRecipientAgent{
       const signature=await this.identity.signReceipt(canonicalJson(response));
       if(Buffer.from(signature,"base64").length!==64)
         throw new F01RecipientDenied("recipient P03 release signing key unavailable");
-      this.journal.anchored(command.operationId,localReceipt.localReceiptHash);
-      return{...response,deviceSignatureBase64:signature};
+      const signedReply:F01SignedReply<NativeFleetResult>={...response,deviceSignatureBase64:signature};
+      this.journal.anchoredSigned(command.operationId,localReceipt.localReceiptHash,signedReply);
+      return signedReply;
     }catch(error){
       this.journal.uncertain(command.operationId);
       throw error;
