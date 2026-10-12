@@ -14,6 +14,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { verifyReleaseRoot } from "../../admin/release-manifest.js";
 import type { LocalV3ReleaseHost } from "./local-release-agent.js";
+import { V3NativeSwitchJournal } from "./native-switch-journal.js";
 
 const execFile=promisify(execCallback);
 const HASH=/^[a-f0-9]{64}$/u;
@@ -89,15 +90,30 @@ export class WindowsV3NativeReleaseHost implements LocalV3ReleaseHost {
       path.win32.normalize(previous).toLowerCase())
       fail("Windows release XML CAS violated");
     const newText=config.replace(matches[0][0],"<workingdirectory>"+next.directory+"</workingdirectory>");
-    const temp=this.xml+"."+randomUUID()+".pending";
-    // Independent supervisor (not V3 OAuth process) controls service lifecycle.
-    await writeFile(temp,newText,{flag:"wx"});
-    await execute("C:\\Windows\\System32\\sc.exe",["stop","RadlinaV3OAuthBeta"]);
-    // Preserve exact old XML with a durable rollback file; no destructive reset.
-    const backup=this.xml+"."+expectedPreviousHash+".f01-pre-switch.xml";
-    await rename(this.xml,backup);
-    await rename(temp,this.xml);
-    await execute("C:\\Windows\\System32\\sc.exe",["start","RadlinaV3OAuthBeta"]);
+    const journal=new V3NativeSwitchJournal(
+      "E:\\radlina-v3-runtime\\supervisor\\native-switch.sqlite3","windows-main",
+    );
+    try{
+      const switchId=journal.begin(expectedPreviousHash,manifest);
+      try{
+        const temp=this.xml+"."+randomUUID()+".pending";
+        // Independent supervisor (not V3 OAuth process) controls lifecycle.
+        await writeFile(temp,newText,{flag:"wx"});
+        await execute("C:\\Windows\\System32\\sc.exe",["stop","RadlinaV3OAuthBeta"]);
+        journal.advance(switchId,"prepared","service_stopped");
+        // Retain old XML. A subsequent unknown outcome cannot auto-rollback.
+        const backup=this.xml+"."+expectedPreviousHash+".f01-pre-switch.xml";
+        await rename(this.xml,backup);
+        await rename(temp,this.xml);
+        journal.advance(switchId,"service_stopped","pointer_replaced");
+        journal.advance(switchId,"pointer_replaced","restart_requested");
+        await execute("C:\\Windows\\System32\\sc.exe",["start","RadlinaV3OAuthBeta"]);
+        journal.advance(switchId,"restart_requested","native_start_returned");
+      }catch(error){
+        journal.uncertain(switchId);
+        throw error;
+      }
+    }finally{journal.close();}
   }
   async verifyActiveRelease(manifest:string):Promise<{
     health:"healthy"|"degraded"|"unhealthy"|"unknown";
@@ -181,15 +197,31 @@ export class MacV3NativeReleaseHost implements LocalV3ReleaseHost {
     )].map(match=>match[1]);
     if(versionReferences.length!==3||versionReferences.some(id=>id!==manifest))
       fail("Mac release switch left stale or mixed entrypoints");
-    const temp=this.plist+"."+randomUUID()+".pending";
-    await writeFile(temp,replacement,{flag:"wx",mode:0o600});
     const domain="gui/"+String(process.getuid?.()??-1);
     if(domain.endsWith("/-1"))fail("logged-in Mac GUI session required");
-    await execute("/bin/launchctl",["bootout",domain+"/"+this.label]);
-    const backup=this.plist+"."+previousHash+".f01-pre-switch.plist";
-    await rename(this.plist,backup);
-    await rename(temp,this.plist);
-    await execute("/bin/launchctl",["bootstrap",domain,this.plist]);
+    const journal=new V3NativeSwitchJournal(path.join(
+      os.homedir(),".local","share","radlina","v3-beta",
+      "macbook-main-agent","fleet","native-switch.sqlite3",
+    ),"macbook-main");
+    try{
+      const switchId=journal.begin(previousHash,manifest);
+      try{
+        const temp=this.plist+"."+randomUUID()+".pending";
+        await writeFile(temp,replacement,{flag:"wx",mode:0o600});
+        await execute("/bin/launchctl",["bootout",domain+"/"+this.label]);
+        journal.advance(switchId,"prepared","service_stopped");
+        const backup=this.plist+"."+previousHash+".f01-pre-switch.plist";
+        await rename(this.plist,backup);
+        await rename(temp,this.plist);
+        journal.advance(switchId,"service_stopped","pointer_replaced");
+        journal.advance(switchId,"pointer_replaced","restart_requested");
+        await execute("/bin/launchctl",["bootstrap",domain,this.plist]);
+        journal.advance(switchId,"restart_requested","native_start_returned");
+      }catch(error){
+        journal.uncertain(switchId);
+        throw error;
+      }
+    }finally{journal.close();}
   }
   async verifyActiveRelease(manifest:string):Promise<{
     health:"healthy"|"degraded"|"unhealthy"|"unknown";
