@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { loadConfig } from "../../src/config/index.js";
 import { observeLiveMacTailnetPeer } from "../../src/v3/device/mac-heartbeat-ingress.js";
+import { requireOwnerApprovedMacOperatorPolicy } from "../../src/v3/device/p08-mac-operator-policy.js";
+import { finalFourFactoryFromOwnerEnvironment } from "../../src/v3/control-plane/v3-environment-factory.js";
 import { startV3ReadOnlyOAuthGateway } from "../../src/v3/gateway/oauth-readonly.js";
 
 /**
@@ -43,12 +45,33 @@ if (
 ) {
   throw new Error("V3 mac heartbeat requires exact independently verified Windows owner pin");
 }
-const gateway = await startV3ReadOnlyOAuthGateway({
+const operatorPolicyPath = process.env["RADLINA_V3_SIGNED_MAC_OPERATOR_POLICY_PATH"];
+if (operatorPolicyPath && !macOwnerPublicPin) {
+  throw new Error("Mac execution capability policy requires P03 owner-pinned heartbeat");
+}
+const approvedOperatorPolicy = operatorPolicyPath
+  ? requireOwnerApprovedMacOperatorPolicy(
+    JSON.parse(readFileSync(operatorPolicyPath, "utf8")),
+  ) : undefined;
+if (approvedOperatorPolicy && approvedOperatorPolicy.ownerPublicKeyPem !== macOwnerPublicPin?.publicKeyPem) {
+  throw new Error("Mac operator capability policy must bind exact P03 owner public key");
+}
+const finalFourEnabled=process.env["RADLINA_V3_FINAL4_ENABLE"]==="1";
+if(finalFourEnabled&&!approvedOperatorPolicy){
+  throw new Error("V3 final-four requires the existing signed Mac P03 operator policy");
+}
+const finalFourFactory=finalFourEnabled
+  ? finalFourFactoryFromOwnerEnvironment()
+  : undefined;
+let gateway:Awaited<ReturnType<typeof startV3ReadOnlyOAuthGateway>>;
+try {
+  gateway=await startV3ReadOnlyOAuthGateway({
   baseConfig,
   publicUrl,
   stateDirectory,
   port: 7344,
   ...(enabled && configuredRoot ? { windowsFileRoot: configuredRoot } : {}),
+  ...(finalFourFactory ? { finalFourFactory } : {}),
   ...(macOwnerPublicPin
     ? {
         macHeartbeatPins: {
@@ -58,10 +81,14 @@ const gateway = await startV3ReadOnlyOAuthGateway({
             "f2c2e93ff120fbc5122cbb6b5a0b461a072f54bd8d226368c858fd0bd17037ea",
           macTailnetNodeHash: "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c",
           observeLiveMacTailnetNodeHash: observeLiveMacTailnetPeer,
+      ...(approvedOperatorPolicy ? { approvedOperatorPolicy } : {}),
         },
       }
     : {}),
-});
+  });
+} catch(error) {
+  throw error;
+}
 try {
   const auth = await fetch("http://127.0.0.1:7344/auth-health", {
     signal: AbortSignal.timeout(5000),
@@ -92,6 +119,7 @@ process.stdout.write(
     executableTools: enabled ? 1 : 0,
     localWindowsFileOperationsEnabled: enabled,
     macSignedHeartbeatIngressEnabled: macHeartbeatEnabled,
+    finalFourPhysicalPortsConfigured: Boolean(finalFourFactory),
     deviceEnrollmentLive: false,
     v2Service: "UNTOUCHED",
   }) + "\n",
