@@ -128,5 +128,11 @@ for label in com.radlina.remote-mcp.v3.mac-operator \
              com.radlina.remote-mcp.v3.mac-s03-witness; do
   launchctl bootstrap "$DOMAIN" "$LAUNCH/$label.plist"
 done
+# Optional owner-authorized independent Mac S03 ingress install.
+# The separate Windows V3 tunnel, V2 and tailnet remain untouched.
+if [[ "${RADLINA_V3_S03_INSTALL_CLOUDFLARE:-0}" == "1" ]]; then
+  [[ -f "$RELEASE/scripts/operations/v3-s03-cloudflare-mac-install.sh" ]]
+  bash "$RELEASE/scripts/operations/v3-s03-cloudflare-mac-install.sh" --install
+fi
 echo "V3_MAC_FINAL4_AGENTS_INSTALLED $RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
 echo "Source installed; acceptance still requires later authorized real-world tests."
