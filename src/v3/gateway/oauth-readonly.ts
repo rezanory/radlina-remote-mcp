@@ -1,5 +1,6 @@
 import path from "node:path";
 import { mkdirSync } from "node:fs";
+import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import helmet from "helmet";
@@ -19,6 +20,11 @@ import type { AppConfig } from "../../config/schema.js";
 import { configSchema } from "../../config/schema.js";
 import { Store } from "../../persistence/store.js";
 import { SqliteDeviceRegistry } from "../device/registry.js";
+import {
+  V3MacSignedHeartbeatIngress,
+  effectiveTrustedDeviceHeartbeat,
+  type P08HeartbeatPins,
+} from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
 
 const V3_SCOPES = new Set(["device:read", "filesystem:read", "filesystem:write", "offline_access"]);
@@ -41,6 +47,7 @@ export type V3ReadOnlyGatewayOptions = {
   publicUrl: string;
   port: number;
   windowsFileRoot?: string;
+  macHeartbeatPins?: P08HeartbeatPins;
 };
 
 export type V3ReadOnlyGateway = {
@@ -85,6 +92,7 @@ function verifiedScopedTokenVerifier(auth: AuthService): OAuthTokenVerifier {
 function buildScopedV3Server(
   registry: SqliteDeviceRegistry,
   windowsFiles?: V3WindowsScopedFiles,
+  macIngress?: V3MacSignedHeartbeatIngress,
 ): McpServer {
   const server = new McpServer({
     name: "radlina-remote-mcp-v3-readonly",
@@ -104,7 +112,7 @@ function buildScopedV3Server(
     async () =>
       success({
         generation: "v3",
-        mode: "oauth-readonly-pre-enrollment",
+        mode: windowsFiles ? "oauth-scoped-local-windows" : "oauth-readonly-pre-enrollment",
         tools: [
           "get_capabilities",
           "list_devices",
@@ -122,7 +130,8 @@ function buildScopedV3Server(
       inputSchema: z.object({}),
       annotations: READ_ANNOTATIONS,
     },
-    async () => success({ devices: registry.list() }),
+    async () =>
+      success({ devices: registry.list().map((d) => effectiveTrustedDeviceHeartbeat(d)) }),
   );
   server.registerTool(
     "get_device",
@@ -131,7 +140,12 @@ function buildScopedV3Server(
       inputSchema: z.object({ deviceId: z.string().min(1).max(128) }),
       annotations: READ_ANNOTATIONS,
     },
-    async ({ deviceId }) => success({ device: registry.get(deviceId) ?? null }),
+    async ({ deviceId }) =>
+      success({
+        device: registry.get(deviceId)
+          ? effectiveTrustedDeviceHeartbeat(registry.require(deviceId))
+          : null,
+      }),
   );
   server.registerTool(
     "v3_admin_status",
@@ -143,11 +157,12 @@ function buildScopedV3Server(
     async () =>
       success({
         generation: "v3",
-        mode: "oauth-readonly-pre-enrollment",
+        mode: windowsFiles ? "oauth-scoped-local-windows" : "oauth-readonly-pre-enrollment",
         productionReady: false,
         remoteExecutionEnabled: false,
         deviceCount: registry.list().length,
         localWindowsFileOperationsEnabled: Boolean(windowsFiles),
+        macSignedHeartbeatIngressEnabled: Boolean(macIngress),
       }),
   );
   if (windowsFiles) {
@@ -165,8 +180,7 @@ function buildScopedV3Server(
         }),
         annotations: WRITE_ANNOTATIONS,
       },
-      async (input, context) =>
-        success(await windowsFiles.write(input, context.http?.authInfo)),
+      async (input, context) => success(await windowsFiles.write(input, context.http?.authInfo)),
     );
     server.registerTool(
       "v3_windows_read_text_file",
@@ -179,8 +193,7 @@ function buildScopedV3Server(
         }),
         annotations: READ_ANNOTATIONS,
       },
-      async (input, context) =>
-        success(await windowsFiles.read(input, context.http?.authInfo)),
+      async (input, context) => success(await windowsFiles.read(input, context.http?.authInfo)),
     );
   }
   return server;
@@ -236,9 +249,13 @@ export async function startV3ReadOnlyOAuthGateway(
   const registry = new SqliteDeviceRegistry(path.join(stateRoot, "v3-devices.sqlite3"));
   let server: Server | undefined;
   let windowsFiles: V3WindowsScopedFiles | undefined;
+  let macIngress: V3MacSignedHeartbeatIngress | undefined;
   try {
     const auth = new ScopedV3AuthService(cfg, store);
     await auth.initialize();
+    if (options.macHeartbeatPins) {
+      macIngress = new V3MacSignedHeartbeatIngress(registry, options.macHeartbeatPins);
+    }
     if (options.windowsFileRoot) {
       windowsFiles = new V3WindowsScopedFiles(
         cfg,
@@ -275,9 +292,34 @@ export async function startV3ReadOnlyOAuthGateway(
       next();
     });
     auth.install(app);
-    const mcpHandler = createMcpHandler(() => buildScopedV3Server(registry, windowsFiles), {
-      legacy: "reject",
-    });
+    if (macIngress) {
+      let recentAt = 0;
+      const ingress = macIngress;
+      app.post("/v3/agent/heartbeat", express.json({ limit: "8kb" }), (request, response) => {
+        const now = Date.now();
+        if (now - recentAt < 1500) {
+          response.status(429).json({ error: "rate_limited" });
+          return;
+        }
+        recentAt = now;
+        try {
+          if (Buffer.byteLength(JSON.stringify(request.body ?? null), "utf8") > 8192) {
+            response.status(413).json({ error: "bounded_heartbeat_required" });
+            return;
+          }
+          const receipt = ingress.receive(request.body);
+          response.status(200).json(receipt);
+        } catch {
+          response.status(403).json({ error: "signed_mac_identity_required" });
+        }
+      });
+    }
+    const mcpHandler = createMcpHandler(
+      () => buildScopedV3Server(registry, windowsFiles, macIngress),
+      {
+        legacy: "reject",
+      },
+    );
     const nodeHandler = toNodeHandler(mcpHandler);
     const bearer = requireBearerAuth({
       verifier: verifiedScopedTokenVerifier(auth),
