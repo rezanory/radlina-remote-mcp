@@ -19,8 +19,15 @@ import type { AppConfig } from "../../config/schema.js";
 import { configSchema } from "../../config/schema.js";
 import { Store } from "../../persistence/store.js";
 import { SqliteDeviceRegistry } from "../device/registry.js";
+import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
 
-const READ_SCOPES = new Set(["device:read", "offline_access"]);
+const V3_SCOPES = new Set(["device:read", "filesystem:read", "filesystem:write", "offline_access"]);
+const WRITE_ANNOTATIONS = {
+  readOnlyHint: false,
+  destructiveHint: false,
+  idempotentHint: true,
+  openWorldHint: false,
+};
 const READ_ANNOTATIONS = {
   readOnlyHint: true,
   destructiveHint: false,
@@ -33,6 +40,7 @@ export type V3ReadOnlyGatewayOptions = {
   stateDirectory: string;
   publicUrl: string;
   port: number;
+  windowsFileRoot?: string;
 };
 
 export type V3ReadOnlyGateway = {
@@ -55,26 +63,29 @@ function independentState(stateDirectory: string, productionDirectory: string): 
   return requested;
 }
 
-class ReadOnlyAuthService extends AuthService {
+class ScopedV3AuthService extends AuthService {
   override oauthMetadata() {
-    return { ...super.oauthMetadata(), scopes_supported: ["device:read", "offline_access"] };
+    return { ...super.oauthMetadata(), scopes_supported: [...V3_SCOPES] };
   }
 }
 
-function verifiedReadOnlyTokenVerifier(auth: AuthService): OAuthTokenVerifier {
+function verifiedScopedTokenVerifier(auth: AuthService): OAuthTokenVerifier {
   return {
     verifyAccessToken: async (token: string) => {
       const info = await auth.verifyAccessToken(token);
       const scopes = info.scopes ?? [];
-      if (!scopes.includes("device:read") || scopes.some((s) => !READ_SCOPES.has(s))) {
-        throw new OAuthError(OAuthErrorCode.InsufficientScope, "V3 gateway is read-only");
+      if (!scopes.includes("device:read") || scopes.some((s) => !V3_SCOPES.has(s))) {
+        throw new OAuthError(OAuthErrorCode.InsufficientScope, "V3 OAuth scope is not allowed");
       }
       return info;
     },
   };
 }
 
-function buildReadOnlyServer(registry: SqliteDeviceRegistry): McpServer {
+function buildScopedV3Server(
+  registry: SqliteDeviceRegistry,
+  windowsFiles?: V3WindowsScopedFiles,
+): McpServer {
   const server = new McpServer({
     name: "radlina-remote-mcp-v3-readonly",
     version: "3.0.0-alpha.1",
@@ -94,7 +105,13 @@ function buildReadOnlyServer(registry: SqliteDeviceRegistry): McpServer {
       success({
         generation: "v3",
         mode: "oauth-readonly-pre-enrollment",
-        tools: ["get_capabilities", "list_devices", "get_device", "v3_admin_status"],
+        tools: [
+          "get_capabilities",
+          "list_devices",
+          "get_device",
+          "v3_admin_status",
+          ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
+        ],
       }),
   );
   server.registerTool(
@@ -130,8 +147,42 @@ function buildReadOnlyServer(registry: SqliteDeviceRegistry): McpServer {
         productionReady: false,
         remoteExecutionEnabled: false,
         deviceCount: registry.list().length,
+        localWindowsFileOperationsEnabled: Boolean(windowsFiles),
       }),
   );
+  if (windowsFiles) {
+    server.registerTool(
+      "v3_windows_write_text_file",
+      {
+        description:
+          "Write UTF-8 through the native local Windows V3 adapter under an owner-approved root. Requires filesystem:write OAuth.",
+        inputSchema: z.object({
+          targetDeviceId: z.literal("windows-main"),
+          relativePath: z.string().min(1).max(1024),
+          content: z.string().max(65536),
+          overwrite: z.boolean().default(false),
+          idempotencyKey: z.string().uuid(),
+        }),
+        annotations: WRITE_ANNOTATIONS,
+      },
+      async (input, context) =>
+        success(await windowsFiles.write(input, context.http?.authInfo)),
+    );
+    server.registerTool(
+      "v3_windows_read_text_file",
+      {
+        description:
+          "Read bounded UTF-8 via native local Windows V3 adapter under an owner-approved root. Requires filesystem:read OAuth.",
+        inputSchema: z.object({
+          targetDeviceId: z.literal("windows-main"),
+          relativePath: z.string().min(1).max(1024),
+        }),
+        annotations: READ_ANNOTATIONS,
+      },
+      async (input, context) =>
+        success(await windowsFiles.read(input, context.http?.authInfo)),
+    );
+  }
   return server;
 }
 
@@ -184,9 +235,19 @@ export async function startV3ReadOnlyOAuthGateway(
   const store = new Store(cfg.storage.directory);
   const registry = new SqliteDeviceRegistry(path.join(stateRoot, "v3-devices.sqlite3"));
   let server: Server | undefined;
+  let windowsFiles: V3WindowsScopedFiles | undefined;
   try {
-    const auth = new ReadOnlyAuthService(cfg, store);
+    const auth = new ScopedV3AuthService(cfg, store);
     await auth.initialize();
+    if (options.windowsFileRoot) {
+      windowsFiles = new V3WindowsScopedFiles(
+        cfg,
+        store,
+        registry,
+        options.windowsFileRoot,
+        stateRoot,
+      );
+    }
     const app = createMcpExpressApp({
       host: "127.0.0.1",
       allowedHosts: cfg.server.allowedHosts,
@@ -204,20 +265,22 @@ export async function startV3ReadOnlyOAuthGateway(
         raw
           .trim()
           .split(/\s+/u)
-          .some((scope) => !READ_SCOPES.has(scope))
+          .some((scope) => !V3_SCOPES.has(scope))
       ) {
         response
           .status(400)
-          .json({ error: "invalid_scope", error_description: "V3 gateway is read-only" });
+          .json({ error: "invalid_scope", error_description: "V3 scope is not allowed" });
         return;
       }
       next();
     });
     auth.install(app);
-    const mcpHandler = createMcpHandler(() => buildReadOnlyServer(registry), { legacy: "reject" });
+    const mcpHandler = createMcpHandler(() => buildScopedV3Server(registry, windowsFiles), {
+      legacy: "reject",
+    });
     const nodeHandler = toNodeHandler(mcpHandler);
     const bearer = requireBearerAuth({
-      verifier: verifiedReadOnlyTokenVerifier(auth),
+      verifier: verifiedScopedTokenVerifier(auth),
       resourceMetadataUrl: auth.resourceMetadataUrl(),
     });
     app.all("/mcp", bearer, (request, response) => {
@@ -242,6 +305,7 @@ export async function startV3ReadOnlyOAuthGateway(
             active.close((err) => (err ? reject(err) : resolve())),
           );
         } finally {
+          await windowsFiles?.close();
           registry.close();
           store.close();
         }
@@ -249,6 +313,7 @@ export async function startV3ReadOnlyOAuthGateway(
     };
   } catch (error) {
     if (server?.listening) await new Promise<void>((resolve) => server!.close(() => resolve()));
+    await windowsFiles?.close();
     registry.close();
     store.close();
     throw error;
