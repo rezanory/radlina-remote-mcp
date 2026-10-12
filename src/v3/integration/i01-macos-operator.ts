@@ -5,7 +5,7 @@
  * approval + live pinned Windows peer observation.
  */
 import { execFile as execCallback } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createPublicKey, randomUUID, verify } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -93,15 +93,37 @@ function signedSession(signer:ExistingPhysicalMacP03Signer) {
     signatureBase64:signer.signCanonical(canonicalJson(payload)),
   };
 }
-async function lastAcknowledgedMacHeartbeat(state:string):Promise<boolean>{
+async function lastAcknowledgedMacHeartbeat(state:string,publicKeyPem:string,
+  agentInstanceId:string):Promise<boolean>{
   try{
-    const lines=(await readFile(path.join(state,"heartbeat-events.jsonl"),"utf8")).trim().split(/\r?\n/u);
-    const entry=JSON.parse(lines[lines.length-1]??"{}") as {
-      status?:string;code?:string;signedAtMs?:number;
-    };
-    return entry.status==="delivered"&&entry.code==="signed_heartbeat_acknowledged"&&
-      typeof entry.signedAtMs==="number"&&Date.now()-entry.signedAtMs<=120000&&
-      Date.now()>=entry.signedAtMs;
+    const bytes=await readFile(path.join(state,"heartbeat-latest-ack.json"));
+    if(bytes.length>8192)return false;
+    const record=JSON.parse(bytes.toString("utf8")) as Record<string,unknown>;
+    if(record["schema"]!=="radlina.v3.p08.durable-heartbeat-ack/v1"||
+      !record["envelope"]||typeof record["envelope"]!=="object"||
+      !record["gatewayReceipt"]||typeof record["gatewayReceipt"]!=="object")return false;
+    const envelope=record["envelope"] as Record<string,unknown>;
+    const receipt=record["gatewayReceipt"] as Record<string,unknown>;
+    if(envelope["schema"]!=="radlina.v3.p03.heartbeat-evidence/v1"||
+      !envelope["heartbeat"]||typeof envelope["heartbeat"]!=="object")return false;
+    const heartbeat=envelope["heartbeat"] as Record<string,unknown>;
+    const timestamp=heartbeat["signedAtMs"];
+    const proofBase64=envelope["deviceSignatureBase64"];
+    if(heartbeat["schema"]!=="radlina.v3.p03.signed-heartbeat/v1"||
+      heartbeat["deviceId"]!=="macbook-main"||
+      heartbeat["agentInstanceId"]!==agentInstanceId||
+      heartbeat["agentVersion"]!=="3.0.0-alpha.1"||
+      heartbeat["health"]!=="healthy"||heartbeat["status"]!=="online"||
+      JSON.stringify(heartbeat["capabilities"])!=='["device.health"]'||
+      typeof timestamp!=="number"||!Number.isSafeInteger(timestamp)||
+      Date.now()<timestamp||Date.now()-timestamp>120000||
+      receipt["acceptance"]!=="V3_P08_REAL_MAC_SIGNED_HEARTBEAT_ACCEPTED"||
+      receipt["deviceId"]!=="macbook-main"||receipt["trustState"]!=="trusted"||
+      receipt["crossDeviceExecutionEnabled"]!==false||
+      typeof proofBase64!=="string")return false;
+    const sig=Buffer.from(proofBase64,"base64");
+    return sig.length===64&&sig.toString("base64")===proofBase64&&
+      verify(null,Buffer.from(canonicalJson(heartbeat)),createPublicKey(publicKeyPem),sig);
   }catch{return false;}
 }
 export async function runPhysicalMacOperatorOnce(policyFile:string):Promise<{
@@ -117,12 +139,12 @@ export async function runPhysicalMacOperatorOnce(policyFile:string):Promise<{
     throw Error("trusted Windows owner device is not physically visible on Tailnet");
   }
   const agentState=path.join(os.homedir(),".local","share","radlina","v3-beta","macbook-main-agent");
-  if(!await lastAcknowledgedMacHeartbeat(agentState)) {
-    throw Error("macOS P03 signed heartbeat is not freshly acknowledged by V3");
-  }
   const signer=await ExistingPhysicalMacP03Signer.open();
   const identity=signer.publicIdentity();
   if(identity.publicKeyFingerprint!==macKey)throw Error("Mac enrolled Keychain key changed");
+  if(!await lastAcknowledgedMacHeartbeat(agentState,identity.publicKeyPem,identity.agentInstanceId)) {
+    throw Error("macOS P03 signed heartbeat evidence not freshly acknowledged or verifiable");
+  }
   const signedHeartbeat={
     schema:"radlina.v3.p03.signed-heartbeat/v1",
     deviceId:"macbook-main",

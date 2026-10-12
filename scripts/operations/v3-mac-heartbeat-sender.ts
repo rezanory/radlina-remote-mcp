@@ -8,7 +8,7 @@
  */
 import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -116,6 +116,17 @@ async function main(): Promise<void> {
       (receipt as Record<string, unknown>)["trustState"] !== "trusted" ||
       (receipt as Record<string, unknown>)["crossDeviceExecutionEnabled"] !== false
     ) fail("P08 gateway did not acknowledge admitted physical Mac");
+    // Persist signed P03 evidence, not merely a mutable JSONL success flag.
+    // The operator will independently verify the heartbeat using Keychain P03 identity.
+    const acknowledgement={
+      schema:"radlina.v3.p08.durable-heartbeat-ack/v1",
+      envelope, gatewayReceipt:receipt, acknowledgedAtMs:Date.now(),
+    };
+    const body=JSON.stringify(acknowledgement)+"\n";
+    if(Buffer.byteLength(body,"utf8")>8192)fail("oversized P08 signed acknowledgement");
+    const pending=path.join(state,"heartbeat-latest-ack."+randomUUID()+".pending");
+    await writeFile(pending,body,{flag:"wx",mode:0o600});
+    await rename(pending,path.join(state,"heartbeat-latest-ack.json"));
     await audit("delivered", "signed_heartbeat_acknowledged", signedAt);
     process.stdout.write(JSON.stringify({
       outcome: "P08_SIGNED_MAC_HEARTBEAT_ACKNOWLEDGED",
