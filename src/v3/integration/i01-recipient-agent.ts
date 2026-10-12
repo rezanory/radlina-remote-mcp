@@ -7,12 +7,13 @@ import { createPublicKey, verify } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import * as z from "zod/v4";
 import { canonicalJson, sha256 } from "../../utils/json.js";
 import { agentExecutionReceiptSchema } from "../device/agent-protocol.js";
-import type {
-  I01OwnerSignedEnvelope, I01ExactSignedOperation,
-  I01SignedDeviceResponse,
+import {
+  i01RecipientApprovalSchema,
+  i01SignedOwnerEnvelopeSchema,
+  type I01ExactSignedOperation,
+  type I01SignedDeviceResponse,
 } from "./i01-secured-dispatch.js";
 
 const HASH = /^[0-9a-f]{64}$/u;
@@ -71,17 +72,7 @@ function exactSignature(pem:string,message:unknown,signature:string):boolean{
       verify(null,Buffer.from(canonicalJson(message)),createPublicKey(pem),proof);
   }catch{return false;}
 }
-const localApprovalSchema=z.object({
-  schema:z.literal("radlina.v3.i01.recipient-approval/v1"),
-  operationSha256:z.string().regex(HASH),
-  sourceDeviceId:z.string().min(1).max(64),
-  targetDeviceId:z.string().min(1).max(64),
-  subject:z.string().min(1).max(200),
-  localUserApproved:z.literal(true),
-  nonce:z.string().uuid(),
-  issuedAtMs:z.number().int().positive(),
-  expiresAtMs:z.number().int().positive(),
-}).strict();
+
 function operationIdentityHash(operation:I01ExactSignedOperation):string{
   return sha256(canonicalJson({
     workflowExecutionId:operation.workflowExecutionId,
@@ -151,7 +142,8 @@ export class I01RecipientExecutionAgent{
     if(fingerprint!==ownerFingerprint||!HASH.test(device.publicKeyFingerprint)||!device.deviceId)
       throw new I01TargetDenied("physical P03 owner and device pins required");
   }
-  async receive(input:I01OwnerSignedEnvelope):Promise<I01SignedDeviceResponse>{
+  async receive(raw:unknown):Promise<I01SignedDeviceResponse>{
+    const input = i01SignedOwnerEnvelopeSchema.parse(raw);
     const op=input.operation;
     if(op.schema!=="radlina.v3.i01.exact-device-dispatch/v1"||
       op.targetDeviceId!==this.device.deviceId||
@@ -164,7 +156,7 @@ export class I01RecipientExecutionAgent{
       !exactSignature(this.ownerPublicKeyPem,op,input.ownerSignatureBase64)){
       throw new I01TargetDenied("bound signed owner operation invalid or expired");
     }
-    const approval=localApprovalSchema.parse(input.recipientApproval.approval);
+    const approval=i01RecipientApprovalSchema.parse(input.recipientApproval.approval);
     const opHash=operationIdentityHash(op);
     if(approval.operationSha256!==opHash||
       approval.sourceDeviceId!==op.sourceDeviceId||

@@ -16,7 +16,7 @@ import { SqliteCrossDeviceConsentAuthority } from "../security/device-consent.js
 import type { WorkflowDispatchInput, WorkflowDispatchResult, ExecutionDispatchPort } from "../workflow/runtime.js";
 
 const digest = z.string().regex(/^[0-9a-f]{64}$/u);
-const exactOperation = agentExecuteRequestSchema.extend({
+export const i01ExactOperationSchema = agentExecuteRequestSchema.extend({
   schema: z.literal("radlina.v3.i01.exact-device-dispatch/v1"),
   sourceDeviceId: z.string().min(1).max(64),
   subject: z.string().min(1).max(200),
@@ -25,13 +25,13 @@ const exactOperation = agentExecuteRequestSchema.extend({
   expiresAtMs: z.number().int().positive(),
   nonce: z.string().uuid(),
 }).strict();
-export type I01ExactSignedOperation = z.infer<typeof exactOperation>;
+export type I01ExactSignedOperation = z.infer<typeof i01ExactOperationSchema>;
 export type I01OwnerSignedEnvelope = {
   operation: I01ExactSignedOperation;
   ownerSignatureBase64: string;
   recipientApproval: I01SignedRecipientApproval;
 };
-const approvalSchema = z.object({
+export const i01RecipientApprovalSchema = z.object({
   schema: z.literal("radlina.v3.i01.recipient-approval/v1"),
   operationSha256: digest,
   sourceDeviceId: z.string().min(1).max(64),
@@ -43,10 +43,10 @@ const approvalSchema = z.object({
   expiresAtMs: z.number().int().positive(),
 }).strict();
 export type I01SignedRecipientApproval = {
-  approval: z.infer<typeof approvalSchema>;
+  approval: z.infer<typeof i01RecipientApprovalSchema>;
   deviceSignatureBase64: string;
 };
-const deviceResponse = z.object({
+export const i01SignedDeviceResponseSchema = z.object({
   schema: z.literal("radlina.v3.i01.signed-device-response/v1"),
   requestId: z.string().uuid(),
   receipt: agentExecutionReceiptSchema,
@@ -54,7 +54,15 @@ const deviceResponse = z.object({
   outputSha256: digest.nullable(),
   deviceSignatureBase64: z.string().min(80).max(200),
 }).strict();
-export type I01SignedDeviceResponse = z.infer<typeof deviceResponse>;
+export type I01SignedDeviceResponse = z.infer<typeof i01SignedDeviceResponseSchema>;
+export const i01SignedOwnerEnvelopeSchema = z.object({
+  operation: i01ExactOperationSchema,
+  ownerSignatureBase64: z.string().min(80).max(200),
+  recipientApproval: z.object({
+    approval: i01RecipientApprovalSchema,
+    deviceSignatureBase64: z.string().min(80).max(200),
+  }).strict(),
+}).strict();
 
 export interface I01TrustedDeviceResolver {
   /** Must consult actual P03 dual-signed registry + fresh signed heartbeat. */
@@ -186,7 +194,7 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
     const local = await this.recipient.approveExact({
       operationSha256:operationHash,source:origin,targetDeviceId:target,subject:input.subject,
     });
-    const approval = approvalSchema.parse(local.approval);
+    const approval = i01RecipientApprovalSchema.parse(local.approval);
     if (approval.operationSha256 !== operationHash ||
       approval.targetDeviceId !== target || approval.sourceDeviceId !== origin.deviceId ||
       approval.subject !== input.subject || approval.issuedAtMs > this.now() ||
@@ -202,7 +210,7 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
     },origin,randomUUID());
     if (!granted.allowed) throw new I01DispatchDenied(granted.reason);
     const issued = this.now();
-    const request = exactOperation.parse({
+    const request = i01ExactOperationSchema.parse({
       schema:"radlina.v3.i01.exact-device-dispatch/v1",
       requestId:randomUUID(),workflowExecutionId:input.workflowExecutionId,
       nodeId:input.node.id,attempt:input.attempt,
@@ -224,7 +232,7 @@ export class I01ConsentAndAuditDispatcher implements ExecutionDispatchPort {
     this.journal.reserve(key,sha256(canonical),target,request.requestId);
     try {
       const raw = await this.transport.sendExact(target,{operation:request,ownerSignatureBase64:signature,recipientApproval:local});
-      const response = deviceResponse.parse(raw);
+      const response = i01SignedDeviceResponseSchema.parse(raw);
       const receipt = response.receipt;
       const actualOutputHash = response.output === undefined ? null : sha256(canonicalJson(response.output));
       const signedReceipt = {

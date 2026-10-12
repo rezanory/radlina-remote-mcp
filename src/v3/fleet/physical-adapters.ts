@@ -24,7 +24,7 @@ import { effectiveTrustedDeviceHeartbeat } from "../device/mac-heartbeat-ingress
 import type { SqliteDeviceRegistry } from "../device/registry.js";
 
 const hash = z.string().regex(/^[0-9a-f]{64}$/u);
-const exactFleetCommand = z.object({
+export const f01ExactFleetCommandSchema = z.object({
   schema: z.literal("radlina.v3.f01.exact-fleet-operation/v1"),
   operationId: z.string().uuid(),
   planId: z.string().uuid(),
@@ -36,7 +36,11 @@ const exactFleetCommand = z.object({
   expiresAtMs: z.number().int().positive(),
   nonce: z.string().uuid(),
 }).strict();
-export type F01PhysicalCommand = z.infer<typeof exactFleetCommand>;
+export type F01PhysicalCommand = z.infer<typeof f01ExactFleetCommandSchema>;
+export const f01SignedCommandSchema = z.object({
+  command: f01ExactFleetCommandSchema,
+  ownerSignatureBase64: z.string().min(80).max(200),
+}).strict();
 export interface F01SignedCommand {
   command: F01PhysicalCommand;
   ownerSignatureBase64: string;
@@ -223,7 +227,7 @@ export class V3PhysicalSignedFleetAgent implements FleetDeviceAgentPort, FleetRe
       throw new F01PhysicalBlocked("physical device P03 signed heartbeat not fresh");
     await this.recipient.assertSignedLocalApproval(this.plan.planId,id,action,target,previous);
     const now=this.now();
-    const command=exactFleetCommand.parse({
+    const command=f01ExactFleetCommandSchema.parse({
       schema:"radlina.v3.f01.exact-fleet-operation/v1",
       operationId:randomUUID(),planId:this.plan.planId,deviceId:id,action,
       targetManifestSha256:target,previousManifestSha256:previous,

@@ -11,7 +11,7 @@ import { canonicalJson, sha256 } from "../../utils/json.js";
 import type {
   FleetAttestation, FleetSwitchReceipt, FleetVerifyReceipt, FleetOperation,
 } from "./contracts.js";
-import type { F01PhysicalCommand, F01SignedCommand, F01SignedReply } from "./physical-adapters.js";
+import { f01SignedCommandSchema, type F01PhysicalCommand, type F01SignedReply } from "./physical-adapters.js";
 
 type NativeFleetResult = FleetAttestation | FleetSwitchReceipt | FleetVerifyReceipt;
 export interface LocalV3ReleaseHost {
@@ -111,7 +111,8 @@ export class F01PhysicalRecipientAgent{
       sha256(createPublicKey(ownerPublicKeyPem).export({type:"spki",format:"der"}))!==ownerFingerprint
     ) throw new F01RecipientDenied("physical V3-only recipient and pinned owner signer required");
   }
-  async execute(request:F01SignedCommand):Promise<F01SignedReply<NativeFleetResult>>{
+  async execute(raw:unknown):Promise<F01SignedReply<NativeFleetResult>>{
+    const request=f01SignedCommandSchema.parse(raw);
     const command=request.command;
     if(command.schema!=="radlina.v3.f01.exact-fleet-operation/v1"||
       command.deviceId!==this.host.deviceId||

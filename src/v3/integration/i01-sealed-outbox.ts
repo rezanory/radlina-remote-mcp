@@ -11,10 +11,12 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 import { canonicalJson, sha256 } from "../../utils/json.js";
-import type {
-  I01BoundDeviceTransport,
-  I01OwnerSignedEnvelope,
-  I01SignedDeviceResponse,
+import {
+  i01SignedOwnerEnvelopeSchema,
+  i01SignedDeviceResponseSchema,
+  type I01BoundDeviceTransport,
+  type I01OwnerSignedEnvelope,
+  type I01SignedDeviceResponse,
 } from "./i01-secured-dispatch.js";
 
 export interface I01SealedOutboxData {
@@ -80,7 +82,8 @@ export class I01DurableSealedOutbox implements I01BoundDeviceTransport {
       "expires_at_ms,state,lease_id FROM v3_i01_outbox WHERE request_id=?"
     ).get(id) as OutboxRow|undefined;
   }
-  async sendExact(deviceId:string,envelope:I01OwnerSignedEnvelope):Promise<I01SignedDeviceResponse>{
+  async sendExact(deviceId:string,raw:I01OwnerSignedEnvelope):Promise<I01SignedDeviceResponse>{
+    const envelope=i01SignedOwnerEnvelopeSchema.parse(raw);
     const op=envelope.operation;
     if(!["macbook-main","windows-main"].includes(deviceId)||
       op.targetDeviceId!==deviceId||op.expiresAtMs<=this.now()||
@@ -107,7 +110,7 @@ export class I01DurableSealedOutbox implements I01BoundDeviceTransport {
       if(result?.state==="returned"&&result.sealed_result){
         const raw=await this.crypt.unseal(result.sealed_result);
         if(raw.byteLength>262144)throw new I01OutboxDenied("bounded sealed result required");
-        return JSON.parse(Buffer.from(raw).toString("utf8")) as I01SignedDeviceResponse;
+        return i01SignedDeviceResponseSchema.parse(JSON.parse(Buffer.from(raw).toString("utf8")));
       }
       if(result?.state==="unknown")break;
       await new Promise<void>(resolve=>setTimeout(resolve,250));
@@ -141,7 +144,7 @@ export class I01DurableSealedOutbox implements I01BoundDeviceTransport {
       throw new I01OutboxDenied("physical claim CAS mismatch");
     const raw=await this.crypt.unseal(leased.sealed_message);
     if(raw.byteLength>262144)throw new I01OutboxDenied("oversized signed operation");
-    const envelope=JSON.parse(Buffer.from(raw).toString("utf8")) as I01OwnerSignedEnvelope;
+    const envelope=i01SignedOwnerEnvelopeSchema.parse(JSON.parse(Buffer.from(raw).toString("utf8")));
     if(envelope.operation.targetDeviceId!==session.deviceId||
       sha256(canonicalJson(envelope))!==leased.operation_hash){
       throw new I01OutboxDenied("physical target or sealed owner envelope changed");
@@ -157,14 +160,15 @@ export class I01DurableSealedOutbox implements I01BoundDeviceTransport {
       throw new I01OutboxDenied("delivery requires a fresh physical signed session");
     }
     await this.authenticate.assertPhysicalAgent(session);
-    const row=this.row(response.requestId);
+    const signedResult=i01SignedDeviceResponseSchema.parse(response);
+    const row=this.row(signedResult.requestId);
     if(!row||row.device_id!==session.deviceId||row.state!=="leased"||
       row.lease_id!==leaseId||row.expires_at_ms<=this.now())
       throw new I01OutboxDenied("signed target receipt does not bind to active exact lease");
-    if(response.receipt.resolvedDeviceId!==session.deviceId||
-      response.schema!=="radlina.v3.i01.signed-device-response/v1")
+    if(signedResult.receipt.resolvedDeviceId!==session.deviceId||
+      signedResult.schema!=="radlina.v3.i01.signed-device-response/v1")
       throw new I01OutboxDenied("physical device signed result changed its target");
-    const sealed=await this.crypt.seal(Buffer.from(canonicalJson(response),"utf8"));
+    const sealed=await this.crypt.seal(Buffer.from(canonicalJson(signedResult),"utf8"));
     if(sealed.byteLength>262144)
       throw new I01OutboxDenied("sealed result exceeds bounded transport");
     const written=this.db.prepare(
