@@ -30,6 +30,7 @@ import { V3PhysicalFleetOrchestrator } from "../fleet/physical-composition.js";
 import { V3IndependentPhysicalAcceptanceLedger } from "../acceptance/ac01-final-gates.js";
 import type { V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 import type { I01PhysicalRelayPorts } from "./i01-agent-relay-http.js";
+import { requireFinalFourSchemaBaseline } from "./final4-schema-migrations.js";
 
 const digest=z.string().regex(/^[a-f0-9]{64}$/u);
 const configSchema=z.object({
@@ -202,6 +203,10 @@ export function createV3FinalFourPhysicalComposition(input:{
       path.join(state,"final4","acceptance.sqlite3"),
       config.ownerPublicKeyPem,config.independentReviewerPublicKeyPem,
     ));
+    // Adopt only structurally verified existing V3 tables into the v1 schema
+    // baseline before accepting any remote tool request. This is not an
+    // owner acceptance decision and does not touch P03 or V2 databases.
+    requireFinalFourSchemaBaseline(state);
     // The shared registry belongs to the gateway and must be closed exactly
     // once by gateway shutdown, AFTER the physical ports are released.
     return{
