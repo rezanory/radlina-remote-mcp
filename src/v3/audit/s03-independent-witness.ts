@@ -71,11 +71,13 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       signal:AbortSignal.timeout(15000),
     };
     let result:Response;
+    let recovered=false;
     try{
       result=await fetch(this.endpoint,request);
+      if(result.status>=500)throw new Error("witness response may be a lost durable ACK");
     }catch{
-      // The original POST might already have durably committed at the Mac.
-      // Lookup is read-only: never replay an audit append on an unknown ACK.
+      // Original append may already have committed. Fetch ONLY the original
+      // persisted signed ACK; never retry the POST /anchor mutation.
       try{
         result=await fetch(this.endpoint+"/lookup",{
           ...request,signal:AbortSignal.timeout(15000),
@@ -85,6 +87,7 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       }
       if(result.status!==200)
         throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; no signed ACK");
+      recovered=true;
     }
     if(result.status!==201&&result.status!==200) {
       throw new S03ExternalAuditUnavailable("S03 witness append HTTP_"+result.status);
@@ -101,7 +104,9 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       !Number.isSafeInteger(ack.sequence)||ack.sequence<=0||
       !safeHex(ack.chainHash)||!safeHex(ack.previousHash)||
       ack.issuedAtMs>Date.now()+120000||
-      Date.now()-ack.issuedAtMs>15*60*1000||
+      // A recovered, exact Ed25519 ACK can be older than 15 minutes; it
+      // still binds this immutable request hash and cannot authorize a new op.
+      (!recovered&&Date.now()-ack.issuedAtMs>15*60*1000)||
       proof.length!==64||
       proof.toString("base64")!==raw.signatureBase64||
       !verify(null,Buffer.from(canonicalJson(ack)),createPublicKey(this.witnessPublicKeyPem),proof)

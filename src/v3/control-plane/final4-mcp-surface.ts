@@ -106,7 +106,7 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
         auth,workflowExecutionId:input.workflowExecutionId,
         requestedSourceDeviceId:input.sourceDeviceId,
       });
-      return ok(ports.s02e.status(input.requestId,owner.subject));
+      return ok(ports.s02e.status(input.requestId,owner.subject,input.workflowExecutionId));
     }catch(e){return denied(e);}
   });
   server.registerTool("v3_exact_device_execute",{
@@ -114,6 +114,8 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
     inputSchema:z.object({
       targetDeviceId:z.enum(["macbook-main","windows-main"]),
       sourceDeviceId:z.enum(["macbook-main","windows-main"]),
+      workflowExecutionId:z.string().uuid(),
+      consentRequestId:z.string().uuid(),
       capability:z.string().min(1).max(128),
       input:z.record(z.string(),z.unknown()).default({}),
       idempotencyKey:z.string().uuid(),
@@ -124,13 +126,18 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
     try{
       const auth=ownerAuth(context,"device:execute",ports);
       const bound=await ports.authenticatedPlugin.bindOwner({
-        auth,workflowExecutionId:input.idempotencyKey,
+        auth,workflowExecutionId:input.workflowExecutionId,
         requestedSourceDeviceId:input.sourceDeviceId,
       });
       if(!bound.attested||bound.sourceDeviceId!==input.sourceDeviceId||bound.sourceDeviceId===input.targetDeviceId)
         throw new Error("exact remote source must be verified and distinct");
+      // This consent must be the one physically approved for this exact
+      // OAuth workflow, owner, source, target and immutable input.
+      ports.s02e.requireExact(input.consentRequestId,input.workflowExecutionId,
+        bound.subject,input.sourceDeviceId,input.targetDeviceId,input.capability,
+        sha256(canonicalJson(input.input)));
       const node=workflowNodeSchema.parse({
-        id:"direct",
+        id:"direct-"+input.idempotencyKey,
         capability:input.capability,
         input:input.input,
         dependsOn:[],
@@ -148,7 +155,7 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
         },
       });
       const result=await ports.execution.execute({
-        workflowExecutionId:input.idempotencyKey,
+        workflowExecutionId:input.workflowExecutionId,
         subject:bound.subject,node,attempt:1,
       });
       return ok(result);

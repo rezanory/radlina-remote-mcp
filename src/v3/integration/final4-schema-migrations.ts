@@ -38,6 +38,10 @@ export const finalFourSqliteSchemaManifest:readonly StoreContract[]=[
     ["v3_consent_decision_nonces",["nonce"]],
     ["v3_consent_decision_proofs",["request_id","evidence_json"]],
     ["v3_consent_events",["sequence","payload_json","previous_hash","event_hash"]],
+    ["v3_i01_consent_workflow_bindings",[
+      "request_id","workflow_execution_id","subject","source_device_id",
+      "target_device_id","capability","input_sha256",
+    ]],
   ]},
   {file:"i01-relay.sqlite3",tables:[
     ["v3_i01_outbox",[
