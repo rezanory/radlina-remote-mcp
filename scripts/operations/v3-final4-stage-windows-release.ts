@@ -6,6 +6,7 @@
  * This artifact is Windows-only. Mac must independently prepare and prove
  * runtime dependency compatibility before a two-device F01 rollout.
  */
+import {execFileSync} from "node:child_process";
 import {createHash,randomUUID} from "node:crypto";
 import {createReadStream} from "node:fs";
 import {cp,lstat,mkdir,readFile,readdir,rename,stat,writeFile} from "node:fs/promises";
@@ -15,21 +16,33 @@ import {verifyReleaseRoot,type ReleaseFile,type ReleaseManifest} from "../../src
 
 const DIGEST=/^[a-f0-9]{64}$/u;
 const BASE="E:\\radlina-v3-runtime";
-const SNAPSHOT="E:\\radlina-remote-mcp-worktrees\\v3-stage2-release-20261012";
 function deny(message:string):never{throw Error("V3_STAGE2_PREPARE_DENIED: "+message);}
 const args=process.argv.slice(2);
-const resume=args.length===4&&args[0]==="--resume";
+const resume=args.length===6&&args[0]==="--resume";
 if(process.platform!=="win32"||os.hostname().toLowerCase()!=="laptop-13qineif"||
-  !(resume||(args.length===3&&args[0]==="--prepare")))
-  deny("explicit physical Windows stage preparation or bounded resume required");
-const candidate=args[1]!,approvedHash=args[2]!;
-if(candidate!==path.win32.join(BASE,"stage2-candidate-dd9727d")||
-  !DIGEST.test(approvedHash))deny("exact owner-approved staging candidate required");
+  !(resume||(args.length===5&&args[0]==="--prepare")))
+  deny("explicit pinned physical Windows stage preparation or bounded resume required");
+const candidate=args[1]!,approvedHash=args[2]!,expectedGitSha=args[3]!,SNAPSHOT=args[4]!;
+if(!DIGEST.test(approvedHash)|| !/^[a-f0-9]{40}$/u.test(expectedGitSha)||
+  candidate!==path.win32.join(BASE,"stage2-candidate-"+expectedGitSha.slice(0,7))||
+  !SNAPSHOT.startsWith("E:\\radlina-remote-mcp-worktrees\\v3-")||
+  SNAPSHOT.includes("..")||!path.win32.isAbsolute(SNAPSHOT))
+  deny("exact source SHA, V3 snapshot and immutable staging candidate required");
+const snapshotInfo=await lstat(SNAPSHOT);
+if(!snapshotInfo.isDirectory()||snapshotInfo.isSymbolicLink())
+  deny("source snapshot must be a real directory");
+const checkedOut=execFileSync("git",["rev-parse","HEAD"],{
+  cwd:SNAPSHOT,encoding:"utf8",windowsHide:true,
+}).trim();
+if(checkedOut!==expectedGitSha||execFileSync("git",["status","--porcelain"],{
+  cwd:SNAPSHOT,encoding:"utf8",windowsHide:true,
+}).trim())
+  deny("source snapshot must be clean and pinned to the immutable Git SHA");
 const candidateInfo=await lstat(candidate);
 if(!candidateInfo.isDirectory()||candidateInfo.isSymbolicLink())
   deny("candidate cannot be a symlink");
 const valid=await verifyReleaseRoot(candidate,approvedHash);
-if(valid.manifest.source.gitSha!=="dd9727d2146fe4079b3709ad449c1ae497d02e92")
+if(valid.manifest.source.gitSha!==expectedGitSha)
   deny("candidate does not bind original stage-one validated Git commit");
 if(valid.manifest.files.length>20000)deny("unexpected large release manifest");
 const distScripts=path.join(SNAPSHOT,"dist","scripts");
@@ -47,7 +60,7 @@ for(const required of [
   const s=await lstat(path.join(distScripts,required));
   if(!s.isFile()||s.isSymbolicLink())deny("V3 compiled executable missing: "+required);
 }
-const temp=resume?args[3]!:path.join(BASE,"stage2-prepared-"+randomUUID());
+const temp=resume?args[5]!:path.join(BASE,"stage2-prepared-"+randomUUID());
 if(resume){
   if(path.win32.dirname(temp).toLowerCase()!==BASE.toLowerCase()||
     !/^stage2-prepared-[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(path.basename(temp)))
