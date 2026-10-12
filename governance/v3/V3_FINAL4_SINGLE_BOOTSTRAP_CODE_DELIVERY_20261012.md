@@ -10,7 +10,7 @@
 - Production daemon: `scripts/operations/v3-oauth-readonly-daemon.ts`.
 - Only opt-in environment entry: `finalFourFactoryFromOwnerEnvironment` in `src/v3/control-plane/v3-environment-factory.ts`.
 - The factory calls **one** active physical composition, `createV3FinalFourPhysicalComposition` in `src/v3/integration/final4-physical-bootstrap.ts`.
-- `v3-physical-final4-runtime.ts` defines shared factory types **and contains an alternate source composition that is NOT called by the daemon**. It must not be registered as a second bootstrap. Its source must be reconciled with the parallel contributor before removal.
+- `v3-physical-final4-runtime.ts` exports shared factory types **only**. The previously unused conflicting composition was removed from executable source after preserving its entire original implementation in commit `14f429f`; no second runtime/bootstrap entry remains.
 - Gateway-owned `SqliteDeviceRegistry` is now injected into the physical composition. No duplicate physical P03 registry is allocated or closed by this route. The OAuth gateway closes it after closing composed ports.
 - I01's durable dispatch journal is included in physical composition shutdown.
 
@@ -37,7 +37,7 @@ All items above are **source presence only**. This document does not assert comp
 
 ## Files with parallel uncommitted changes
 
-The worktree includes uncommitted and untracked changes from multiple contributors. Use exact-path staging; do NOT run `git add -A`, reset/clean, prune, force-push, or overwrite shared changes. The alternate physical composition and integration files must be coordinated with their author before consolidation; do not destroy evidence.
+The worktree includes uncommitted and untracked changes from multiple contributors. Use exact-path staging; do NOT run `git add -A`, reset/clean, prune, force-push, or overwrite shared changes. The inactive alternate composition source was preserved in commit `14f429f` before reducing the runtime module to types only. Do not overwrite other contributors' future changes; the physical bootstrap is now uniquely injected by the V3 environment factory.
 
 ## Deferred final-release evidence (explicitly NOT executed)
 
