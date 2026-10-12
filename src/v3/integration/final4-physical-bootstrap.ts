@@ -119,8 +119,13 @@ export function createV3FinalFourPhysicalComposition(input:{
   };
   try{
     const peer={
-      observeExactTailnetNodeHash:(deviceId:"windows-main"|"macbook-main")=>
-        deviceId==="macbook-main"?observeLiveMacTailnetPeer():windowsNodeHash(),
+      observeExactTailnetNodeHash:(deviceId:"windows-main"|"macbook-main")=>{
+        const observed=deviceId==="macbook-main"?observeLiveMacTailnetPeer():windowsNodeHash();
+        // Trusted P03 enrollment must agree with BOTH the live Tailnet node
+        // and the immutable owner-pinned physical final-four binding.
+        const pinned=deviceId==="macbook-main"?config.macTailnetNodeHash:config.windowsTailnetNodeHash;
+        return observed===pinned?observed:undefined;
+      },
     };
     const physical=new V3PhysicalP03Reader(
       registry,peer,config.windowsDeviceFingerprint,config.macDeviceFingerprint,
