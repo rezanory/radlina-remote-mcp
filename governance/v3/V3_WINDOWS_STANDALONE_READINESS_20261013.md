@@ -75,6 +75,17 @@ The special-purpose isolated V3 Windows-only service upgrader `scripts/operation
 - Actual post-upgrade signed registry heartbeat: `windows-main`: trusted, online, fresh, intentionally degraded until physical cross-device success; `macbook-main`: trusted registration but stale heartbeat, status unknown. These are physical registry readings and not mocked.
 - The upgrader includes a rollback branch: if new OAuth health checks fail, restore exact original V3 XML and restart original V3; explicitly fail if even rollback health cannot be verified. This rollback branch was **not executed** by the successful upgrade and is not claimed as a real F01 device rollback acceptance.
 
+### Static Windows Final Four supervisor launcher — owner-gated future install
+
+After the full immutable Windows release was independently verified, the exact manifest-bound `scripts/operations/v3-final4-windows-task-launch.ps1` was staged under the dedicated V3-only supervisor directory with explicit protected ACL for `LAPTOP-13QINEIF\\Radlina`, Administrators and SYSTEM; no inheritance. This is a **static file preparation**, not task registration, owner approval, runtime activation or fleet acceptance.
+
+- Source package Manifest: `934cd1627f57b0c01e1fe9058524c8eb8b1af83a51671c04b1856c5d2a9039ec`.
+- Verified against exact manifest file entry before/after copy: SHA256 `797a6e6cd868eede1c51677dbe541c880ad7e1d33065112153067a77823478a2`.
+- Staged path: `E:\\radlina-v3-runtime\\supervisor\\v3-final4-windows-task-launch.ps1`.
+- Real physical command returned `V3_WINDOWS_SUPERVISOR_LAUNCHER_STAGED_NOT_INSTALLED`, exitCode 0, session `77b28225-6bb2-443e-b305-c96d2e3be0f6`.
+- Independent post-stage operating system read: `V2=Running`, `V3=Running`, `V3Tunnel=Running`; active V3 release is the exact new immutable directory; protected supervisor ACL=true. All three pending Task Scheduler records remained **not installed**; session `9964f7b3-21a5-4832-894c-a0781698beb5`.
+- Owner-only `v3-final4-windows-install.ps1 -Install` must later receive actual signed Final Four config, original immutable release manifest and real elevated `LAPTOP-13QINEIF\\Radlina` interactive token. Do not substitute the current SYSTEM management token, even though the user account has an active logon session.
+
 ### Installation boundaries, Windows-vs-Mac dependencies
 
 1. **Windows-only V3 WinSW service activation completed**; live working directory is now `E:\\radlina-v3-runtime\\releases\\934cd1627f57b0c01e1fe9058524c8eb8b1af83a51671c04b1856c5d2a9039ec`. The prior `p08-heartbeat-20261012` release remains recorded as previous/rollback; no Final Four physical ports were activated.
