@@ -58,6 +58,17 @@ function denied(error:unknown){
     content:[{type:"text" as const,text:JSON.stringify({error:"V3_POLICY_OR_ACCEPTANCE_DENIED"})}],
   };
 }
+/** Exact on-wire tool names, shared by MCP registration and capability discovery. */
+export const V3_FINAL4_MCP_TOOL_NAMES=[
+  "v3_consent_request",
+  "v3_consent_status",
+  "v3_exact_device_execute",
+  "v3_exact_device_reconcile",
+  "v3_fleet_plan",
+  "v3_fleet_run",
+  "v3_fleet_reconcile",
+  "v3_release_acceptance_status",
+] as const;
 export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPorts):void{
   server.registerTool("v3_consent_request",{
     description:"Request bounded once-only, recipient-signed S02E consent for a specified V3 device, capability and exact input.",

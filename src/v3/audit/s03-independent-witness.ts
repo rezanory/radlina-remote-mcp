@@ -70,29 +70,49 @@ export class S03ExternalAuditClient implements I01ExternalAuditAnchor,F01Indepen
       body:serialized,
       signal:AbortSignal.timeout(15000),
     };
+    // All recovery requests address the immutable request hash; this read
+    // uses the Mac witness lookup route and NEVER re-POSTs the anchor.
+    const recoverOriginal=async():Promise<Response>=>{
+      let lookup:Response;
+      try{
+        lookup=await fetch(this.endpoint+"/lookup",{
+          ...request,signal:AbortSignal.timeout(15000),
+        });
+      }catch{
+        throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; manual reconcile");
+      }
+      if(lookup.status!==200)
+        throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; no signed ACK");
+      return lookup;
+    };
     let result:Response;
     let recovered=false;
     try{
       result=await fetch(this.endpoint,request);
       if(result.status>=500)throw new Error("witness response may be a lost durable ACK");
     }catch{
-      // Original append may already have committed. Fetch ONLY the original
-      // persisted signed ACK; never retry the POST /anchor mutation.
-      try{
-        result=await fetch(this.endpoint+"/lookup",{
-          ...request,signal:AbortSignal.timeout(15000),
-        });
-      }catch{
-        throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; manual reconcile");
-      }
-      if(result.status!==200)
-        throw new S03ExternalAuditUnavailable("independent S03 append outcome unknown; no signed ACK");
+      result=await recoverOriginal();
       recovered=true;
     }
     if(result.status!==201&&result.status!==200) {
       throw new S03ExternalAuditUnavailable("S03 witness append HTTP_"+result.status);
     }
-    const bytes=Buffer.from(await result.arrayBuffer());
+    let bytes:Buffer;
+    try{
+      bytes=Buffer.from(await result.arrayBuffer());
+    }catch{
+      // POST may have committed even when the response body disconnects.
+      // Never treat a truncated body as acceptance and never repeat the POST.
+      if(recovered)
+        throw new S03ExternalAuditUnavailable("S03 original ACK read failed; manual reconcile");
+      result=await recoverOriginal();
+      recovered=true;
+      try{
+        bytes=Buffer.from(await result.arrayBuffer());
+      }catch{
+        throw new S03ExternalAuditUnavailable("S03 recovered ACK read failed; manual reconcile");
+      }
+    }
     if(bytes.length>8192)throw new S03ExternalAuditUnavailable("S03 witness signed ACK exceeds bound");
     const raw=JSON.parse(bytes.toString("utf8")) as S03SignedWitnessAck;
     const ack=raw.witness;

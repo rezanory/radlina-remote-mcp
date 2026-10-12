@@ -26,7 +26,7 @@ import {
   type P08HeartbeatPins,
 } from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
-import { registerV3FinalFourTools, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
+import { registerV3FinalFourTools, V3_FINAL4_MCP_TOOL_NAMES, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 import { installV3PhysicalAgentRelayRoutes, type I01PhysicalRelayPorts } from "../integration/i01-agent-relay-http.js";
 import type { V3FinalFourFactoryContext, V3ComposedPhysicalFinalFour } from "../control-plane/v3-physical-final4-runtime.js";
 
@@ -130,7 +130,7 @@ function buildScopedV3Server(
           "get_device",
           "v3_admin_status",
           ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
-          ...(finalFour ? ["v3_consent_request","v3_consent_status","v3_exact_device_execute", "v3_fleet_plan", "v3_fleet_run", "v3_release_acceptance_status"] : []),
+          ...(finalFour ? V3_FINAL4_MCP_TOOL_NAMES : []),
         ],
       }),
   );
