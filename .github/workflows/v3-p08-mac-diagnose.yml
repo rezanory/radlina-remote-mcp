@@ -74,6 +74,36 @@ jobs:
             }
           }else console.log('p08.eventsPresent=false');
           CHECK_P08
+          node <<'P08_LOG_ERRORS'
+          const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+          const root=path.join(os.homedir(),'.local','share','radlina','v3-beta','macbook-main-agent');
+          for(const [label,name] of [['stderr','launchd-err.log'],['stdout','launchd-out.log']]){
+            const file=path.join(root,name);
+            if(!fs.existsSync(file)){console.log('p08.'+label+'Present=false');continue}
+            const st=fs.statSync(file);
+            console.log('p08.'+label+'Present=true');
+            console.log('p08.'+label+'Bytes='+st.size);
+            const content=fs.readFileSync(file,'utf8').slice(-4000);
+            for(const line of content.split(/\r?\n/u).filter(Boolean).slice(-10)){
+              let safe='';
+              try{
+                const v=JSON.parse(line);
+                safe=JSON.stringify({
+                  outcome:String(v.outcome??'').slice(0,70),
+                  reason:String(v.reason??'').slice(0,180),
+                });
+              }catch{
+                if(/^(Error|TypeError|SyntaxError|ReferenceError|RangeError|node:internal|.*ERR_|.*Error \[)/u.test(line.trim()))
+                  safe=line.trim().slice(0,180);
+              }
+              if(safe){
+                safe=safe.replace(/(Bearer|token|secret)[^\s]{0,80}/giu,'[REDACTED]')
+                  .replace(/[A-Za-z0-9+/=_-]{95,}/gu,'[REDACTED_LONG_VALUE]');
+                console.log('p08.'+label+'Diagnostic='+safe);
+              }
+            }
+          }
+          P08_LOG_ERRORS
           node <<'NETWORK_P08'
           const url='https://v3-mcp.radlina.com/auth-health';
           try{
