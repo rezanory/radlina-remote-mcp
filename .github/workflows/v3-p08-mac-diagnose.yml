@@ -1,0 +1,84 @@
+name: V3 P08 Physical Mac Heartbeat Diagnosis (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-p08-readonly-diagnosis
+  cancel-in-progress: false
+
+jobs:
+  diagnose-p08:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 10
+    steps:
+      - name: Read real macOS LaunchAgent, bounded event and HTTPS status
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(uname -s)" == 'Darwin' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          LABEL='com.radlina.remote-mcp.v3.mac-heartbeat'
+          PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+          STATE="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
+          DOMAIN="gui/$(id -u)"
+          if ! launchctl print "$DOMAIN" >/dev/null 2>&1; then DOMAIN="user/$(id -u)"; fi
+          echo "p08.launchDomain=$DOMAIN"
+          if [[ -f "$PLIST" && ! -L "$PLIST" ]]; then
+            echo 'p08.plistPresent=true'
+            echo "p08.plistMode=$(stat -f '%Lp' "$PLIST")"
+          else
+            echo 'p08.plistPresent=false'
+          fi
+          if OUTPUT="$(launchctl print "$DOMAIN/$LABEL" 2>&1)"; then
+            echo 'p08.launchctlPresent=true'
+            printf '%s\n' "$OUTPUT" | grep -E '^[[:space:]]*(state|pid|last exit code|runs|program|path)[[:space:]:=]' | head -n 18 || true
+          else
+            echo 'p08.launchctlPresent=false'
+          fi
+          node <<'CHECK_P08'
+          const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+          const root=path.join(os.homedir(),'.local','share','radlina','v3-beta','macbook-main-agent');
+          const ackFile=path.join(root,'heartbeat-latest-ack.json');
+          const events=path.join(root,'heartbeat-events.jsonl');
+          if(fs.existsSync(ackFile)){
+            try{
+              const v=JSON.parse(fs.readFileSync(ackFile,'utf8'));
+              console.log('p08.durableAckPresent=true');
+              console.log('p08.durableAckAgeMs='+ (Date.now()-Number(v.acknowledgedAtMs)));
+              console.log('p08.ackAcceptance='+String(v.gatewayReceipt?.acceptance??'MISSING'));
+            }catch{console.log('p08.durableAckMalformed=true');}
+          }else console.log('p08.durableAckPresent=false');
+          if(fs.existsSync(events)){
+            const lines=fs.readFileSync(events,'utf8').split(/\r?\n/u).filter(Boolean).slice(-8);
+            for(const l of lines){
+              try {
+                const v=JSON.parse(l);
+                console.log('p08.event='+JSON.stringify({
+                  at:String(v.time??'').slice(0,30),
+                  status:String(v.status??'').slice(0,24),
+                  code:String(v.code??'').slice(0,180),
+                }));
+              }catch{console.log('p08.eventMalformed=true')}
+            }
+          }else console.log('p08.eventsPresent=false');
+          CHECK_P08
+          node <<'NETWORK_P08'
+          const url='https://v3-mcp.radlina.com/auth-health';
+          try{
+            const r=await fetch(url,{signal:AbortSignal.timeout(12000)});
+            console.log('p08.publicHttpsHealthStatus='+r.status);
+          }catch(e){console.log('p08.publicHttpsHealthReachable=false '+String(e?.cause?.code??e?.name??'NETWORK_FAIL'))}
+          NETWORK_P08
+          echo 'P08_DIAGNOSTIC_READ_ONLY_COMPLETE_NOT_PRODUCTION_ACCEPTANCE'
