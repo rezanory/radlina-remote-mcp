@@ -1,0 +1,52 @@
+name: V3 S03 Mac Independent Witness Public Key Preparation (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-s03-mac-public-preparation
+  cancel-in-progress: false
+
+jobs:
+  prepare-separate-public-witness:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 20
+    steps:
+      - name: Checkout immutable owner-reviewed V3 code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ad0bd0290df616b9038fd23202c0212a70661453
+      - name: Prepare physical Mac S03 identity in separate durable Keychain
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          [[ "$(git rev-parse HEAD)" == 'ad0bd0290df616b9038fd23202c0212a70661453' ]]
+          npm ci --ignore-scripts --no-fund --no-audit
+          node node_modules/tsx/dist/cli.mjs scripts/operations/v3-s03-mac-keychain-prepare.ts --prepare
+          OUT="$HOME/.local/share/radlina/v3-beta/macbook-main-s03/witness-public-receipt.json"
+          [[ -f "$OUT" && ! -L "$OUT" && "$(stat -f '%Lp' "$OUT")" == '600' ]]
+          node -e 'const fs=require("node:fs"),v=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));if(v.schema!=="radlina.v3.s03.mac-public-key-preparation/v1"||v.deviceId!=="macbook-main-s03"||v.keychainPrivateKeyExported!==false||!(/^[a-f0-9]{64}$/u).test(v.fingerprint))process.exit(22)' "$OUT"
+          echo "RADLINA_S03_PUBLIC_ONLY_RECEIPT=$OUT" >> "$GITHUB_ENV"
+          echo "S03_PHYSICAL_MAC_PUBLIC_ONLY_PREPARED_NO_WRITER_OR_RELEASE_ACCEPTANCE"
+      - name: Upload ONLY the witness public PEM and fingerprint receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-s03-mac-public-only-${{ github.run_id }}
+          path: ${{ env.RADLINA_S03_PUBLIC_ONLY_RECEIPT }}
+          if-no-files-found: error
+          retention-days: 1
