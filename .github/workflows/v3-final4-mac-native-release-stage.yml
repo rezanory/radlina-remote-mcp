@@ -1,0 +1,45 @@
+name: V3 Final Four Native macOS Release Stage (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-native-release-stage
+  cancel-in-progress: false
+
+jobs:
+  native-mac-release-stage:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact immutable V3 Final Four source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: dfbabeca64527b405fd9c35c42be74cf6c9dfea3
+      - name: Compile native macOS runtime and prepare immutable checked release only
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          [[ "$(git rev-parse HEAD)" == 'dfbabeca64527b405fd9c35c42be74cf6c9dfea3' ]]
+          [[ -z "$(git status --porcelain)" ]]
+          git switch -c "v3-mac-native-release-run-$GITHUB_RUN_ID"
+          npm ci --ignore-scripts --no-audit --no-fund
+          node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit
+          node node_modules/typescript/bin/tsc -p tsconfig.json
+          node scripts/operations/v3-final4-stage-mac-release.mjs --prepare dfbabeca64527b405fd9c35c42be74cf6c9dfea3
+          echo "V3_MAC_RUNTIME_SOURCE_STAGED_NO_AGENTS_STARTED"
