@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       installation_action:
-        description: "Install the versioned per-user LaunchAgent. Does not execute a fleet test."
+        description: "Install P08 or repair its bounded ESM runtime without touching V2."
         type: choice
-        options: [stage-install]
+        options: [stage-install, repair-esm]
         default: stage-install
         required: true
 
@@ -22,7 +22,7 @@ jobs:
     if: >-
       github.repository == 'rezanory/radlina-remote-mcp' &&
       github.actor == 'rezanory' &&
-      inputs.installation_action == 'stage-install'
+      (inputs.installation_action == 'stage-install' || inputs.installation_action == 'repair-esm')
     runs-on: [self-hosted, macOS, X64, radlina-macbook]
     environment: v3-mac-dev-validation-no-review
     timeout-minutes: 25
@@ -33,6 +33,7 @@ jobs:
           persist-credentials: false
           ref: ad0bd0290df616b9038fd23202c0212a70661453
       - name: Install only versioned V3 signed heartbeat LaunchAgent
+        if: ${{ inputs.installation_action == 'stage-install' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -42,6 +43,53 @@ jobs:
           [[ "$(node --version)" == 'v24.20.0' ]]
           [[ "$(git rev-parse HEAD)" == 'ad0bd0290df616b9038fd23202c0212a70661453' ]]
           bash scripts/operations/v3-mac-launchagent-install.sh --install
+      - name: Repair verified P08 TypeScript ESM mode without replacing the signed sender
+        if: ${{ inputs.installation_action == 'repair-esm' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          [[ "$(git rev-parse HEAD)" == 'ad0bd0290df616b9038fd23202c0212a70661453' ]]
+          BASE="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
+          SCRIPT="$BASE/v3-mac-heartbeat-sender.ts"
+          SOURCE="$BASE/signer-de625477bbbc60d37adcc690c082df53fe5e6d6f"
+          LABEL='com.radlina.remote-mcp.v3.mac-heartbeat'
+          PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+          PKG="$BASE/package.json"
+          for dir in "$BASE" "$SOURCE"; do
+            [[ -d "$dir" && ! -L "$dir" && "$(stat -f '%Lp' "$dir")" == '700' ]]
+          done
+          [[ "$(git -C "$SOURCE" rev-parse HEAD)" == 'de625477bbbc60d37adcc690c082df53fe5e6d6f' ]]
+          for file in "$SCRIPT" "$PLIST"; do
+            [[ -f "$file" && ! -L "$file" && "$(stat -f '%Lp' "$file")" == '600' ]]
+          done
+          cmp -s "$SCRIPT" scripts/operations/v3-mac-heartbeat-sender.ts
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:2' "$PLIST")" == "$SCRIPT" ]]
+          DOMAIN="gui/$(id -u)"
+          if ! launchctl print "$DOMAIN" >/dev/null 2>&1; then DOMAIN="user/$(id -u)"; fi
+          launchctl print "$DOMAIN/$LABEL" >/dev/null
+          if [[ -e "$PKG" || -L "$PKG" ]]; then
+            [[ -f "$PKG" && ! -L "$PKG" && "$(stat -f '%Lp' "$PKG")" == '600' ]]
+            node -e 'const p=require(process.argv[1]);if(p.type!=="module"||p.private!==true)process.exit(21)' "$PKG"
+            echo 'P08_ESM_CONTEXT_ALREADY_VALID'
+          else
+            TMP="$(mktemp "$BASE/.p08-esm-context.XXXXXXXX")"
+            trap 'rm -f "$TMP"' EXIT
+            printf '%s\n' '{"private":true,"type":"module"}' > "$TMP"
+            chmod 600 "$TMP"
+            [[ ! -e "$PKG" && ! -L "$PKG" ]]
+            mv -n "$TMP" "$PKG"
+            [[ -f "$PKG" && ! -L "$PKG" && "$(stat -f '%Lp' "$PKG")" == '600' ]]
+            node -e 'const p=require(process.argv[1]);if(p.type!=="module"||p.private!==true)process.exit(22)' "$PKG"
+            echo 'P08_ESM_CONTEXT_REPAIRED'
+          fi
+          launchctl kickstart "$DOMAIN/$LABEL"
+          echo 'P08_VERIFIED_ESM_REPAIR_TRIGGERED_NOT_ACCEPTED'
       - name: Summarize installation, not acceptance
         shell: bash
         run: |
