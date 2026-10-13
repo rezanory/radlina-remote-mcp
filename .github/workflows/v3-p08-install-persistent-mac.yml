@@ -27,10 +27,11 @@ jobs:
     environment: v3-mac-dev-validation-no-review
     timeout-minutes: 25
     steps:
-      - name: Checkout selected immutable source
+      - name: Checkout exact reviewed V3 installer source
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ad0bd0290df616b9038fd23202c0212a70661453
       - name: Install only versioned V3 signed heartbeat LaunchAgent
         shell: bash
         run: |
@@ -39,6 +40,7 @@ jobs:
           [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
           [[ "$(uname -m)" == 'x86_64' ]]
           [[ "$(node --version)" == 'v24.20.0' ]]
+          [[ "$(git rev-parse HEAD)" == 'ad0bd0290df616b9038fd23202c0212a70661453' ]]
           bash scripts/operations/v3-mac-launchagent-install.sh --install
       - name: Summarize installation, not acceptance
         shell: bash
