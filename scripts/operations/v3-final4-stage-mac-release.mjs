@@ -69,7 +69,7 @@ async function walk(directory,prefix){
   for(const item of entries){
     // npm creates command symlinks in .bin; these are unnecessary for runtime
     // because all LaunchAgents use the exact absolute node + tsx cli path.
-    if(prefix==="node_modules"&&item.name===".bin")continue;
+    if((prefix==="node_modules"||prefix.startsWith("node_modules/"))&&item.name===".bin")continue;
     const rel=validateReleaseRelativePath(prefix+"/"+item.name);
     if(item.isSymbolicLink())deny("release dependency symlink forbidden: "+rel);
     if(item.isDirectory())out.push(...await walk(path.join(directory,item.name),rel));
