@@ -104,6 +104,39 @@ jobs:
             }
           }
           P08_LOG_ERRORS
+          node <<'CLASSIFY_P08_ERRORS'
+          const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
+          const file=path.join(os.homedir(),'.local','share','radlina','v3-beta','macbook-main-agent','launchd-err.log');
+          if(fs.existsSync(file)){
+            const log=fs.readFileSync(file,'utf8');
+            const indicators={
+              ERR_MODULE_NOT_FOUND:/ERR_MODULE_NOT_FOUND|Cannot find (?:package|module)/u,
+              ERR_UNKNOWN_FILE_EXTENSION:/ERR_UNKNOWN_FILE_EXTENSION/u,
+              ERR_REQUIRE_ESM:/ERR_REQUIRE_ESM/u,
+              ERR_PERMISSION:/EACCES|EPERM|permission denied/u,
+              ERR_KEYCHAIN:/Keychain|security:|SecKey/u,
+              ERR_PUBLIC_NETWORK:/fetch failed|ETIMEDOUT|ENOTFOUND|ECONNRESET/u,
+              ERR_PROCESS_ARGV:/immutable pinned signer required/u,
+              ERR_TSX:/tsx|node_modules\/tsx/u,
+              ERR_SYNTAX:/SyntaxError|TransformError|Unexpected token/u,
+              ERR_UNCAUGHT:/uncaughtException|UnhandledPromiseRejection|node:internal/u,
+            };
+            for(const [name,re] of Object.entries(indicators)){
+              console.log('p08.errorCategory.'+name+'='+re.test(log));
+            }
+            const codes=Array.from(new Set(log.match(/\bERR_[A-Z0-9_]+\b/gu)||[])).slice(-12);
+            console.log('p08.nodeErrorCodes='+JSON.stringify(codes));
+            const last=log.split(/\r?\n/u).filter(Boolean).slice(-30);
+            const sanitized=last.filter(x=>/^(?:\s*(?:Error|TypeError|ReferenceError|SyntaxError|TransformError):|\s*Error \[ERR_|\s*code: ['"]ERR_)/u.test(x));
+            for(const line of sanitized.slice(-3)){
+              const cleaned=line.trim().replace(/\/?Users\/[^/\s]+\/\S+/gu,'[PATH]')
+                .replace(/\/?home\/[^/\s]+\/\S+/gu,'[PATH]')
+                .replace(/(Bearer|token|secret)[^\s]{0,60}/giu,'[REDACTED]')
+                .replace(/[A-Za-z0-9+/=_-]{95,}/gu,'[REDACTED]');
+              console.log('p08.errorMessage='+cleaned.slice(0,200));
+            }
+          }
+          CLASSIFY_P08_ERRORS
           node <<'NETWORK_P08'
           const url='https://v3-mcp.radlina.com/auth-health';
           try{
