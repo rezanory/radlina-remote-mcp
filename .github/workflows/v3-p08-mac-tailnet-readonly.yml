@@ -1,0 +1,73 @@
+name: V3 P08 Mac Tailnet / Signer Read-Only Diagnosis (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-tailnet-readonly-diagnosis
+  cancel-in-progress: false
+
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 8
+    steps:
+      - name: Classify physical macOS Tailscale state without modifying network or keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          node <<'CHECK_TAILNET'
+          const fs=require('node:fs');
+          const cp=require('node:child_process');
+          const crypto=require('node:crypto');
+          const paths=[
+            '/usr/local/bin/tailscale',
+            '/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+          ];
+          for(const binary of paths) {
+            if(!fs.existsSync(binary)){console.log('v3.tailnet.binaryPresent=false');continue;}
+            console.log('v3.tailnet.binaryPresent=true');
+            let v;
+            try {
+              v=JSON.parse(cp.execFileSync(binary,['status','--json'],
+                {encoding:'utf8',timeout:13000,maxBuffer:1024*1024}));
+            }catch(e){
+              console.log('v3.tailnet.readable=false');
+              console.log('v3.tailnet.cliExitCode='+String(e.status??'unknown'));
+              continue;
+            }
+            const me=v.Self||{};
+            const peer=Object.values(v.Peer||{}).find(x=>
+              /laptop-13qineif/i.test(String(x.HostName??''))||
+              /laptop-13qineif/i.test(String(x.DNSName??'')));
+            const id=typeof me.ID==='string'?me.ID:'';
+            console.log('v3.tailnet.backend='+String(v.BackendState||'unknown'));
+            console.log('v3.tailnet.nameMatch='+(v.CurrentTailnet?.Name==='rezanory.github'));
+            console.log('v3.tailnet.selfIdPresent='+Boolean(id));
+            console.log('v3.tailnet.selfIdFingerprint='+(id?crypto.createHash('sha256').update(id).digest('hex'):'MISSING'));
+            console.log('v3.tailnet.selfOnline='+String(me.Online??'MISSING'));
+            console.log('v3.tailnet.selfOS='+String(me.OS??'MISSING'));
+            console.log('v3.tailnet.selfExpired='+String(me.Expired??false));
+            console.log('v3.tailnet.loggedOut='+String(v.BackendState==='NeedsLogin'));
+            console.log('v3.tailnet.windowsPeerVisible='+Boolean(peer));
+            console.log('v3.tailnet.windowsPeerOnline='+String(peer?.Online??'MISSING'));
+            console.log('v3.tailnet.windowsPeerLastSeenPresent='+Boolean(peer?.LastSeen));
+            console.log('v3.tailnet.p08SignerExactPredicate='+
+              (v.BackendState==='Running'&&v.CurrentTailnet?.Name==='rezanory.github'&&
+               me.Online===true&&Boolean(id)));
+          }
+          CHECK_TAILNET
+          echo 'V3_MAC_TAILNET_READ_ONLY_DIAGNOSED_NO_VPN_CHANGES'
