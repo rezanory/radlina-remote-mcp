@@ -49,7 +49,7 @@ jobs:
           const manifest=join(release,'RELEASE_MANIFEST.json');
           if(!existsSync(manifest)||lstatSync(manifest).isSymbolicLink())throw Error('trusted immutable native Mac release missing');
           if(createHash('sha256').update(readFileSync(manifest)).digest('hex')!==trustedManifest)throw Error('native release manifest mismatch');
-          const util=await import(pathToFileURL(join(release,'dist','utils','json.js')).href);
+          const util=await import(pathToFileURL(join(release,'dist','src','utils','json.js')).href);
           if(typeof util.canonicalJson!=='function')throw Error('canonical signer serializer unavailable');
           const record=JSON.parse(policyJson);
           const p=record.policy;
