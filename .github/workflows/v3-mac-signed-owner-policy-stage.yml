@@ -49,6 +49,12 @@ jobs:
           const manifest=join(release,'RELEASE_MANIFEST.json');
           if(!existsSync(manifest)||lstatSync(manifest).isSymbolicLink())throw Error('trusted immutable native Mac release missing');
           if(createHash('sha256').update(readFileSync(manifest)).digest('hex')!==trustedManifest)throw Error('native release manifest mismatch');
+          const fullVerifier=join(release,'scripts','operations','verify-release.mjs');
+          if(!existsSync(fullVerifier)||lstatSync(fullVerifier).isSymbolicLink())throw Error('independent native full-file verifier absent');
+          execFileSync(process.execPath,[fullVerifier,release,trustedManifest],{
+            timeout:110000,maxBuffer:2*1024*1024,stdio:'ignore'
+          });
+          console.log('v3.macOwnerPolicy.all16610ReleaseFilesVerified=true');
           const util=await import(pathToFileURL(join(release,'dist','src','utils','json.js')).href);
           if(typeof util.canonicalJson!=='function')throw Error('canonical signer serializer unavailable');
           const record=JSON.parse(policyJson);
@@ -59,8 +65,8 @@ jobs:
             p.approvalMode!=='interactive-target-local'||
             !Array.isArray(p.allowedCapabilities)||
             p.allowedCapabilities.join(',')!=='device.health,filesystem.read,filesystem.write'||
-            Date.parse(p.expiresAt)<Date.now()+60*60*1000||
-            Date.parse(p.createdAt)>Date.now()+120000)
+            !Number.isFinite(Date.parse(p.expiresAt))||Date.parse(p.expiresAt)<Date.now()+60*60*1000||
+            !Number.isFinite(Date.parse(p.createdAt))||Date.parse(p.createdAt)>Date.now()+120000)
             throw Error('real owner policy expired, overbroad or wrong target');
           const ownerKey=createPublicKey(p.ownerPublicKeyPem);
           const pin=createHash('sha256').update(ownerKey.export({type:'spki',format:'der'})).digest('hex');
