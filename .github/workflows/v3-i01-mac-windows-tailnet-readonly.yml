@@ -15,6 +15,7 @@ jobs:
     if: >-
       github.repository == 'rezanory/radlina-remote-mcp' &&
       github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
       github.ref == 'refs/heads/production/controller-full-control-v1'
     environment: v3-mac-dev-validation-no-review
     runs-on: [self-hosted, macOS, X64, radlina-macbook]
@@ -42,9 +43,13 @@ jobs:
           if(!query.ok)throw Error('Mac Tailnet status not available');
           const status=JSON.parse(query.output);
           const self=status.Self||{};
-          const peer=Object.values(status.Peer||{}).find(p=>
-            String(p.HostName||'').toLowerCase()==='laptop-13qineif'||
+          const entries=Object.values(status.Peer||{});
+          const exactDns=entries.filter(p=>
             String(p.DNSName||'').replace(/\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net');
+          const fallback=entries.filter(p=>
+            String(p.HostName||'').toLowerCase()==='laptop-13qineif');
+          const peer=exactDns.length===1?exactDns[0]:
+            exactDns.length===0&&fallback.length===1?fallback[0]:undefined;
           console.log('v3.i01.preflightMacOnline='+Boolean(self.Online));
           console.log('v3.i01.preflightWindowsPeerPresent='+Boolean(peer));
           console.log('v3.i01.preflightWindowsPeerOnline='+Boolean(peer?.Online));
