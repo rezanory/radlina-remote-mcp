@@ -1,0 +1,82 @@
+name: V3 P08 Mac VPN Extension and Process Diagnostics (manual read-only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-p08-mac-extension-diagnose
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 5
+    steps:
+      - name: Read exact macOS VPN extension and routing state without mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          node <<'READONLY'
+          const cp=require('node:child_process');
+          const path=require('node:path');
+          const run=(bin,args,timeout=14000)=>{
+            try{return {ok:true,output:cp.execFileSync(bin,args,{encoding:'utf8',maxBuffer:2e6,timeout})}}
+            catch(e){return{ok:false,code:String(e.status??e.code??'unknown')}}
+          };
+          const processes=run('/bin/ps',['-axo','comm=']);
+          if(processes.ok){
+            const set=new Set(processes.output.split('\n').map(x=>path.basename(x.trim())).filter(x=>/tailscale|vee.?pn/i.test(x)));
+            for(const name of [...set].sort()) {
+              if(/^[A-Za-z0-9._ -]{1,70}$/.test(name))
+                console.log('v3.macVpn.processBasename='+name);
+            }
+          }else console.log('v3.macVpn.processQueryFailed=true');
+          const launch=run('/bin/launchctl',['list']);
+          if(launch.ok){
+            const names=launch.output.split('\n').map(line=>line.trim().split(/\s+/).at(-1)??'')
+              .filter(name=>/tailscale|vee.?pn/i.test(name)&&/^[A-Za-z0-9._-]{1,120}$/.test(name));
+            for(const name of names.slice(0,15))console.log('v3.macVpn.launchLabel='+name);
+          }else console.log('v3.macVpn.launchQueryFailed=true');
+          const sx=run('/usr/bin/systemextensionsctl',['list']);
+          if(sx.ok){
+            const lines=sx.output.split('\n').filter(x=>/tailscale|vee.?pn/i.test(x));
+            for(const l of lines.slice(0,12)) {
+              const desc=l.toLowerCase();
+              console.log('v3.macVpn.extensionPresent=true');
+              console.log('v3.macVpn.extensionTailscale='+desc.includes('tailscale'));
+              console.log('v3.macVpn.extensionActive='+desc.includes('[activated enabled]'));
+              console.log('v3.macVpn.extensionWaitingApproval='+/awaiting|waiting|needs.*approval/.test(desc));
+            }
+          }else console.log('v3.macVpn.extensionQueryFailed=true');
+          const proxy=run('/usr/sbin/scutil',['--proxy']);
+          if(proxy.ok){
+            for(const key of ['HTTPEnable','HTTPSEnable','SOCKSEnable','ProxyAutoConfigEnable','ProxyAutoDiscoveryEnable']) {
+              const match=proxy.output.match(new RegExp('(?:^|\\n)\\s*'+key+'\\s*:\\s*([01])','m'));
+              console.log('v3.macVpn.proxy.'+key+'='+(match?match[1]:'absent'));
+            }
+          }
+          const services=run('/usr/sbin/scutil',['--nc','list']);
+          if(services.ok){
+            for(const l of services.output.split('\n').filter(s=>/tailscale|vee.?pn/i.test(s)).slice(0,8)){
+              console.log('v3.macVpn.configuredVpnTailscale='+/tailscale/i.test(l));
+              console.log('v3.macVpn.configuredVpnConnected='+/Connected/i.test(l));
+            }
+          }
+          const route=run('/sbin/route',['-n','get','default']);
+          if(route.ok){
+            const m=route.output.match(/\binterface:\s*([a-z]+\d+)/i);
+            console.log('v3.macVpn.defaultInterface='+(m?m[1]:'unknown'));
+          }
+          console.log('V3_MAC_OS_VPN_EXTENSION_READONLY_DIAGNOSTIC_COMPLETE');
+          READONLY
