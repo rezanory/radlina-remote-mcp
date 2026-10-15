@@ -86,6 +86,9 @@ jobs:
           const util=await import(pathToFileURL(join(release,'dist','src','utils','json.js')).href);
           if(typeof util.canonicalJson!=='function')throw Error('canonical signer serializer unavailable');
           const record=JSON.parse(policyJson);
+          if(!record||typeof record!=='object'||Array.isArray(record)||
+            Object.keys(record).sort().join(',')!=='ownerSignatureBase64,policy')
+            throw Error('owner signed record has unexpected unverified fields');
           const p=record.policy;
           if(p?.schema!=='radlina.v3.i01.macos-physical-operator-policy/v1'||
             p.macDeviceId!=='macbook-main'||p.controllerDeviceId!=='windows-main'||
@@ -118,7 +121,7 @@ jobs:
           if(folder.isSymbolicLink()||!folder.isDirectory()||(folder.mode&0o077)!==0)
             throw Error('owner policy private directory permission invalid');
           const dest=join(dir,'mac-operator-owner-signed-20261015.json');
-          const bytes=Buffer.from(JSON.stringify(record)+'\n');
+          const bytes=Buffer.from(JSON.stringify({policy:p,ownerSignatureBase64:record.ownerSignatureBase64})+'\n');
           const digest=createHash('sha256').update(bytes).digest('hex');
           if(existsSync(dest)) {
             const st=lstatSync(dest);
