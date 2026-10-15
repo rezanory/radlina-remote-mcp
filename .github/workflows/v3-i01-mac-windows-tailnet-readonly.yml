@@ -42,7 +42,12 @@ jobs:
           if(!query.ok)throw Error('Mac Tailnet status not available');
           const status=JSON.parse(query.output);
           const self=status.Self||{};
-          const peer=Object.values(status.Peer||{}).find(p=>p.HostName==='laptop-13qineif');
+          const peer=Object.values(status.Peer||{}).find(p=>
+            String(p.HostName||'').toLowerCase()==='laptop-13qineif'||
+            String(p.DNSName||'').replace(/\\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net');
+          console.log('v3.i01.preflightMacOnline='+Boolean(self.Online));
+          console.log('v3.i01.preflightWindowsPeerPresent='+Boolean(peer));
+          console.log('v3.i01.preflightWindowsPeerOnline='+Boolean(peer?.Online));
           if(status.BackendState!=='Running'||status.CurrentTailnet?.Name!=='rezanory.github'
              ||self.Online!==true||!self.ID||!peer||peer.Online!==true)
             throw Error('live Mac and Windows enrollment prerequisites missing');
