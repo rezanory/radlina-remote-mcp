@@ -1,0 +1,65 @@
+name: V3 I01 Mac to Windows Tailnet Physical Read-Only Reachability
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-i01-mac-peer-readonly-20261015
+  cancel-in-progress: false
+
+jobs:
+  mac-to-windows:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 6
+    steps:
+      - name: Check exact P03 trusted Tailscale identity and bounded Mac to Windows reachability
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          node <<'READ_ONLY'
+          const cp=require('node:child_process');
+          const fs=require('node:fs');
+          const crypto=require('node:crypto');
+          const cli='/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+          if(!fs.existsSync(cli))throw Error('registered Mac CLI unavailable');
+          function exec(args,ms=12000){
+            try{return {ok:true,output:cp.execFileSync(cli,args,{encoding:'utf8',timeout:ms,maxBuffer:1048576}),exit:0}}
+            catch(e){return {ok:false,output:String(e.stdout||'')+'\n'+String(e.stderr||''),exit:Number.isInteger(e.status)?e.status:-1}}
+          }
+          const query=exec(['status','--json']);
+          if(!query.ok)throw Error('Mac Tailnet status not available');
+          const status=JSON.parse(query.output);
+          const self=status.Self||{};
+          const peer=Object.values(status.Peer||{}).find(p=>p.HostName==='laptop-13qineif');
+          if(status.BackendState!=='Running'||status.CurrentTailnet?.Name!=='rezanory.github'
+             ||self.Online!==true||!self.ID||!peer||peer.Online!==true)
+            throw Error('live Mac and Windows enrollment prerequisites missing');
+          const fp=crypto.createHash('sha256').update(self.ID).digest('hex');
+          console.log('v3.i01.realMacIdentityPresent=true');
+          console.log('v3.i01.macTailnetNodeFingerprint='+fp);
+          console.log('v3.i01.windowsPeerOnline=true');
+          console.log('v3.i01.peerDirectEndpointPresent='+Boolean(peer.CurAddr));
+          const args=['laptop-13qineif'];
+          for(const [kind,extra] of [['disco',[]],['tsmp',['--tsmp']]]) {
+            const test=exec(['ping',...extra,'--c','1','--timeout','8s',...args],18000);
+            const out=test.output;
+            console.log('v3.i01.'+kind+'.exitCode='+test.exit);
+            console.log('v3.i01.'+kind+'.pong='+/pong from /i.test(out));
+            console.log('v3.i01.'+kind+'.derpRelay='+/via DERP\(/i.test(out));
+            console.log('v3.i01.'+kind+'.directConnection='+/via \d+\.\d+\.\d+\.\d+:\d+/i.test(out));
+            console.log('v3.i01.'+kind+'.timeout='+/timed out|no reply/i.test(out));
+          }
+          console.log('V3_MAC_TO_WINDOWS_ACTUAL_TAILNET_READONLY_PROBE_DONE_NOT_I01_ACCEPTANCE');
+          READ_ONLY
