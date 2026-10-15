@@ -44,7 +44,7 @@ jobs:
           const self=status.Self||{};
           const peer=Object.values(status.Peer||{}).find(p=>
             String(p.HostName||'').toLowerCase()==='laptop-13qineif'||
-            String(p.DNSName||'').replace(/\\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net');
+            String(p.DNSName||'').replace(/\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net');
           console.log('v3.i01.preflightMacOnline='+Boolean(self.Online));
           console.log('v3.i01.preflightWindowsPeerPresent='+Boolean(peer));
           console.log('v3.i01.preflightWindowsPeerOnline='+Boolean(peer?.Online));
