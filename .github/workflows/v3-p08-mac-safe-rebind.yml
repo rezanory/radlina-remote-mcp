@@ -1,0 +1,96 @@
+name: V3 Physical Mac Tailscale Safe Socket Rebind (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-tailnet-bounded-rebind
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 6
+    steps:
+      - name: Rebind Tailscale sockets once without VPN down/up or identity reset
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          node <<'BOUND_REBIND'
+          const cp=require('node:child_process');
+          const fs=require('node:fs');
+          const crypto=require('node:crypto');
+          const b=['/usr/local/bin/tailscale','/Applications/Tailscale.app/Contents/MacOS/Tailscale'].find(p=>fs.existsSync(p));
+          if(!b)throw Error('existing CLI missing; do not install or change VPN');
+          function run(args,timeout=17000) {
+            return cp.execFileSync(b,args,{encoding:'utf8',timeout,maxBuffer:1024*1024});
+          }
+          function snapshot(timeout=17000) {
+            const s=JSON.parse(run(['status','--json'],timeout));
+            return {backend:s.BackendState,tailnet:s.CurrentTailnet?.Name,
+              selfId:s.Self?.ID,selfOnline:s.Self?.Online===true,
+              expired:s.Self?.Expired===true};
+          }
+          const before=snapshot();
+          if(before.backend!=='Running'||before.tailnet!=='rezanory.github'||!before.selfId||before.expired)
+            throw Error('Tailscale identity not trusted; no attempt');
+          const beforeHash=crypto.createHash('sha256').update(before.selfId).digest('hex');
+          console.log('v3.rebind.beforeOnline='+before.selfOnline);
+          console.log('v3.rebind.beforeNodeHash='+beforeHash);
+          if(before.selfOnline) {
+            console.log('V3_REBIND_NOT_NEEDED_NODE_ALREADY_ONLINE');
+            process.exit(0);
+          }
+          let out='';
+          try {
+            out=run(['debug','--help'],12000);
+          } catch { throw Error('Tailscale debug subcommands unavailable; no mutation'); }
+          if(!/(^|\s)rebind(\s|$)/m.test(out))
+            throw Error('safe socket rebind unavailable; do not attempt VPN restart');
+          try {
+            run(['debug','rebind'],16000);
+            console.log('v3.rebind.commandAccepted=true');
+          } catch(e) {
+            console.log('v3.rebind.commandAccepted=false');
+            throw Error('one safe socket rebind failed; no retries or VPN changes');
+          }
+          // Single bounded propagation; never change stored tailnet preferences.
+          const deadline=Date.now()+24000;
+          let after=null;
+          let transientStatusErrors=0;
+          while(Date.now()<deadline) {
+            const remaining=deadline-Date.now();
+            if(remaining<500)break;
+            try {
+              after=snapshot(Math.min(3500,remaining));
+              if(after.selfOnline)break;
+            } catch {
+              transientStatusErrors++;
+            }
+            if(Date.now()+3000<deadline)
+              cp.execFileSync('/bin/sleep',['3'],{timeout:5000});
+          }
+          console.log('v3.rebind.transientStatusErrors='+transientStatusErrors);
+          if(!after)throw Error('Tailscale status unavailable after bounded rebind; fails closed');
+          const afterHash=crypto.createHash('sha256').update(after.selfId||'').digest('hex');
+          console.log('v3.rebind.afterOnline='+after.selfOnline);
+          console.log('v3.rebind.sameNodeIdentity='+(afterHash===beforeHash));
+          console.log('v3.rebind.sameTailnet='+(after.tailnet===before.tailnet));
+          if(afterHash!==beforeHash||after.tailnet!==before.tailnet)
+            throw Error('unexpected node identity changed; fails closed');
+          if(!after.selfOnline) throw Error('socket rebind completed but node remains offline; external network remediation required');
+          console.log('V3_MAC_TAILSCALE_SAFE_REBIND_ONLINE_PASS');
+          BOUND_REBIND
+          echo 'V3_ONLY_MAC_NET_SOCKETS_ATTEMPTED_V2_WIN_NO_CHANGE'
