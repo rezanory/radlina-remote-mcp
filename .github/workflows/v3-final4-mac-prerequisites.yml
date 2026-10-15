@@ -38,6 +38,11 @@ jobs:
             ACTUAL="$(shasum -a 256 "$MANIFEST" | awk '{print $1}')"
             echo "v3.macReleaseManifestMatches=$([[ "$ACTUAL" == "$SHA" ]] && echo true || echo false)"
             [[ "$ACTUAL" == "$SHA" ]]
+            # Check every staged file against the full immutable manifest, not just its digest.
+            VERIFIER="$RELEASE/scripts/operations/verify-release.mjs"
+            [[ -f "$VERIFIER" && ! -L "$VERIFIER" ]]
+            node "$VERIFIER" "$RELEASE" "$SHA"
+            echo 'v3.macReleaseAllFilesVerified=true'
           else
             echo 'v3.macReleaseStaged=false'
             exit 22
