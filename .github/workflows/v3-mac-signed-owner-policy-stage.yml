@@ -15,6 +15,7 @@ jobs:
     if: >-
       github.repository == 'rezanory/radlina-remote-mcp' &&
       github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
       github.ref == 'refs/heads/production/controller-full-control-v1'
     runs-on: [self-hosted, macOS, X64, radlina-macbook]
     environment: v3-mac-dev-validation-no-review
