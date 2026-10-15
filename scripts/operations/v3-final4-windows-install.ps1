@@ -84,13 +84,20 @@ foreach ($task in $tasks) {
     throw ('Existing V3 task must not be replaced: '+$task.Name)
   }
 }
+# Isolated V3-only Windows Task Scheduler folder; never touch V2.
+$scheduler=New-Object -ComObject Schedule.Service
+$scheduler.Connect()
+$rootFolder=$scheduler.GetFolder('\')
+try {$null=$scheduler.GetFolder('\RadlinaV3')} catch {
+  $null=$rootFolder.CreateFolder('RadlinaV3')
+}
 $principal=New-ScheduledTaskPrincipal -UserId 'LAPTOP-13QINEIF\Radlina' -LogonType Interactive -RunLevel Highest
 $trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 1) -RepetitionDuration (New-TimeSpan -Days 3650)
-$settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -StartWhenAvailable:$false -MultipleInstances IgnoreNew
+$settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -StartWhenAvailable:$false -MultipleInstances IgnoreNew -Disable
 foreach ($task in $tasks) {
   $argument='-NoProfile -NonInteractive -File "'+$launcher+'" -Role '+$task.Role+' -FinalFourConfigFile "'+$config+'" -FinalFourConfigSha256 '+$FinalFourConfigSha256
   $action=New-ScheduledTaskAction -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -Argument $argument -WorkingDirectory $supervisor
   Register-ScheduledTask -TaskName $task.Name -TaskPath '\RadlinaV3\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings | Out-Null
 }
 Write-Output 'V3_WINDOWS_FINAL4_INTERACTIVE_TASKS_INSTALLED'
-Write-Output 'No V2 changes, physical canary/rollback or acceptance claimed.'
+Write-Output 'All three V3 tasks installed DISABLED pending scoped owner approval; no V2 changes, canary/rollback or acceptance claimed.'
