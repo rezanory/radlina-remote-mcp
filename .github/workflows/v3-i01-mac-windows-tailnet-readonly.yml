@@ -47,13 +47,15 @@ jobs:
              ||self.Online!==true||!self.ID||!peer||peer.Online!==true)
             throw Error('live Mac and Windows enrollment prerequisites missing');
           const fp=crypto.createHash('sha256').update(self.ID).digest('hex');
+          if(fp!=='c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c')
+            throw Error('live Mac Tailscale node does not match independent protected P03 enrollment');
           console.log('v3.i01.realMacIdentityPresent=true');
           console.log('v3.i01.macTailnetNodeFingerprint='+fp);
           console.log('v3.i01.windowsPeerOnline=true');
           console.log('v3.i01.peerDirectEndpointPresent='+Boolean(peer.CurAddr));
           const args=['laptop-13qineif'];
           for(const [kind,extra] of [['disco',[]],['tsmp',['--tsmp']]]) {
-            const test=exec(['ping',...extra,'--c','1','--timeout','8s',...args],18000);
+            const test=exec(['ping',...extra,'--c','3','--timeout','5s',...args],25000);
             const out=test.output;
             console.log('v3.i01.'+kind+'.exitCode='+test.exit);
             console.log('v3.i01.'+kind+'.pong='+/pong from /i.test(out));
