@@ -1,0 +1,94 @@
+name: V3 Final Four Mac Physical Prerequisite Preflight (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-final4-mac-prereq-readonly
+  cancel-in-progress: false
+
+jobs:
+  verify-mac-prerequisites:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 10
+    steps:
+      - name: Read only exact V3 native release, agents and Keychain item presence
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          echo 'v3.macRunnerVerified=true'
+          SHA='dc5f17f68a43e05bccf8e94915f509e0bdfe92b381b63d58efacbeea0062cd3d'
+          ROOT="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
+          RELEASE="$ROOT/releases/$SHA"
+          MANIFEST="$RELEASE/RELEASE_MANIFEST.json"
+          if [[ -d "$RELEASE" && ! -L "$RELEASE" && -f "$MANIFEST" && ! -L "$MANIFEST" ]]; then
+            ACTUAL="$(shasum -a 256 "$MANIFEST" | awk '{print $1}')"
+            echo "v3.macReleaseManifestMatches=$([[ "$ACTUAL" == "$SHA" ]] && echo true || echo false)"
+            [[ "$ACTUAL" == "$SHA" ]]
+            # Check every staged file against the full immutable manifest, not just its digest.
+            VERIFIER="$RELEASE/scripts/operations/verify-release.mjs"
+            [[ -f "$VERIFIER" && ! -L "$VERIFIER" ]]
+            node "$VERIFIER" "$RELEASE" "$SHA"
+            echo 'v3.macReleaseAllFilesVerified=true'
+          else
+            echo 'v3.macReleaseStaged=false'
+            exit 22
+          fi
+          for script in v3-mac-operator-cycle.ts v3-mac-fleet-cycle.ts v3-s03-mac-witness-daemon.ts; do
+            path="$RELEASE/scripts/operations/$script"
+            if [[ -f "$path" && ! -L "$path" ]]; then
+              echo "v3.agentEntrypoint.$script=true"
+            else
+              echo "v3.agentEntrypoint.$script=false"
+            fi
+          done
+          DOMAIN="gui/$(id -u)"
+          if ! launchctl print "$DOMAIN" >/dev/null 2>&1; then DOMAIN="user/$(id -u)"; fi
+          for role in mac-heartbeat mac-operator mac-fleet-agent mac-s03-witness; do
+            label="com.radlina.remote-mcp.v3.$role"
+            plist="$HOME/Library/LaunchAgents/$label.plist"
+            if [[ -f "$plist" && ! -L "$plist" ]]; then
+              echo "v3.launchAgentPlist.$role=true"
+              echo "v3.launchAgentPlistPrivate.$role=$([[ "$(stat -f '%Lp' "$plist")" == '600' ]] && echo true || echo false)"
+            else
+              echo "v3.launchAgentPlist.$role=false"
+            fi
+            if launchctl print "$DOMAIN/$label" >/dev/null 2>&1; then
+              echo "v3.launchAgentRegistered.$role=true"
+            else
+              echo "v3.launchAgentRegistered.$role=false"
+            fi
+          done
+          if /usr/bin/security find-generic-password -s 'com.radlina.remote-mcp.v3.s03-writer-token' -a 'amirsheikhzadeh' >/dev/null 2>&1; then
+            echo 'v3.s03WriterTokenKeychainItemPresent=true'
+          else
+            echo 'v3.s03WriterTokenKeychainItemPresent=false'
+          fi
+          if /usr/bin/security find-generic-password -s 'com.radlina.remote-mcp.v3.s03-writer-hmac-base64' -a 'amirsheikhzadeh' >/dev/null 2>&1; then
+            echo 'v3.s03HmacKeychainItemPresent=true'
+          else
+            echo 'v3.s03HmacKeychainItemPresent=false'
+          fi
+          S03="$HOME/.local/share/radlina/v3-beta/macbook-main-s03"
+          for filename in s03-writer-token.secret s03-writer-hmac.b64 witness-public-receipt.json; do
+            file="$S03/$filename"
+            if [[ -f "$file" && ! -L "$file" && "$(stat -f '%Lp' "$file")" == '600' ]]; then
+              echo "v3.s03PrivateFileMode.$filename=true"
+            else
+              echo "v3.s03PrivateFileMode.$filename=false"
+            fi
+          done
+          echo 'V3_MAC_FINAL4_READONLY_PREFLIGHT_COMPLETE_NOT_PRODUCTION_ACCEPTANCE'
