@@ -1,0 +1,100 @@
+name: V3 P08 Mac Tailscale App One-Time Reconnect (owner-authorized)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-single-app-reconnect
+  cancel-in-progress: false
+
+jobs:
+  reconnect:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 8
+    steps:
+      - name: Restart ONLY the Mac Tailscale GUI app once, preserve network identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ -d /Applications/Tailscale.app ]]
+          node <<'ONE_APP_CYCLE'
+          const cp=require('node:child_process');
+          const crypto=require('node:crypto');
+          const fs=require('node:fs');
+          const b='/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+          if(!fs.existsSync(b))throw Error('exact existing Mac Standalone CLI missing');
+          function run(exe,args,ms=12000){return cp.execFileSync(exe,args,
+            {encoding:'utf8',timeout:ms,maxBuffer:1024*1024})}
+          function state(ms=12000){
+            const s=JSON.parse(run(b,['status','--json'],ms));
+            return {online:s.Self?.Online===true,id:s.Self?.ID,
+              backend:s.BackendState,tailnet:s.CurrentTailnet?.Name,
+              expired:s.Self?.Expired===true};
+          }
+          const old=state();
+          if(old.backend!=='Running'||old.tailnet!=='rezanory.github'||!old.id||old.expired)
+            throw Error('exact P03 Mac tailnet not stable; refuse GUI restart');
+          const pinned=crypto.createHash('sha256').update(old.id).digest('hex');
+          console.log('v3.macApp.initialOnline='+old.online);
+          console.log('v3.macApp.pinnedNodeHash='+pinned);
+          if(old.online) {
+            console.log('V3_MAC_APP_RESTART_NOT_REQUIRED_ALREADY_ONLINE');
+            process.exit(0);
+          }
+          let quitSucceeded=false;
+          try {
+            // Exit the GUI ONLY; no tailscale up/down, logout or preferences.
+            run('/usr/bin/osascript',['-e',
+              'tell application id "io.tailscale.ipn.macsys" to quit'],14000);
+            quitSucceeded=true;
+            console.log('v3.macApp.quitAccepted=true');
+          }catch{
+            console.log('v3.macApp.quitAccepted=false');
+          }
+          // Always attempt to bring this exact native standalone Mac app back,
+          // including when AppleScript did not complete cleanly.
+          let started=false;
+          try{
+            run('/usr/bin/open',['-a','/Applications/Tailscale.app'],14000);
+            started=true;
+          }catch{
+            try{run('/usr/bin/open',['/Applications/Tailscale.app'],14000);started=true}catch{}
+          }
+          console.log('v3.macApp.reopenAccepted='+started);
+          if(!started)throw Error('Mac Tailscale app did not reopen; manual native UI recovery necessary');
+          if(!quitSucceeded)throw Error('App quit not verified; no claim of actual restart');
+          let last=null,transient=0;
+          const stop=Date.now()+60000;
+          while(Date.now()<stop) {
+            try {
+              last=state(4500);
+              const hash=crypto.createHash('sha256').update(last.id||'').digest('hex');
+              if(last.tailnet!==old.tailnet||hash!==pinned)
+                throw Error('node identity or tailnet changed: HALT');
+              if(last.online)break;
+            } catch(e) {
+              if(String(e.message).includes('HALT'))throw e;
+              transient++;
+            }
+            if(Date.now()+4000<stop)
+              cp.execFileSync('/bin/sleep',['4'],{timeout:6000});
+          }
+          console.log('v3.macApp.transientStatusErrors='+transient);
+          console.log('v3.macApp.afterOnline='+Boolean(last?.online));
+          console.log('v3.macApp.sameTailnet='+(last?.tailnet===old.tailnet));
+          if(!last?.online)throw Error('Mac GUI app relaunched but control-plane remains offline; do not weaken P08');
+          console.log('V3_MAC_TAILSCALE_REAL_APP_RECONNECT_ONLINE_PASS');
+          ONE_APP_CYCLE
+          echo 'V3_ONLY_MAC_TAILSCALE_GUI_RECONNECT_NO_V2_OR_VEEPN_MUTATION'
