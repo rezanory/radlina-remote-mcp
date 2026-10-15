@@ -1,0 +1,88 @@
+name: V3 P08 Mac Control Plane TLS and DNS Path (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-mac-controlplane-readonly
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 7
+    steps:
+      - name: Inspect only Mac DNS TLS handshake and network state
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "x86_64" ]]
+          [[ "$(hostname)" == "amirs-MacBook-Pro.local" ]]
+          [[ "$(id -un)" == "amirsheikhzadeh" ]]
+          [[ "$(node --version)" == "v24.20.0" ]]
+          node <<'DIAGNOSTIC'
+          const dns=require('node:dns').promises;
+          const tls=require('node:tls');
+          const child=require('node:child_process');
+          const targets=['login.tailscale.com','controlplane.tailscale.com','derp1.tailscale.com',
+            'github.com','v3-mcp.radlina.com'];
+          const safeError=(e)=>{
+            const code=String(e?.code||e?.cause?.code||e?.name||'unknown');
+            return /^[A-Z_0-9]{2,50}$/.test(code)?code:'UNKNOWN';
+          };
+          async function resolveHost(host) {
+            try {
+              const answer=await Promise.race([dns.lookup(host,{all:true}),
+                new Promise((_,reject)=>setTimeout(()=>reject(Object.assign(
+                  new Error('timeout'),{code:'ETIMEDOUT'})),6000))]);
+              console.log('v3.control.'+host+'.dnsCount='+answer.length);
+              console.log('v3.control.'+host+'.dnsV4='+answer.some(x=>x.family===4));
+              console.log('v3.control.'+host+'.dnsV6='+answer.some(x=>x.family===6));
+            }catch(e){console.log('v3.control.'+host+'.dnsError='+safeError(e))}
+          }
+          function tcpTls(host) {
+            return new Promise(resolve=>{
+              let settled=false;
+              const finish=(status)=>{
+                if(settled)return; settled=true; socket.destroy();resolve(status);
+              };
+              const socket=tls.connect({host,port:443,servername:host,
+                rejectUnauthorized:true,timeout:8500},()=>{
+                  finish(socket.authorized?'TLS_OK':'TLS_UNVERIFIED');
+                });
+              socket.on('error',e=>finish(safeError(e)));
+              socket.on('timeout',()=>finish('TIMEOUT'));
+            });
+          }
+          (async()=>{
+            for(const host of targets){await resolveHost(host);
+              console.log('v3.control.'+host+'.tls='+await tcpTls(host))}
+            const cli='/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+            try {
+              const s=JSON.parse(child.execFileSync(cli,['status','--json'],{
+                encoding:'utf8',timeout:14000,maxBuffer:1e6}));
+              console.log('v3.control.tailnetMatch='+(s.CurrentTailnet?.Name==='rezanory.github'));
+              console.log('v3.control.backend='+String(s.BackendState||'unknown'));
+              console.log('v3.control.selfOnline='+String(s.Self?.Online??'missing'));
+              console.log('v3.control.healthCategoryCount='+
+                (Array.isArray(s.Health)?s.Health.length:0));
+            }catch(e){console.log('v3.control.tailscaleStatusError='+safeError(e))}
+            try{
+              const n=JSON.parse(child.execFileSync(cli,['netcheck','--format=json'],{
+                encoding:'utf8',timeout:24000,maxBuffer:1e6}));
+              console.log('v3.control.netcheck.udp='+String(n.UDP??'unknown'));
+              console.log('v3.control.netcheck.preferredDerp='+String(n.PreferredDERP??'unknown'));
+              console.log('v3.control.netcheck.derpCount='+Object.keys(n.DERPLatency||{}).length);
+            }catch(e){console.log('v3.control.netcheckError='+safeError(e))}
+            const proxyVars=['HTTP_PROXY','HTTPS_PROXY','ALL_PROXY','NO_PROXY',
+              'http_proxy','https_proxy','all_proxy','no_proxy'];
+            for(const name of proxyVars)
+              console.log('v3.control.env.'+name+'Present='+Boolean(process.env[name]));
+            console.log('V3_PHYSICAL_MAC_CONTROL_PLANE_TLS_DIAG_COMPLETE_NO_VPN_CHANGES');
+          })().catch(e=>{console.error('V3_DIAG_FAILED='+safeError(e));process.exitCode=1});
+          DIAGNOSTIC
