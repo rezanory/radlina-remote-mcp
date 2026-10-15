@@ -7,7 +7,7 @@
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { cp, copyFile, lstat, mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { cp, copyFile, lstat, mkdir, readdir, rename, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

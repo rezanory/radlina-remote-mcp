@@ -37,7 +37,13 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off",
     },
   },
-  // Frozen historical acceptance fixture: a legacy untyped result list is intentionally
+  // This Mac-native .mjs is JavaScript (not a TypeScript project source).
+  // Keep syntax, no-undef and no-unused checks; disable inapplicable typed JS checks.
+  {
+    files: ["scripts/operations/v3-final4-stage-mac-release.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { globals: { process: "readonly", console: "readonly" } },
+  },  // Frozen historical acceptance fixture: a legacy untyped result list is intentionally
   // preserved as evidence. The waiver is scoped ONLY to this file, not runtime code.
   {
     files: ["scripts/acceptance/v3-wave4-runtime.ts"],
