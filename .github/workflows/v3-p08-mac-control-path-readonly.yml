@@ -1,0 +1,85 @@
+name: V3 Mac Tailnet Control Path Diagnosis (manual, read only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-tailnet-control-probe
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 8
+    steps:
+      - name: Inspect control-path and network without changing Tailscale preferences
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          node <<'READ_ONLY'
+          const fs=require('node:fs');
+          const cp=require('node:child_process');
+          const paths=['/usr/local/bin/tailscale','/Applications/Tailscale.app/Contents/MacOS/Tailscale'];
+          const binary=paths.find(p=>fs.existsSync(p));
+          if(!binary)throw Error('no existing tailscale CLI');
+          function command(args,ms=18000){
+            try{
+              const value=cp.execFileSync(binary,args,{encoding:'utf8',timeout:ms,maxBuffer:1e6});
+              return{ok:true,value};
+            }catch(e){return{ok:false,errorType:String(e.code||e.status||'error')}}
+          }
+          const prefs=command(['debug','prefs']);
+          if(prefs.ok){
+            try{
+              const p=JSON.parse(prefs.value);
+              console.log('v3.network.prefsReadable=true');
+              for(const key of ['WantRunning','LoggedOut','ShieldsUp','RouteAll','CorpDNS','ExitNodeAllowLANAccess']){
+                console.log('v3.network.pref.'+key+'='+String(p[key]??'MISSING'));
+              }
+              console.log('v3.network.exitNodeConfigured='+Boolean(p.ExitNodeID));
+            }catch{console.log('v3.network.prefsJson=false')}
+          }else console.log('v3.network.prefsReadable=false '+prefs.errorType);
+          const status=command(['status','--json']);
+          if(status.ok) {
+            const s=JSON.parse(status.value);
+            console.log('v3.network.selfOnline='+String(s.Self?.Online??'MISSING'));
+            console.log('v3.network.selfExpired='+String(s.Self?.Expired??false));
+            console.log('v3.network.backend='+String(s.BackendState??'unknown'));
+            console.log('v3.network.healthWarningCount='+((s.Health||[]).length));
+          }
+          const netcheck=command(['netcheck','--json'],30000);
+          if(netcheck.ok){
+            try{
+              const n=JSON.parse(netcheck.value);
+              console.log('v3.network.netcheckSucceeded=true');
+              for(const key of ['UDP','IPv4','IPv6','MappingVariesByDestIP','OSHasIPv6','CaptivePortal']){
+                const val=n[key];console.log('v3.network.netcheck.'+key+'='+String(typeof val==='boolean'?val:(val?'present':'MISSING')));
+              }
+              console.log('v3.network.netcheck.preferredDERP='+String(n.PreferredDERP??'MISSING'));
+              console.log('v3.network.netcheck.derpCount='+Object.keys(n.DERPLatency||{}).length);
+            }catch{console.log('v3.network.netcheckJson=false')}
+          }else console.log('v3.network.netcheckSucceeded=false '+netcheck.errorType);
+          async function probe(url,key){
+            try{
+              const response=await fetch(url,{method:'HEAD',redirect:'manual',signal:AbortSignal.timeout(12000)});
+              console.log('v3.network.https.'+key+'='+response.status);
+            }catch(e){console.log('v3.network.https.'+key+'=FAILED '+String(e.cause?.code||e.name))}
+          }
+          (async()=>{
+            await probe('https://login.tailscale.com','tailscaleLogin');
+            await probe('https://v3-mcp.radlina.com/auth-health','v3OAuth');
+          })().catch(()=>process.exitCode=1);
+          READ_ONLY
+          echo 'V3_MAC_CONTROL_PATH_DIAG_ONLY_NO_TAILSCALE_OR_V2_MUTATION'
