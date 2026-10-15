@@ -1,0 +1,105 @@
+name: V3 Mac Physical Owner-Signed Policy Stage (no activation)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-policy-physical-stage
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 8
+    steps:
+      - name: Independently verify actual protected Windows owner signature and stage private Mac file
+        shell: bash
+        env:
+          V3_SIGNED_POLICY: ${{ secrets.RADLINA_V3_MAC_OPERATOR_OWNER_SIGNED_POLICY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          node --input-type=module <<'VERIFY_AND_STAGE'
+          import {createHash,createPublicKey,verify} from 'node:crypto';
+          import {readFileSync,writeFileSync,existsSync,mkdirSync,lstatSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          import {homedir} from 'node:os';
+          import {join} from 'node:path';
+          import {pathToFileURL} from 'node:url';
+          const trustedManifest='dc5f17f68a43e05bccf8e94915f509e0bdfe92b381b63d58efacbeea0062cd3d';
+          const ownerPin='6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93';
+          const macPin='f2c2e93ff120fbc5122cbb6b5a0b461a072f54bd8d226368c858fd0bd17037ea';
+          const policyJson=process.env.V3_SIGNED_POLICY;
+          if(!policyJson||Buffer.byteLength(policyJson,'utf8')>8192)throw Error('owner policy environment secret missing/oversized');
+          const root=join(homedir(),'.local','share','radlina','v3-beta','macbook-main-agent');
+          const release=join(root,'releases',trustedManifest);
+          const manifest=join(release,'RELEASE_MANIFEST.json');
+          if(!existsSync(manifest)||lstatSync(manifest).isSymbolicLink())throw Error('trusted immutable native Mac release missing');
+          if(createHash('sha256').update(readFileSync(manifest)).digest('hex')!==trustedManifest)throw Error('native release manifest mismatch');
+          const util=await import(pathToFileURL(join(release,'dist','utils','json.js')).href);
+          if(typeof util.canonicalJson!=='function')throw Error('canonical signer serializer unavailable');
+          const record=JSON.parse(policyJson);
+          const p=record.policy;
+          if(p?.schema!=='radlina.v3.i01.macos-physical-operator-policy/v1'||
+            p.macDeviceId!=='macbook-main'||p.controllerDeviceId!=='windows-main'||
+            p.macPublicKeyFingerprint!==macPin||
+            p.approvalMode!=='interactive-target-local'||
+            !Array.isArray(p.allowedCapabilities)||
+            p.allowedCapabilities.join(',')!=='device.health,filesystem.read,filesystem.write'||
+            Date.parse(p.expiresAt)<Date.now()+60*60*1000||
+            Date.parse(p.createdAt)>Date.now()+120000)
+            throw Error('real owner policy expired, overbroad or wrong target');
+          const ownerKey=createPublicKey(p.ownerPublicKeyPem);
+          const pin=createHash('sha256').update(ownerKey.export({type:'spki',format:'der'})).digest('hex');
+          if(ownerKey.asymmetricKeyType!=='ed25519'||pin!==ownerPin)
+            throw Error('owner Ed25519 public key pin mismatch');
+          const signature=Buffer.from(record.ownerSignatureBase64??'','base64');
+          if(signature.length!==64||signature.toString('base64')!==record.ownerSignatureBase64||
+            !verify(null,Buffer.from(util.canonicalJson(p)),ownerKey,signature))
+            throw Error('physical owner signature invalid');
+          const cli='/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+          const status=JSON.parse(execFileSync(cli,['status','--json'],{encoding:'utf8',timeout:12000,maxBuffer:1024*1024}));
+          const peer=Object.values(status.Peer||{}).filter(x=>
+            x.OS==='windows'&&x.Online===true&&x.DNSName?.replace(/\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net');
+          if(status.BackendState!=='Running'||status.Self?.Online!==true||
+            status.CurrentTailnet?.Name!=='rezanory.github'||peer.length!==1||!peer[0]?.ID||
+            createHash('sha256').update(peer[0].ID).digest('hex')!==p.windowsTailnetNodeHash)
+            throw Error('trusted physical Windows P03 peer missing in live Mac Tailnet');
+          const dir=join(root,'owner-policies');
+          mkdirSync(dir,{recursive:true,mode:0o700});
+          const folder=lstatSync(dir);
+          if(folder.isSymbolicLink()||!folder.isDirectory()||(folder.mode&0o077)!==0)
+            throw Error('owner policy private directory permission invalid');
+          const dest=join(dir,'mac-operator-owner-signed-20261015.json');
+          const bytes=Buffer.from(JSON.stringify(record)+'\n');
+          const digest=createHash('sha256').update(bytes).digest('hex');
+          if(existsSync(dest)) {
+            const st=lstatSync(dest);
+            if(st.isSymbolicLink()||!st.isFile()||(st.mode&0o077)!==0||
+              createHash('sha256').update(readFileSync(dest)).digest('hex')!==digest)
+              throw Error('existing physical owner policy must not be replaced');
+            console.log('v3.macOwnerPolicy.alreadyStagedAndVerified=true');
+          }else {
+            writeFileSync(dest,bytes,{flag:'wx',mode:0o600});
+            if((lstatSync(dest).mode&0o077)!==0)throw Error('owner policy file permission invalid');
+            console.log('v3.macOwnerPolicy.staged=true');
+          }
+          console.log('v3.macOwnerPolicy.signatureVerified=true');
+          console.log('v3.macOwnerPolicy.realWindowsPeerVerified=true');
+          console.log('v3.macOwnerPolicy.fileSha256='+digest);
+          console.log('v3.macOwnerPolicy.operatorActivated=false');
+          console.log('V3_MAC_SIGNED_OWNER_POLICY_PHYSICALLY_STAGED_NOT_I01_ACCEPTANCE');
+          VERIFY_AND_STAGE
