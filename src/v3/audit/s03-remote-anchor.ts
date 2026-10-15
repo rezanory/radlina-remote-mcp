@@ -41,7 +41,7 @@ export interface S03AnchorTransport {
 }
 export class S03HttpsAuditTransport implements S03AnchorTransport {
   constructor(
-    private readonly endpoint:"https://v3-audit.radlina.com/v1/anchor",
+    private readonly endpoint:"https://v3-audit.radlina.com/api/v1/anchor",
   ){}
   async persist(event:S03AnchorEvent){
     const body=canonicalJson(event);
