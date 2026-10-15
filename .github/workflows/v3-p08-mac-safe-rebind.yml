@@ -37,8 +37,8 @@ jobs:
           function run(args,timeout=17000) {
             return cp.execFileSync(b,args,{encoding:'utf8',timeout,maxBuffer:1024*1024});
           }
-          function snapshot() {
-            const s=JSON.parse(run(['status','--json']));
+          function snapshot(timeout=17000) {
+            const s=JSON.parse(run(['status','--json'],timeout));
             return {backend:s.BackendState,tailnet:s.CurrentTailnet?.Name,
               selfId:s.Self?.ID,selfOnline:s.Self?.Online===true,
               expired:s.Self?.Expired===true};
@@ -68,11 +68,22 @@ jobs:
           }
           // Single bounded propagation; never change stored tailnet preferences.
           const deadline=Date.now()+24000;
-          let after;
-          do {
-            cp.execFileSync('/bin/sleep',['4'],{timeout:6000});
-            after=snapshot();
-          } while(!after.selfOnline&&Date.now()<deadline);
+          let after=null;
+          let transientStatusErrors=0;
+          while(Date.now()<deadline) {
+            const remaining=deadline-Date.now();
+            if(remaining<500)break;
+            try {
+              after=snapshot(Math.min(3500,remaining));
+              if(after.selfOnline)break;
+            } catch {
+              transientStatusErrors++;
+            }
+            if(Date.now()+3000<deadline)
+              cp.execFileSync('/bin/sleep',['3'],{timeout:5000});
+          }
+          console.log('v3.rebind.transientStatusErrors='+transientStatusErrors);
+          if(!after)throw Error('Tailscale status unavailable after bounded rebind; fails closed');
           const afterHash=crypto.createHash('sha256').update(after.selfId||'').digest('hex');
           console.log('v3.rebind.afterOnline='+after.selfOnline);
           console.log('v3.rebind.sameNodeIdentity='+(afterHash===beforeHash));
