@@ -58,8 +58,16 @@ jobs:
             console.log('v3.network.selfExpired='+String(s.Self?.Expired??false));
             console.log('v3.network.backend='+String(s.BackendState??'unknown'));
             console.log('v3.network.healthWarningCount='+((s.Health||[]).length));
+            // Print only the bounded non-secret category of status health messages.
+            for(const h of (Array.isArray(s.Health)?s.Health:[]).slice(0,3)){
+              const detail=(typeof h==='string'?h:String(h?.message||h?.title||'unknown'));
+              const safe=detail.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/giu,'[EMAIL]')
+                .replace(/\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b/gu,'[IP]')
+                .replace(/https?:\\/\\/[^\\s]+/gu,'[URL]').slice(0,220);
+              console.log('v3.network.healthMessage='+safe);
+            }
           }
-          const netcheck=command(['netcheck','--json'],30000);
+          const netcheck=command(['netcheck','--format=json'],30000);
           if(netcheck.ok){
             try{
               const n=JSON.parse(netcheck.value);
