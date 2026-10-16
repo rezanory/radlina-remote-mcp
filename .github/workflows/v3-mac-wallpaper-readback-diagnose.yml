@@ -44,7 +44,7 @@ jobs:
                   print("v3.wallpaper.screen\(i).actualImageFileExists=\(FileManager.default.fileExists(atPath:actual.path))")
                   print("v3.wallpaper.screen\(i).actualImageIsFileURL=\(actual.isFileURL)")
               }
-              print("v3.wallpaper.screen\(i).desktopOptionsCount=\(opts.count)")
+              print("v3.wallpaper.screen\(i).desktopOptionsCount=\(opts?.count ?? 0)")
           }
           print("V3_MAC_WALLPAPER_READONLY_DIAGNOSTIC_COMPLETE")
           SWIFT
