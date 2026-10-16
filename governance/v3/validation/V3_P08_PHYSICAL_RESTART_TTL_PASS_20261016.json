@@ -1,0 +1,63 @@
+{
+  "schema": "radlina.v3.p08.physical-acceptance-evidence/v1",
+  "record_id": "V3-P08-GATE25-MAC-RESTART-TTL-20261016",
+  "date": "2026-10-16",
+  "component": {
+    "id": "P08",
+    "name": "device.agent.macos",
+    "logicalDeviceId": "macbook-main"
+  },
+  "physicalTarget": {
+    "hostname": "amirs-MacBook-Pro.local",
+    "platform": "darwin",
+    "architecture": "x64",
+    "nodeVersion": "v24.20.0",
+    "tailnet": "rezanory.github",
+    "trustedP03NodeHash": "c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c"
+  },
+  "sources": {
+    "physicalTestRun": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38962903274",
+    "workflow": ".github/workflows/v3-p08-physical-restart-ttl-acceptance.yml",
+    "workflowSourceMerge": "87a220443bac1740e6ad78d5ae5caf348e790cf3",
+    "evidenceArtifactLocalSha256": "bcd1ddb1718e2c8d8c069686f9f492ded3a4679de5b02a0ef119849c9f1d5efb",
+    "initialHarnessFailureRun": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38962687471",
+    "harnessFixPR": "https://github.com/rezanory/radlina-remote-mcp/pull/41",
+    "priorMacNativeComponentProof": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38091109343",
+    "priorMacSignedDurableHeartbeat": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38957337980"
+  },
+  "proof": {
+    "source": "GitHub self-hosted native physical macOS Runner",
+    "actualP03IdentityPinned": true,
+    "realWindowsP03PeerOnline": true,
+    "freshSignedGatewayAckBeforeRestart": true,
+    "onlyV3MacP08LaunchAgentTargetedRestart": true,
+    "launchctlKickstartSucceeded": true,
+    "postRestartDistinctGatewayAcceptedSignedReceipts": 4,
+    "postRestartReceiptObservationsUTC": [
+      "2026-10-16T20:32:24Z",
+      "2026-10-16T20:33:14Z",
+      "2026-10-16T20:34:04Z",
+      "2026-10-16T20:34:54Z"
+    ],
+    "postRestartSignedTimestampSpanAtLeast120Seconds": true,
+    "localMacAuditDeliveredEventsMatchOriginalReceiptSignedAt": true,
+    "futureCrossDeviceExecutionDisabled": true,
+    "launchAgentStillRegistered": true,
+    "observedLiveRegistryMacOnlineHealthyPostTest": true,
+    "observedLiveRegistryLastSeenUTC": "2026-10-16T20:36:23.073Z",
+    "originalMacPrivateKeyExported": false,
+    "v2Changed": false
+  },
+  "technicalResult": "PHYSICAL_OPERATIONAL_P08_RESTART_TTL_PASS",
+  "acceptanceReconciliation": {
+    "reviewer": "ChatGPT, evidence reviewed in this conversation",
+    "independentExternalReviewerCryptographicSignaturePresent": false,
+    "independentExternalReviewerSignatureWasFabricated": false,
+    "finalProductionReady": false,
+    "officialAcceptedComponentsBefore": 24,
+    "officialAcceptedComponentsAfter": 24,
+    "reasonOfficialCountNotMutated": "Existing V3 Final Four handoff explicitly reserves formal signed reviewer acceptance; this evidence proves operational P08 only, not an independent sign-off.",
+    "remainingToCloseFormalP08": "Obtain a genuine independent reviewer-signed P08 acceptance receipt or explicitly authorize a documented change to the acceptance authority, without fabricating signatures."
+  },
+  "excluded": "I01,F01,AC01,Mac Fleet,S03"
+}
