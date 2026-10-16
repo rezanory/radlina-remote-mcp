@@ -57,7 +57,14 @@
     "officialAcceptedComponentsBefore": 24,
     "officialAcceptedComponentsAfter": 24,
     "reasonOfficialCountNotMutated": "Existing V3 Final Four handoff explicitly reserves formal signed reviewer acceptance; this evidence proves operational P08 only, not an independent sign-off.",
-    "remainingToCloseFormalP08": "Obtain a genuine independent reviewer-signed P08 acceptance receipt or explicitly authorize a documented change to the acceptance authority, without fabricating signatures."
+    "remainingToCloseFormalP08": "Obtain a genuine independent reviewer-signed P08 acceptance receipt or explicitly authorize a documented change to the acceptance authority, without fabricating signatures.",
+    "historicalCountAtRecordCreation": 24,
+    "supersededBy": "governance/v3/validation/V3_GATE_ACCEPTANCE_CURRENT_25_OF_28_20261017.json",
+    "ownerRatifiedAfterPhysicalProof": true,
+    "currentOfficialAcceptedComponents": 25,
+    "currentP08Status": "ACCEPTED_BY_OWNER_AND_CHATGPT_REVIEW_OF_REAL_PHYSICAL_TEST",
+    "newIndependentSignatureClaimed": false,
+    "ownerRatificationNote": "Owner explicitly confirms gate 25 accepted and orders count 25/28; former external-review precondition is not used for P08 release accounting. Preserve original physical proof and historical tally fields."
   },
   "excluded": "I01,F01,AC01,Mac Fleet,S03"
 }
