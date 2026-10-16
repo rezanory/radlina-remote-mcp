@@ -64,7 +64,15 @@
     "officialFinalFourAcceptedBefore": 24,
     "officialFinalFourAcceptedAfter": 24,
     "independentReviewerCryptographicAcceptanceClaimed": false,
-    "whyOpen": "No installed/running canonical Mac I01 operator, missing genuine final-four production reviewer policy and independent S03 witness credentials; native ChatGPT OAuth currently device:read only. Never fabricate local user consent, reviewer keys, or a signed real delivery receipt."
+    "whyOpen": "No installed/running canonical Mac I01 operator, missing genuine final-four production reviewer policy and independent S03 witness credentials; native ChatGPT OAuth currently device:read only. Never fabricate local user consent, reviewer keys, or a signed real delivery receipt.",
+    "historicalAcceptedCountWhenI01PreflightCreated": 24,
+    "currentAcceptedCountAfterOwnerP08Ratification": 25,
+    "currentAcceptedTally": "25/28",
+    "currentAcceptedPercentage": 89.29,
+    "authoritativeTallyFile": "governance/v3/validation/V3_GATE_ACCEPTANCE_CURRENT_25_OF_28_20261017.json",
+    "i01GateNumber": 26,
+    "i01FinalAcceptanceUnchanged": "OPEN",
+    "historicalCountPreserved": true
   },
   "safety": {
     "v2Changed": false,
