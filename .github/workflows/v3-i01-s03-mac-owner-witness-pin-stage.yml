@@ -1,0 +1,124 @@
+name: V3 I01 Stage Real Mac S03 Witness Public Pins (no activation)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-i01-mac-real-s03-witness-public-pin-stage
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Verify original owner Ed25519 signature and genuine separate Mac S03 witness key
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' && "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          node --input-type=module <<'STAGE'
+          import {readFileSync,writeFileSync,existsSync,lstatSync} from 'node:fs';
+          import {createHash,createPublicKey,verify} from 'node:crypto';
+          import {homedir} from 'node:os';
+          import {join} from 'node:path';
+          const h=x=>createHash('sha256').update(x).digest('hex');
+          const ownerPin='6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93';
+          const witnessPin='32f04e1a18f49fffd5111b98d70dc1f157326a356df3834f8c34b4d2bc7a2238';
+          const macPin='f2c2e93ff120fbc5122cbb6b5a0b461a072f54bd8d226368c858fd0bd17037ea';
+          const winPin='fafcea842b3d0142b9cb24ff05455a09da409d44e7d08a483b39bb0596a7f5a0';
+          const root=join(homedir(),'.local','share','radlina','v3-beta');
+          const state=join(root,'macbook-main-s03');
+          const signedPath=join(root,'macbook-main-agent','owner-policies','mac-operator-owner-signed-20261015.json');
+          const receipt=join(state,'witness-public-receipt.json');
+          const publicPem=join(state,'witness-public.pem');
+          const dest=join(state,'owner-witness-pins-20261016.json');
+          const expectedSigned='ff1fc20dad2f8f25d8644c80a473fa26bedfed8119354fc9cc20359ea2092cbc';
+          function readExactPrivate(file,max,hash) {
+            const stat=lstatSync(file);
+            if(!stat.isFile()||stat.isSymbolicLink()||(stat.mode&0o077)!==0||stat.size>max||stat.size<32)
+              throw Error('S03 genuine private input file mode/bounds failed');
+            const bytes=readFileSync(file);
+            if(hash&&h(bytes)!==hash)throw Error('S03 original file pin mismatched');
+            return bytes;
+          }
+          const old=JSON.parse(readExactPrivate(signedPath,8192,expectedSigned).toString('utf8'));
+          if(Object.keys(old).sort().join(',')!=='ownerSignatureBase64,policy')throw Error('unexpected owner policy envelope');
+          const p=old.policy;
+          if(p?.schema!=='radlina.v3.i01.macos-physical-operator-policy/v1'||
+            p.macDeviceId!=='macbook-main'||p.controllerDeviceId!=='windows-main'||
+            p.macPublicKeyFingerprint!==macPin||
+            Date.parse(p.expiresAt)<Date.now()+3600000||
+            p.approvalMode!=='interactive-target-local')
+            throw Error('original owner-approved Mac P03 policy not valid');
+          const ownerKey=createPublicKey(p.ownerPublicKeyPem);
+          if(ownerKey.asymmetricKeyType!=='ed25519'||
+             h(ownerKey.export({type:'spki',format:'der'}))!==ownerPin)
+            throw Error('real owner Ed25519 public key changed');
+          function canonical(v) {
+            if(v===undefined)return 'null';
+            if(Array.isArray(v))return '['+v.map(x=>canonical(x===undefined?null:x)).join(',')+']';
+            if(v&&typeof v==='object')return '{'+Object.entries(v).filter(([,x])=>x!==undefined)
+              .sort(([a],[b])=>a.localeCompare(b)).map(([k,x])=>JSON.stringify(k)+':'+canonical(x)).join(',')+'}';
+            return JSON.stringify(v)??'null';
+          }
+          const sig=Buffer.from(old.ownerSignatureBase64||'','base64');
+          if(sig.length!==64||sig.toString('base64')!==old.ownerSignatureBase64||
+             !verify(null,Buffer.from(canonical(p)),ownerKey,sig))
+            throw Error('original owner Ed25519 signature is invalid');
+          const witness=JSON.parse(readExactPrivate(receipt,8192).toString('utf8'));
+          const pem=readExactPrivate(publicPem,4096).toString('utf8');
+          const wk=createPublicKey(pem);
+          if(witness.schema!=='radlina.v3.s03.mac-public-key-preparation/v1'||
+             witness.deviceId!=='macbook-main-s03'||witness.keychainPrivateKeyExported!==false||
+             witness.publicKeyPem!==pem||wk.asymmetricKeyType!=='ed25519'||
+             witness.fingerprint!==witnessPin||
+             h(wk.export({type:'spki',format:'der'}))!==witnessPin||
+             witnessPin===macPin||witnessPin===ownerPin)
+            throw Error('Mac independently provisioned real S03 witness public key mismatch');
+          const pins={
+            schema:'radlina.v3.s03.witness-pins/v1',
+            ownerPublicKeyPem:p.ownerPublicKeyPem,
+            ownerKeyFingerprint:ownerPin,
+            physicalDevices:{
+              'windows-main':{
+                publicKeyFingerprint:winPin,
+                agentInstanceId:'9e4d5aa7-c317-4d28-9a43-6638aea5ce2a'
+              },
+              'macbook-main':{
+                publicKeyFingerprint:macPin,
+                agentInstanceId:'641e1487-12c8-426e-ab16-f3ba9a203073'
+              }
+            }
+          };
+          const folder=lstatSync(state);
+          if(!folder.isDirectory()||folder.isSymbolicLink()||(folder.mode&0o077)!==0)
+            throw Error('S03 existing private Mac directory not 0700');
+          const bytes=Buffer.from(canonical(pins)+'\n');
+          if(existsSync(dest)){
+            if(h(readExactPrivate(dest,8192))!==h(bytes))throw Error('existing S03 owner public-pin policy differs; no overwrite');
+            console.log('i01.s03MacPolicy.alreadyStagedVerified=true');
+          }else{
+            writeFileSync(dest,bytes,{flag:'wx',mode:0o600});
+            if((lstatSync(dest).mode&0o077)!==0)throw Error('S03 private policy mode not 0600');
+            console.log('i01.s03MacPolicy.stagedPrivate=true');
+          }
+          console.log('i01.s03MacPolicy.fileSha256='+h(bytes));
+          console.log('i01.s03MacPolicy.independentKeychainWitnessPublicIdentityVerified=true');
+          console.log('i01.s03MacPolicy.ownerRealEd25519PolicySignatureVerified=true');
+          console.log('i01.s03MacPolicy.writerTokenProvisioned=false');
+          console.log('i01.s03MacPolicy.fleetOrI01ExecutionActivated=false');
+          console.log('V3_I01_MAC_S03_REAL_OWNER_WITNESS_PINS_STAGED_NO_EXECUTION');
+          STAGE
