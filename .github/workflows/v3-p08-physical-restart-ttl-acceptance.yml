@@ -58,7 +58,7 @@ jobs:
           typeof a.acknowledgedAtMs!=='number'||Date.now()-a.acknowledgedAtMs>120000||
           a.acknowledgedAtMs>Date.now()+10000)throw Error('latest signed physical ACK not currently healthy');
           const baseline={acknowledgedAtMs:a.acknowledgedAtMs,signedAtMs:a.envelope.heartbeat.signedAtMs,nonce:a.envelope.heartbeat.nonce};
-          fs.writeFileSync(root+'/receipts/p08-gate25-baseline-20261016.json',JSON.stringify(baseline)+'\n',{flag:'wx',mode:0o600});
+          fs.writeFileSync(root+'/receipts/p08-gate25-baseline-'+process.env.GITHUB_RUN_ID+'.json',JSON.stringify(baseline)+'\n',{flag:'wx',mode:0o600});
           console.log('p08.gate25.physicalMacIdentityPinned=true');
           console.log('p08.gate25.windowsPeerOnline=true');
           console.log('p08.gate25.baselineSignedGatewayAckFresh=true');
@@ -69,10 +69,11 @@ jobs:
           launchctl print "$domain/$label" >/dev/null
           echo 'p08.gate25.targetedLaunchdRestartSucceeded=true'
           node <<'AFTER_RESTART'
+          (async () => {
           const fs=require('node:fs'),crypto=require('node:crypto'),os=require('node:os');
           const root=os.homedir()+'/.local/share/radlina/v3-beta/macbook-main-agent';
           const file=root+'/heartbeat-latest-ack.json';
-          const base=JSON.parse(fs.readFileSync(root+'/receipts/p08-gate25-baseline-20261016.json','utf8'));
+          const base=JSON.parse(fs.readFileSync(root+'/receipts/p08-gate25-baseline-'+process.env.GITHUB_RUN_ID+'.json','utf8'));
           const received=[];
           function valid(a,now){
             const h=a?.envelope?.heartbeat;
@@ -125,6 +126,7 @@ jobs:
           console.log('p08.gate25.postRestartAuditMatched=true');
           console.log('p08.gate25.physicalEvidenceSha256='+crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex'));
           console.log('P08_REAL_MAC_PHYSICAL_RESTART_AND_TTL_PROOF_PASS_PENDING_RELEASE_RECONCILIATION');
+          })().catch(e=>{console.error(e);process.exitCode=1;});
           AFTER_RESTART
           launchctl print "$domain/$label" >/dev/null
           echo 'p08.gate25.launchAgentStillRegistered=true'
