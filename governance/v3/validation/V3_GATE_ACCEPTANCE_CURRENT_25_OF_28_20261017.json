@@ -1,0 +1,58 @@
+{
+  "schema": "radlina.v3.final4.owner-acceptance-reconciliation/v1",
+  "recordedOn": "2026-10-17",
+  "ownerInstruction": "Gate 25 was confirmed, therefore accepted total must be 25 of 28; continue Gate 26.",
+  "project": "rezanory/radlina-remote-mcp",
+  "acceptanceAuthority": {
+    "ownerDecisionInConversation": true,
+    "reviewer": "ChatGPT",
+    "independentExternalCryptographicSignatureRequiredForThisP08Counting": false,
+    "externalIndependentSignaturePresent": false,
+    "externalSignatureFabricated": false,
+    "application": "P08 accounting and previously completed 24 gates only; no blanket acceptance for remaining gates"
+  },
+  "acceptedBaseline": 24,
+  "newlyAccepted": {
+    "gate": 25,
+    "id": "P08",
+    "component": "device.agent.macos",
+    "acceptanceStatus": "ACCEPTED_OPERATIONALLY_BY_OWNER_IN_CONVERSATION",
+    "realPhysicalAcceptance": true,
+    "acceptanceEvidence": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38962903274",
+    "sourceArtifact": "governance/v3/validation/V3_P08_PHYSICAL_RESTART_TTL_PASS_20261016.json",
+    "restartVerified": true,
+    "postRestartSignedAckCount": 4,
+    "freshHeartbeatSpanGt120Seconds": true,
+    "auditMatched": true,
+    "noReviewerSignatureClaimed": true,
+    "v2Untouched": true
+  },
+  "currentTally": {
+    "accepted": 25,
+    "total": 28,
+    "percentage": 89.28571428571429
+  },
+  "remaining": [
+    {
+      "gate": 26,
+      "id": "I01",
+      "state": "OPEN",
+      "required": "Real end-to-end authorized cross-host operation with target-local consent, signed response, external audit"
+    },
+    {
+      "gate": 27,
+      "id": "F01",
+      "state": "OPEN",
+      "required": "Physical canary/rollback on two devices"
+    },
+    {
+      "gate": 28,
+      "id": "AC01",
+      "state": "OPEN",
+      "required": "Real native ChatGPT OAuth scoped workflow and operational acceptance"
+    }
+  ],
+  "historicalEvidencePolicy": "Earlier documents saying 24/28 accurately record their creation-time accounting and are superseded for current totals by this explicit owner acceptance decision. No alteration to physical test evidence or signature claims.",
+  "productReady": false,
+  "v2Modified": false
+}
