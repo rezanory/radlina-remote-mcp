@@ -78,10 +78,16 @@ jobs:
             throw Error('signed owner policy signature encoding malformed');
           // Reuse the immutable release's canonical JSON verifier only after
           // pinning its Manifest hash and the known protected owner key.
+          // Match the audited source canonicalJson implementation exactly:
+          // object keys use localeCompare, not JS ordinal Array.sort.
           function canonical(v) {
-            if(v===null||typeof v!=='object')return JSON.stringify(v);
-            if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';
-            return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';
+            if(v===undefined)return 'null';
+            if(Array.isArray(v))return '['+v.map(x=>canonical(x===undefined?null:x)).join(',')+']';
+            if(v&&typeof v==='object')
+              return '{'+Object.entries(v).filter(([,x])=>x!==undefined)
+                .sort(([a],[b])=>a.localeCompare(b))
+                .map(([k,x])=>JSON.stringify(k)+':'+canonical(x)).join(',')+'}';
+            return JSON.stringify(v)??'null';
           }
           if(!verify(null,Buffer.from(canonical(p)),key,signature))
             throw Error('original Windows owner Ed25519 signature invalid');
