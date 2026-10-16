@@ -1,0 +1,130 @@
+name: V3 P08 Physical Mac Restart and 120s Freshness Acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-p08-physical-restart-freshness
+  cancel-in-progress: false
+jobs:
+  p08:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 10
+    steps:
+      - name: Verify exact Mac P03 identity and kickstart ONLY its V3 P08 LaunchAgent
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "x86_64" ]]
+          [[ "$(hostname)" == "amirs-MacBook-Pro.local" ]]
+          [[ "$(id -un)" == "amirsheikhzadeh" ]]
+          [[ "$(node --version)" == "v24.20.0" ]]
+          base="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
+          label="com.radlina.remote-mcp.v3.mac-heartbeat"
+          plist="$HOME/Library/LaunchAgents/$label.plist"
+          [[ -d "$base" && ! -L "$base" && "$(stat -f '%Lp' "$base")" == '700' ]]
+          [[ -f "$plist" && ! -L "$plist" && "$(stat -f '%Lp' "$plist")" == '600' ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :Label' "$plist")" == "$label" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :RunAtLoad' "$plist")" == "true" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :StartInterval' "$plist")" == "45" ]]
+          domain="gui/$(id -u)"
+          launchctl print "$domain" >/dev/null
+          launchctl print "$domain/$label" >/dev/null
+          [[ -f "$base/heartbeat-latest-ack.json" && ! -L "$base/heartbeat-latest-ack.json" ]]
+          [[ -f "$base/heartbeat-events.jsonl" && ! -L "$base/heartbeat-events.jsonl" ]]
+          node <<'PRECHECK'
+          const fs=require('node:fs'),cp=require('node:child_process'),crypto=require('node:crypto'),os=require('node:os');
+          const root=os.homedir()+'/.local/share/radlina/v3-beta/macbook-main-agent';
+          const s=JSON.parse(cp.execFileSync('/Applications/Tailscale.app/Contents/MacOS/Tailscale',['status','--json'],{encoding:'utf8',timeout:12000,maxBuffer:1024*1024}));
+          const id=crypto.createHash('sha256').update(s.Self?.ID||'').digest('hex');
+          const macPin='c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c';
+          const peer=Object.values(s.Peer||{}).filter(p=>String(p.DNSName||'').replace(/\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net'&&p.Online===true);
+          if(s.BackendState!=='Running'||s.CurrentTailnet?.Name!=='rezanory.github'||s.Self?.Online!==true||id!==macPin||peer.length!==1)throw Error('genuine enrolled physical Mac/Windows P03 prerequisites missing');
+          const st=fs.lstatSync(root+'/heartbeat-latest-ack.json');
+          if(!st.isFile()||st.isSymbolicLink()||(st.mode&0o077)!==0||st.size>8192)throw Error('P08 durable ACK file invalid/over-permissive');
+          const a=JSON.parse(fs.readFileSync(root+'/heartbeat-latest-ack.json','utf8'));
+          if(a.schema!=='radlina.v3.p08.durable-heartbeat-ack/v1'||a.gatewayReceipt?.acceptance!=='V3_P08_REAL_MAC_SIGNED_HEARTBEAT_ACCEPTED'||
+          a.gatewayReceipt?.deviceId!=='macbook-main'||a.gatewayReceipt?.trustState!=='trusted'||a.gatewayReceipt?.crossDeviceExecutionEnabled!==false||
+          a.envelope?.schema!=='radlina.v3.p03.heartbeat-evidence/v1'||a.envelope?.heartbeat?.deviceId!=='macbook-main'||
+          a.envelope?.heartbeat?.capabilities?.join(',')!=='device.health'||typeof a.envelope?.heartbeat?.signedAtMs!=='number'||
+          typeof a.acknowledgedAtMs!=='number'||Date.now()-a.acknowledgedAtMs>120000||
+          a.acknowledgedAtMs>Date.now()+10000)throw Error('latest signed physical ACK not currently healthy');
+          const baseline={acknowledgedAtMs:a.acknowledgedAtMs,signedAtMs:a.envelope.heartbeat.signedAtMs,nonce:a.envelope.heartbeat.nonce};
+          fs.writeFileSync(root+'/receipts/p08-gate25-baseline-20261016.json',JSON.stringify(baseline)+'\n',{flag:'wx',mode:0o600});
+          console.log('p08.gate25.physicalMacIdentityPinned=true');
+          console.log('p08.gate25.windowsPeerOnline=true');
+          console.log('p08.gate25.baselineSignedGatewayAckFresh=true');
+          PRECHECK
+          # The only modified runtime is the already installed P08 heartbeat LaunchAgent.
+          # Never restart or modify V2, Mac V2, Tailscale, S03, Operator or Fleet.
+          launchctl kickstart -k "$domain/$label"
+          launchctl print "$domain/$label" >/dev/null
+          echo 'p08.gate25.targetedLaunchdRestartSucceeded=true'
+          node <<'AFTER_RESTART'
+          const fs=require('node:fs'),crypto=require('node:crypto'),os=require('node:os');
+          const root=os.homedir()+'/.local/share/radlina/v3-beta/macbook-main-agent';
+          const file=root+'/heartbeat-latest-ack.json';
+          const base=JSON.parse(fs.readFileSync(root+'/receipts/p08-gate25-baseline-20261016.json','utf8'));
+          const received=[];
+          function valid(a,now){
+            const h=a?.envelope?.heartbeat;
+            if(a?.schema!=='radlina.v3.p08.durable-heartbeat-ack/v1'||
+              a?.gatewayReceipt?.acceptance!=='V3_P08_REAL_MAC_SIGNED_HEARTBEAT_ACCEPTED'||
+              a?.gatewayReceipt?.deviceId!=='macbook-main'||
+              a?.gatewayReceipt?.trustState!=='trusted'||
+              a?.gatewayReceipt?.crossDeviceExecutionEnabled!==false||
+              a?.envelope?.schema!=='radlina.v3.p03.heartbeat-evidence/v1'||
+              h?.deviceId!=='macbook-main'||h?.agentVersion!=='3.0.0-alpha.1'||
+              h?.status!=='online'||h?.capabilities?.join(',')!=='device.health'||
+              typeof h?.nonce!=='string'||typeof h?.signedAtMs!=='number'||
+              typeof a.acknowledgedAtMs!=='number'||now-a.acknowledgedAtMs>120000||
+              a.acknowledgedAtMs>now+10000||Math.abs(now-h.signedAtMs)>120000||
+              !/^[0-9a-f]{64}$/.test(a.gatewayReceipt?.receiptHash||'')||
+              Buffer.from(a.envelope?.deviceSignatureBase64||'','base64').length!==64)
+              throw Error('P08 signed gateway durable ACK failed safe validation');
+            return {acknowledgedAtMs:a.acknowledgedAtMs,signedAtMs:h.signedAtMs,nonce:h.nonce,receiptHash:a.gatewayReceipt.receiptHash};
+          }
+          const wait=t=>new Promise(r=>setTimeout(r,t));
+          const cutoff=Date.now()+330000;
+          while(Date.now()<cutoff){
+            try{
+              const st=fs.lstatSync(file);
+              if(!st.isFile()||st.isSymbolicLink()||(st.mode&0o077)!==0||st.size>8192)throw Error('ACK filesystem integrity/ACL changed');
+              const val=valid(JSON.parse(fs.readFileSync(file,'utf8')),Date.now());
+              const prev=received.at(-1)||base;
+              if(val.acknowledgedAtMs>prev.acknowledgedAtMs && val.signedAtMs>prev.signedAtMs && val.nonce!==prev.nonce){
+                received.push(val);
+                console.log('p08.gate25.postRestartDistinctSignedAckCount='+received.length);
+                if(received.length>=4 && received.at(-1).signedAtMs-received[0].signedAtMs>=120000)break;
+              }
+            }catch(e){if(e.code!=='ENOENT' && !/Unexpected end of JSON input/.test(e.message))throw e}
+            await wait(10000);
+          }
+          if(received.length<4 || received.at(-1).signedAtMs-received[0].signedAtMs<120000)
+            throw Error('P08 post-restart signed heartbeat continuity across 120-second TTL not demonstrated');
+          const history=fs.readFileSync(root+'/heartbeat-events.jsonl','utf8').trim().split('\n').slice(-90).map(x=>JSON.parse(x));
+          for(const p of received) if(!history.some(x=>x.status==='delivered'&&x.code==='signed_heartbeat_acknowledged'&&x.signedAtMs===p.signedAtMs))
+            throw Error('P08 local audit evidence missing for post-restart signed receipt');
+          const out={schema:'radlina.v3.p08.physical-restart-ttl-proof/v1',deviceId:'macbook-main',source:'real-macos-selfhosted-github-runner',actualOwner:'amirsheikhzadeh',
+            realLaunchAgentRestarted:true,verifiedOriginalEnrolledMac:true,postRestartSignedAcks:received.length,
+            postRestartSignedDurationMs:received.at(-1).signedAtMs-received[0].signedAtMs,
+            gatewayAcceptance:'V3_P08_REAL_MAC_SIGNED_HEARTBEAT_ACCEPTED',localAuditDeliveredMatched:true,
+            tamperOrForgedAcceptanceUsed:false,v2Modified:false,ownerPrivateKeyExported:false,
+            observedAt:new Date().toISOString(),operationalEvidence:'PASS',releaseGateAccounting:'PENDING_RECONCILIATION'};
+          const target=root+'/receipts/p08-gate25-physical-restart-ttl-20261016.json';
+          fs.writeFileSync(target,JSON.stringify(out)+'\n',{flag:'wx',mode:0o600});
+          console.log('p08.gate25.sustainedFreshnessAcross120Seconds=true');
+          console.log('p08.gate25.postRestartAuditMatched=true');
+          console.log('p08.gate25.physicalEvidenceSha256='+crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex'));
+          console.log('P08_REAL_MAC_PHYSICAL_RESTART_AND_TTL_PROOF_PASS_PENDING_RELEASE_RECONCILIATION');
+          AFTER_RESTART
+          launchctl print "$domain/$label" >/dev/null
+          echo 'p08.gate25.launchAgentStillRegistered=true'
