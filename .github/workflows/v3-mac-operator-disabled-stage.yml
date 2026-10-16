@@ -1,0 +1,120 @@
+name: V3 Physical Mac Owner Operator Safe Disabled Stage
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radlina-v3-mac-owner-operator-disabled-stage
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 6
+    steps:
+      - name: Verify signed physical owner policy and stage disabled Mac-only LaunchAgent
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == "radlina-macbook-main" ]]
+          [[ "$(hostname)" == "amirs-MacBook-Pro.local" ]]
+          [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "x86_64" ]]
+          [[ "$(id -un)" == "amirsheikhzadeh" ]]
+          [[ "$(node --version)" == "v24.20.0" ]]
+          node --input-type=module <<'STAGE_ONLY'
+          import {readFileSync,openSync,writeSync,closeSync,existsSync,lstatSync,constants} from 'node:fs';
+          import {createHash,createPublicKey,verify} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {homedir} from 'node:os';
+          import {join,resolve} from 'node:path';
+          const expectedManifest='dc5f17f68a43e05bccf8e94915f509e0bdfe92b381b63d58efacbeea0062cd3d';
+          const expectedPolicy='ff1fc20dad2f8f25d8644c80a473fa26bedfed8119354fc9cc20359ea2092cbc';
+          const expectedOwner='6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93';
+          const expectedMacNode='c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c';
+          const home=homedir();
+          const base=join(home,'.local','share','radlina','v3-beta','macbook-main-agent');
+          const release=join(base,'releases',expectedManifest);
+          const policy=join(base,'owner-policies','mac-operator-owner-signed-20261015.json');
+          const manifest=join(release,'RELEASE_MANIFEST.json');
+          const tsx=join(release,'node_modules','tsx','dist','cli.mjs');
+          const entry=join(release,'scripts','operations','v3-mac-operator-cycle.ts');
+          const launch=join(home,'Library','LaunchAgents');
+          const name='com.radlina.remote-mcp.v3.mac-operator';
+          const plist=join(launch,name+'.plist');
+          const hash=x=>createHash('sha256').update(x).digest('hex');
+          for(const file of [policy,manifest,tsx,entry]) {
+            if(!existsSync(file)||!lstatSync(file).isFile()||lstatSync(file).isSymbolicLink())throw Error('pinned V3 file absent or symbolic link');
+          }
+          if(hash(readFileSync(manifest))!==expectedManifest)throw Error('immutable release manifest changed');
+          const pstat=lstatSync(policy);
+          if((pstat.mode&0o077)!==0||hash(readFileSync(policy))!==expectedPolicy)
+            throw Error('physical owner policy file changed or not mode 0600');
+          const obj=JSON.parse(readFileSync(policy,'utf8'));
+          if(Object.keys(obj).sort().join(',')!=='ownerSignatureBase64,policy')
+            throw Error('unexpected unsigned fields in policy envelope');
+          const p=obj.policy;
+          if(p?.schema!=='radlina.v3.i01.macos-physical-operator-policy/v1'||
+            p.macDeviceId!=='macbook-main'||p.controllerDeviceId!=='windows-main'||
+            p.approvalMode!=='interactive-target-local'||
+            p.allowedCapabilities?.join(',')!=='device.health,filesystem.read,filesystem.write'||
+            Date.parse(p.expiresAt)<=Date.now())throw Error('physical owner policy identity or expiry invalid');
+          const key=createPublicKey(p.ownerPublicKeyPem);
+          if(key.asymmetricKeyType!=='ed25519'||hash(key.export({type:'spki',format:'der'}))!==expectedOwner)
+            throw Error('owner Ed25519 public key not trusted');
+          const signature=Buffer.from(obj.ownerSignatureBase64,'base64');
+          if(signature.length!==64||signature.toString('base64')!==obj.ownerSignatureBase64)
+            throw Error('signed owner policy signature encoding malformed');
+          // Reuse the immutable release's canonical JSON verifier only after
+          // pinning its Manifest hash and the known protected owner key.
+          function canonical(v) {
+            if(v===null||typeof v!=='object')return JSON.stringify(v);
+            if(Array.isArray(v))return '['+v.map(canonical).join(',')+']';
+            return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canonical(v[k])).join(',')+'}';
+          }
+          if(!verify(null,Buffer.from(canonical(p)),key,signature))
+            throw Error('original Windows owner Ed25519 signature invalid');
+          const tailscale='/Applications/Tailscale.app/Contents/MacOS/Tailscale';
+          const s=JSON.parse(execFileSync(tailscale,['status','--json'],{encoding:'utf8',timeout:15000,maxBuffer:1024*1024}));
+          if(s.BackendState!=='Running'||s.CurrentTailnet?.Name!=='rezanory.github'||s.Self?.Online!==true||
+            hash(s.Self?.ID||'')!==expectedMacNode)throw Error('live P03 signed Mac Tailscale identity not active');
+          if(!existsSync(launch)||!lstatSync(launch).isDirectory()||lstatSync(launch).isSymbolicLink())
+            throw Error('existing native per-user LaunchAgents directory required');
+          if(existsSync(plist))throw Error('operator plist exists; never replace without owner-reviewed migration');
+          const node=process.execPath;
+          if(!node.startsWith('/'))throw Error('Node runtime must be absolute');
+          const esc=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&apos;');
+          const xml=`<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+          <key>Label</key><string>${name}</string>
+          <key>ProgramArguments</key><array><string>${esc(node)}</string><string>${esc(tsx)}</string><string>${esc(entry)}</string></array>
+          <key>EnvironmentVariables</key><dict><key>RADLINA_V3_RELEASE_ROOT</key><string>${esc(release)}</string><key>RADLINA_V3_MAC_OPERATOR_POLICY_PATH</key><string>${esc(policy)}</string></dict>
+          <key>Disabled</key><true/>
+          <key>RunAtLoad</key><false/>
+          <key>KeepAlive</key><false/>
+          <key>StartInterval</key><integer>30</integer>
+          <key>StandardOutPath</key><string>${esc(join(base,name+'.out.log'))}</string>
+          <key>StandardErrorPath</key><string>${esc(join(base,name+'.err.log'))}</string>
+          </dict></plist>\n`;
+          const fd=openSync(plist,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL,0o600);
+          try{writeSync(fd,xml)}finally{closeSync(fd)}
+          if((lstatSync(plist).mode&0o077)!==0)throw Error('Mac operator staged plist permission mismatch');
+          // No launchctl bootstrap, no install of S03 witness/Fleet, no remote execution.
+          console.log('v3.macOperator.plistSha256='+hash(readFileSync(plist)));
+          console.log('v3.macOperator.ownerSignatureVerified=true');
+          console.log('v3.macOperator.plistMode0600=true');
+          console.log('v3.macOperator.installedDisabled=true');
+          console.log('v3.macOperator.bootstrapInvoked=false');
+          console.log('v3.macOperator.s03WitnessTouched=false');
+          console.log('V3_MAC_OPERATOR_DISABLED_PHYSICAL_STAGE_SUCCESS_NOT_I01_ACCEPTANCE');
+          STAGE_ONLY
