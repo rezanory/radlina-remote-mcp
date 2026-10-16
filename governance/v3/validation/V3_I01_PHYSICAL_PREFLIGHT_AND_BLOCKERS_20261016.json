@@ -1,0 +1,75 @@
+{
+  "schema": "radlina.v3.i01.physical-preflight-and-blockers/v1",
+  "record_id": "V3-I01-GATE26-REAL-MAC-WINDOWS-PREFLIGHT-20261016",
+  "component": {
+    "gate": 26,
+    "id": "I01",
+    "name": "authenticated two-device integration"
+  },
+  "physicalMacProbe": {
+    "source": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38968124187",
+    "verifiedAt": "2026-10-16T21:16:23Z",
+    "physicalRunner": "radlina-macbook-main",
+    "status": "SUCCESS",
+    "macKeychainP03SignerPreviouslyAdmitted": true,
+    "actualOwnerEd25519SignedMacPolicyVerified": true,
+    "physicalMacAndWindowsP03TailnetNodePinsMatched": true,
+    "freshPhysicalP08GatewayAcceptedSignedHeartbeat": true,
+    "exactNativeMacReleaseManifestSha256": "dc5f17f68a43e05bccf8e94915f509e0bdfe92b381b63d58efacbeea0062cd3d",
+    "disabledMacOperatorCandidateVerified": true,
+    "canonicalMacOperatorLaunchAgentInstalled": false,
+    "macS03WitnessLaunchAgentInstalled": false,
+    "macFleetLaunchAgentInstalled": false,
+    "actualCrossHostI01SignedOperationExecuted": false,
+    "actualTargetLocalConsentGrantRecorded": false,
+    "physicalReleaseAcceptance": "NOT_GRANTED"
+  },
+  "windowsObservations": {
+    "windowsV2Service": "Running",
+    "windowsV3OAuthBetaService": "Running",
+    "windowsV3TunnelService": "Running",
+    "windowsI01RecipientTaskInstalled": true,
+    "windowsI01RecipientTaskEnabled": false,
+    "windowsOwnerSigningTaskEnabled": true,
+    "actualOwnerApprovedClientBindingPresent": true,
+    "actualOwnerSignedMacOperatorPolicyPresent": true,
+    "realMacS03WitnessPublicKeyPemPresent": true,
+    "realIndependentReviewerPinnedFinalFourProductionBindingPresent": false,
+    "realMacS03WitnessPolicyPresent": false,
+    "v3GatewayRemoteExecutionEnabled": false,
+    "v3FinalFourPortsBound": false
+  },
+  "componentTests": {
+    "source": "real native Node v24.20.0 Windows E: dedicated V3 source worktree",
+    "exactCommit": "b61f7b61963cd10d30ff4302d5f04cdf61ed08b1",
+    "targetedFiles": [
+      "tests/unit/v3/final4-journal-reconciliation.test.ts",
+      "tests/unit/v3/device-consent.test.ts",
+      "tests/unit/v3/mac-heartbeat-ingress.test.ts",
+      "tests/unit/v3/s03-external-ack-recovery.test.ts"
+    ],
+    "testsPassed": 30,
+    "testFilesPassed": 4,
+    "exitCode": 0,
+    "includes": "I01 replay prevention, signed local consent exactly once, signed P08 rejection, separate S03 receipt reconciliation"
+  },
+  "acceptance": {
+    "physicalMacPolicyAndTransportPreflight": "PASS",
+    "nativeConsentAndAuditComponentUnitTests": "PASS",
+    "realSignedOAuthOriginToMacOperation": "NOT_TESTED",
+    "physicalMacRecipientHumanConsent": "NOT_TESTED",
+    "independentS03Anchor": "NOT_READY",
+    "realSignedCrossHostOutputReceipt": "NOT_TESTED",
+    "formalGate26": "OPEN",
+    "officialFinalFourAcceptedBefore": 24,
+    "officialFinalFourAcceptedAfter": 24,
+    "independentReviewerCryptographicAcceptanceClaimed": false,
+    "whyOpen": "No installed/running canonical Mac I01 operator, missing genuine final-four production reviewer policy and independent S03 witness credentials; native ChatGPT OAuth currently device:read only. Never fabricate local user consent, reviewer keys, or a signed real delivery receipt."
+  },
+  "safety": {
+    "v2Changed": false,
+    "macTailnetSettingsChanged": false,
+    "macFleetActivated": false,
+    "macRemoteExecutionEnabled": false
+  }
+}
