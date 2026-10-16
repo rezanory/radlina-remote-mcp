@@ -1,0 +1,115 @@
+name: V3 I01 Physical Mac Pinned Readiness Inventory (no execution)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-physical-readiness
+  cancel-in-progress: false
+jobs:
+  mac-physical-readiness:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Verify signed P08, Mac owner I01 policy, disabled Operator and peer without execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == "radlina-macbook-main" ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(node --version)" == 'v24.20.0' ]]
+          node --input-type=module <<'CHECK'
+          import {readFileSync,existsSync,lstatSync} from 'node:fs';
+          import {createHash,createPublicKey,verify} from 'node:crypto';
+          import {execFileSync} from 'node:child_process';
+          import {homedir} from 'node:os';
+          import {join} from 'node:path';
+          const hash=v=>createHash('sha256').update(v).digest('hex');
+          const root=join(homedir(),'.local/share/radlina/v3-beta/macbook-main-agent');
+          const manifestPin='dc5f17f68a43e05bccf8e94915f509e0bdfe92b381b63d58efacbeea0062cd3d';
+          const ownerKeyPin='6259d21211f73fc9d2d7cc0174d9bfdc36424cd456878671ab5683468ca0fe93';
+          const p03MacNodePin='c7886ac103d4c05907ff8953ae60687d31303146a9b122cb55bff0dc1860bc9c';
+          const signedPolicyPin='ff1fc20dad2f8f25d8644c80a473fa26bedfed8119354fc9cc20359ea2092cbc';
+          const manifest=join(root,'releases',manifestPin,'RELEASE_MANIFEST.json');
+          const policyFile=join(root,'owner-policies/mac-operator-owner-signed-20261015.json');
+          const ackFile=join(root,'heartbeat-latest-ack.json');
+          const candidate=join(root,'candidates/com.radlina.remote-mcp.v3.mac-operator.disabled.plist');
+          function protectedFile(file,max,sha) {
+            if(!existsSync(file))throw Error('expected protected I01 prerequisite file absent');
+            const stat=lstatSync(file);
+            if(!stat.isFile()||stat.isSymbolicLink()||(stat.mode&0o077)!==0||stat.size>max)
+              throw Error('protected I01 file invalid');
+            const bytes=readFileSync(file);
+            if(sha&&hash(bytes)!==sha)throw Error('pinned I01 file hash differs');
+            return bytes;
+          }
+          protectedFile(manifest,5*1024*1024,manifestPin);
+          const signed=JSON.parse(protectedFile(policyFile,8192,signedPolicyPin).toString('utf8'));
+          if(Object.keys(signed).sort().join(',')!=='ownerSignatureBase64,policy')throw Error('unexpected unsigned I01 policy fields');
+          const pol=signed.policy;
+          if(pol?.schema!=='radlina.v3.i01.macos-physical-operator-policy/v1'||
+             pol.macDeviceId!=='macbook-main'||pol.controllerDeviceId!=='windows-main'||
+             pol.approvalMode!=='interactive-target-local'||Date.parse(pol.expiresAt)<=Date.now()||
+             pol.allowedCapabilities?.join(',')!=='device.health,filesystem.read,filesystem.write')
+            throw Error('I01 real owner capability policy invalid or expired');
+          const ownerKey=createPublicKey(pol.ownerPublicKeyPem);
+          if(ownerKey.asymmetricKeyType!=='ed25519'||
+             hash(ownerKey.export({type:'spki',format:'der'}))!==ownerKeyPin)
+            throw Error('owner public key not the pinned real owner');
+          function canonical(v) {
+            if(v===undefined)return 'null';
+            if(Array.isArray(v))return '['+v.map(x=>canonical(x===undefined?null:x)).join(',')+']';
+            if(v&&typeof v==='object')return '{'+Object.entries(v).filter(([,x])=>x!==undefined)
+              .sort(([a],[b])=>a.localeCompare(b))
+              .map(([k,x])=>JSON.stringify(k)+':'+canonical(x)).join(',')+'}';
+            return JSON.stringify(v)??'null';
+          }
+          const sig=Buffer.from(signed.ownerSignatureBase64||'','base64');
+          if(sig.length!==64||sig.toString('base64')!==signed.ownerSignatureBase64||
+             !verify(null,Buffer.from(canonical(pol)),ownerKey,sig))throw Error('real owner I01 policy signature failed');
+          const data=JSON.parse(execFileSync('/Applications/Tailscale.app/Contents/MacOS/Tailscale',['status','--json'],
+            {encoding:'utf8',timeout:14000,maxBuffer:1048576}));
+          const peers=Object.values(data.Peer||{}).filter(p=>p.Online===true&&
+             String(p.DNSName||'').replace(/\.$/,'').toLowerCase()==='laptop-13qineif.taile17c9e.ts.net');
+          if(data.BackendState!=='Running'||data.CurrentTailnet?.Name!=='rezanory.github'||
+             data.Self?.Online!==true||hash(data.Self?.ID||'')!==p03MacNodePin||
+             peers.length!==1||hash(peers[0].ID||'')!==pol.windowsTailnetNodeHash)
+            throw Error('real pinned physical I01 Tailnet identities not ready');
+          const ack=JSON.parse(protectedFile(ackFile,8192).toString('utf8'));
+          if(ack.schema!=='radlina.v3.p08.durable-heartbeat-ack/v1'||
+             ack.gatewayReceipt?.acceptance!=='V3_P08_REAL_MAC_SIGNED_HEARTBEAT_ACCEPTED'||
+             ack.gatewayReceipt?.trustState!=='trusted'||
+             ack.gatewayReceipt?.crossDeviceExecutionEnabled!==false||
+             Date.now()-ack.acknowledgedAtMs>120000||ack.acknowledgedAtMs>Date.now()+10000)
+            throw Error('P08 physical signed acknowledgement not fresh');
+          const plist=protectedFile(candidate,16*1024);
+          const candidateText=plist.toString('utf8');
+          if(!candidateText.includes('<key>Disabled</key><true/>')||
+             !candidateText.includes('<key>RunAtLoad</key><false/>')||
+             !candidateText.includes('<key>KeepAlive</key><false/>')||
+             !candidateText.includes(manifestPin))throw Error('Mac I01 operator candidate not safely disabled/pinned');
+          const active=join(homedir(),'Library/LaunchAgents/com.radlina.remote-mcp.v3.mac-operator.plist');
+          const activeInstalled=existsSync(active);
+          const witness=join(homedir(),'Library/LaunchAgents/com.radlina.remote-mcp.v3.mac-s03-witness.plist');
+          const macFleet=join(homedir(),'Library/LaunchAgents/com.radlina.remote-mcp.v3.mac-fleet-agent.plist');
+          console.log('i01.physicalMac.ownerSignatureValid=true');
+          console.log('i01.physicalMac.liveMacAndWindowsP03NodePinsVerified=true');
+          console.log('i01.physicalMac.p08SignedAckFresh=true');
+          console.log('i01.physicalMac.immutableNativeReleaseVerified=true');
+          console.log('i01.physicalMac.disabledOwnerOperatorCandidateVerified=true');
+          console.log('i01.physicalMac.activeOperatorInstalled='+activeInstalled);
+          console.log('i01.physicalMac.s03WitnessInstalled='+existsSync(witness));
+          console.log('i01.physicalMac.macFleetInstalled='+existsSync(macFleet));
+          console.log('i01.physicalMac.physicalCommandExecuted=false');
+          console.log('i01.physicalMac.localRecipientConsentClaimed=false');
+          console.log('I01_PHYSICAL_OWNER_POLICY_AND_TRANSPORT_PREFLIGHT_PASS_NOT_I01_GATE_ACCEPTANCE');
+          CHECK
