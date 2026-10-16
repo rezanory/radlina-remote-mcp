@@ -1,0 +1,51 @@
+name: Diagnose actual macOS reminder wallpaper assignment (read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 5
+    steps:
+      - name: Check native owner Desktop NSWorkspace image and original file hash only
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          target="$HOME/Pictures/Radlina/amir-computer-stay-on.png"
+          [[ -f "$target" && ! -L "$target" ]]
+          sha="$(shasum -a 256 "$target" | awk '{print $1}')"
+          [[ "$sha" == '4c43fc73b634a01df5d8b293adef5b19f13ed478953494c9e2cc9a2ba917db1c' ]]
+          echo 'v3.wallpaper.originalFileOnMacVerified=true'
+          echo "v3.wallpaper.macOSVersion=$(sw_vers -productVersion)"
+          scratch="$(mktemp -d)"
+          trap 'rm -rf "$scratch"' EXIT
+          cat > "$scratch/diagnose.swift" <<'SWIFT'
+          import AppKit
+          import Foundation
+          guard CommandLine.arguments.count == 2 else { exit(2) }
+          let expected = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL
+          let w = NSWorkspace.shared
+          print("v3.wallpaper.detectedScreenCount=\(NSScreen.screens.count)")
+          for (i,s) in NSScreen.screens.enumerated() {
+              let actual = w.desktopImageURL(for:s)
+              let opts = w.desktopImageOptions(for:s)
+              print("v3.wallpaper.screen\(i).readbackIsNil=\(actual == nil)")
+              print("v3.wallpaper.screen\(i).currentIsOriginalFile=\(actual?.standardizedFileURL.path == expected.path)")
+              if let actual = actual {
+                  print("v3.wallpaper.screen\(i).actualImageBasename=\(actual.lastPathComponent)")
+                  print("v3.wallpaper.screen\(i).actualImageFileExists=\(FileManager.default.fileExists(atPath:actual.path))")
+                  print("v3.wallpaper.screen\(i).actualImageIsFileURL=\(actual.isFileURL)")
+              }
+              print("v3.wallpaper.screen\(i).desktopOptionsCount=\(opts.count)")
+          }
+          print("V3_MAC_WALLPAPER_READONLY_DIAGNOSTIC_COMPLETE")
+          SWIFT
+          /usr/bin/swift "$scratch/diagnose.swift" "$target"
