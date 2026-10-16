@@ -1,0 +1,44 @@
+{
+  "schema": "radlina.v3.i01.real-independent-mac-s03-public-witness-stage/v1",
+  "deviceId": "macbook-main",
+  "auditWitnessDeviceId": "macbook-main-s03",
+  "evidenceDate": "2026-10-16",
+  "realPhysicalMacS03SignerProof": {
+    "runUrl": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38972683708",
+    "state": "SUCCESS",
+    "witnessKeyFingerprint": "32f04e1a18f49fffd5111b98d70dc1f157326a356df3834f8c34b4d2bc7a2238",
+    "keyType": "Ed25519",
+    "privateKeyStoredInDedicatedMacKeychain": true,
+    "privateKeyExported": false,
+    "physicallyDifferentFromMacP03": true
+  },
+  "physicalOwnerTrustPolicyStage": {
+    "runUrl": "https://github.com/rezanory/radlina-remote-mcp/actions/runs/38972949920",
+    "state": "SUCCESS",
+    "mergePR": "https://github.com/rezanory/radlina-remote-mcp/pull/46",
+    "nativeMacStagedPath": "/Users/amirsheikhzadeh/.local/share/radlina/v3-beta/macbook-main-s03/owner-witness-pins-20261016.json",
+    "stagedMode": "0600",
+    "hash": "41615069fcec5283525d8ccc13d1d6a030273eb583f5da9869add557f7d7e87a",
+    "realOwnerEd25519MacPolicySignatureVerified": true,
+    "originalPhysicalP03WindowsAndMacDeviceFingerprintPinsVerified": true,
+    "tokensGeneratedOrInstalled": false,
+    "witnessProcessStarted": false,
+    "publicAuditEndpointEnabled": false,
+    "v2Changed": false
+  },
+  "pendingRealRequirements": {
+    "trueOwnerProvisionedS03WriterBearerAndHmac": "NOT_INSTALLED",
+    "windowsMachineDpapiSecretFiles": "NOT_VERIFIED",
+    "macDedicatedKeychainWriterCredentials": "NOT_VERIFIED",
+    "independentReviewerEd25519PublicAndActualSignature": "NOT_AVAILABLE",
+    "genuineChatGPTOAuthFilesystemAndExecuteScopes": "NOT_AUTHORIZED",
+    "canonicalMacI01OperatorRunning": "NO",
+    "windowsI01RecipientTaskEnabled": "NO",
+    "actualSignedCrossHostCommandWithTargetLocalConsent": "NOT_EXECUTED",
+    "externalS03AuditAnchoring": "NOT_EXECUTED",
+    "gate26": "OPEN"
+  },
+  "officialAcceptedGates": 25,
+  "total": 28,
+  "note": "Actual S03 witness public signer and owner-pinned policy are valid physical prerequisites only. Do not synthesize external reviewer, owner local consent, S03 bearer, HMAC, or accepted execution receipt."
+}
