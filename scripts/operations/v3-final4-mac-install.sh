@@ -3,7 +3,10 @@
 # Installs separately scoped LaunchAgents, never changes V2 or Tailscale settings.
 set -euo pipefail
 umask 077
-[[ "$#" == 1 && "$1" == "--install" ]]
+[[ "$#" == 1 && ( "$1" == "--install" || "$1" == "--install-i01" ) ]]
+# I01 can be installed independently. Never activate F01 Fleet as a side effect
+# of the earlier cross-device integration gate.
+INSTALL_MODE="$1"
 [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "x86_64" ]]
 [[ "$(hostname)" == "amirs-MacBook-Pro.local" ]]
 [[ "$(id -un)" == "amirsheikhzadeh" ]]
@@ -41,11 +44,19 @@ done
 MANIFEST="$RELEASE/RELEASE_MANIFEST.json"
 [[ -f "$MANIFEST" && ! -L "$MANIFEST" ]]
 [[ "$(shasum -a 256 "$MANIFEST" | awk '{print $1}')" == "$RADLINA_V3_FINAL4_MAC_RELEASE_SHA256" ]]
-for script in v3-mac-operator-cycle.ts v3-mac-fleet-cycle.ts v3-s03-mac-witness-daemon.ts; do
+REQUIRED_SCRIPTS=(v3-mac-operator-cycle.ts v3-s03-mac-witness-daemon.ts)
+if [[ "$INSTALL_MODE" == "--install" ]]; then
+  REQUIRED_SCRIPTS+=(v3-mac-fleet-cycle.ts)
+fi
+for script in "${REQUIRED_SCRIPTS[@]}"; do
   [[ -f "$RELEASE/scripts/operations/$script" ]]
 done
-mkdir -p -m 700 "$BASE" "$BASE/receipts" "$BASE/fleet" "$LAUNCH"
-chmod 700 "$BASE" "$BASE/receipts" "$BASE/fleet"
+mkdir -p -m 700 "$BASE" "$BASE/receipts" "$LAUNCH"
+chmod 700 "$BASE" "$BASE/receipts"
+if [[ "$INSTALL_MODE" == "--install" ]]; then
+  mkdir -p -m 700 "$BASE/fleet"
+  chmod 700 "$BASE/fleet"
+fi
 # P08 is a separate signed-health LaunchAgent, always installed before work agents.
 # Existing P08 is preserved rather than overwritten or re-enrolled.
 P08_LABEL='com.radlina.remote-mcp.v3.mac-heartbeat'
@@ -115,18 +126,34 @@ EOF
  echo '</dict></plist>' >> "$out"
  chmod 600 "$out"
 }
-install_agent 'com.radlina.remote-mcp.v3.mac-operator' \
-  'v3-mac-operator-cycle.ts' 15 0 0
-install_agent 'com.radlina.remote-mcp.v3.mac-fleet-agent' \
-  'v3-mac-fleet-cycle.ts' 45 1 0
+I01_LABELS=(com.radlina.remote-mcp.v3.mac-s03-witness com.radlina.remote-mcp.v3.mac-operator)
+AGENT_LABELS=("${I01_LABELS[@]}")
+if [[ "$INSTALL_MODE" == "--install" ]]; then
+  AGENT_LABELS+=(com.radlina.remote-mcp.v3.mac-fleet-agent)
+fi
+# Fail closed before creating ANY new I01 LaunchAgent, including on a rerun.
+for label in "${AGENT_LABELS[@]}"; do
+  [[ ! -e "$LAUNCH/$label.plist" && ! -L "$LAUNCH/$label.plist" ]] || {
+    echo "V3 LaunchAgent already exists; reconcile explicitly: $label" >&2; exit 16;
+  }
+done
+# The independent S03 listener must be started BEFORE the command operator.
 install_agent 'com.radlina.remote-mcp.v3.mac-s03-witness' \
   'v3-s03-mac-witness-daemon.ts' 0 0 1
+install_agent 'com.radlina.remote-mcp.v3.mac-operator' \
+  'v3-mac-operator-cycle.ts' 15 0 0
+if [[ "$INSTALL_MODE" == "--install" ]]; then
+  install_agent 'com.radlina.remote-mcp.v3.mac-fleet-agent' \
+    'v3-mac-fleet-cycle.ts' 45 1 0
+fi
 DOMAIN="gui/$(id -u)"
 if ! launchctl print "$DOMAIN" >/dev/null 2>&1; then DOMAIN="user/$(id -u)"; fi
-for label in com.radlina.remote-mcp.v3.mac-operator \
-             com.radlina.remote-mcp.v3.mac-fleet-agent \
-             com.radlina.remote-mcp.v3.mac-s03-witness; do
+for label in "${AGENT_LABELS[@]}"; do
   launchctl bootstrap "$DOMAIN" "$LAUNCH/$label.plist"
 done
-echo "V3_MAC_FINAL4_AGENTS_INSTALLED $RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
+if [[ "$INSTALL_MODE" == "--install-i01" ]]; then
+  echo "V3_MAC_I01_AGENTS_INSTALLED_FLEET_UNTOUCHED $RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
+else
+  echo "V3_MAC_FINAL4_AGENTS_INSTALLED $RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
+fi
 echo "Source installed; acceptance still requires later authorized real-world tests."
