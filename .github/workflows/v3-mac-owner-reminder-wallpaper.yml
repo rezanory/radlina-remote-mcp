@@ -1,0 +1,91 @@
+name: Set Mac owner's reminder wallpaper (one-time manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-mac-owner-reminder-wallpaper
+  cancel-in-progress: false
+jobs:
+  set-wallpaper:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    environment: v3-mac-dev-validation-no-review
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    timeout-minutes: 10
+    steps:
+      - name: Install original owner-supplied wallpaper and verify macOS desktop assignment
+        shell: bash
+        env:
+          WALLPAPER_ASSET_URL: ${{ secrets.RADLINA_V3_MAC_WALLPAPER_SOURCE_URL }}
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "${#WALLPAPER_ASSET_URL}" -ge 25 ]]
+          [[ "$WALLPAPER_ASSET_URL" =~ ^https://at[.]adobe[.]com/[A-Za-z0-9]+$ ]]
+          expected="4c43fc73b634a01df5d8b293adef5b19f13ed478953494c9e2cc9a2ba917db1c"
+          scratch="$(mktemp -d)"
+          trap 'rm -rf "$scratch"' EXIT
+          curl --fail --location --silent --show-error --retry 2 --retry-delay 2 \
+            --max-time 70 --output "$scratch/reminder.png" "$WALLPAPER_ASSET_URL"
+          actual="$(shasum -a 256 "$scratch/reminder.png" | awk '{print $1}')"
+          [[ "$actual" == "$expected" ]] || { echo 'Owner-supplied original image hash mismatch'; exit 2; }
+          [[ "$(file -b --mime-type "$scratch/reminder.png")" == 'image/png' ]] || exit 3
+          width="$(sips -g pixelWidth "$scratch/reminder.png" | awk '/pixelWidth:/{print $2}')"
+          height="$(sips -g pixelHeight "$scratch/reminder.png" | awk '/pixelHeight:/{print $2}')"
+          [[ "$width" == '1586' && "$height" == '992' ]] || exit 4
+          echo "v3.wallpaper.originalSha256Verified=true"
+          echo "v3.wallpaper.originalSize=1586x992"
+          [[ -d "$HOME/Pictures" && ! -L "$HOME/Pictures" ]] || { echo 'Mac user Pictures directory absent'; exit 5; }
+          mkdir -p "$HOME/Pictures/Radlina"
+          [[ ! -L "$HOME/Pictures/Radlina" ]] || exit 6
+          chmod 700 "$HOME/Pictures/Radlina"
+          destination="$HOME/Pictures/Radlina/amir-computer-stay-on.png"
+          if [[ -e "$destination" || -L "$destination" ]]; then
+            [[ ! -L "$destination" && -f "$destination" ]] || exit 7
+            [[ "$(shasum -a 256 "$destination" | awk '{print $1}')" == "$expected" ]] || { echo 'Existing user image differs; will not overwrite'; exit 8; }
+            echo "v3.wallpaper.alreadyInstalled=true"
+          else
+            install -m 600 "$scratch/reminder.png" "$destination"
+            echo "v3.wallpaper.originalInstalled=true"
+          fi
+          [[ "$(shasum -a 256 "$destination" | awk '{print $1}')" == "$expected" ]] || exit 9
+          cat > "$scratch/apply-wallpaper.swift" <<'SWIFT'
+          import AppKit
+          import Foundation
+
+          guard CommandLine.arguments.count == 2 else { fatalError("Wallpaper path missing") }
+          let requested = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL
+          let screens = NSScreen.screens
+          print("v3.wallpaper.detectedScreenCount=\(screens.count)")
+          guard !screens.isEmpty else {
+              fputs("No active macOS GUI display in current owner session\n", stderr)
+              exit(11)
+          }
+          let workspace = NSWorkspace.shared
+          var failures = 0
+          for (index, screen) in screens.enumerated() {
+              do {
+                  try workspace.setDesktopImageURL(requested, for: screen, options: [:])
+                  let actual = workspace.desktopImageURL(for: screen)?.standardizedFileURL
+                  let equal = actual?.path == requested.path
+                  print("v3.wallpaper.screen\(index).assignedAndReadBack=\(equal)")
+                  if !equal { failures += 1 }
+              } catch {
+                  print("v3.wallpaper.screen\(index).assignmentFailed=\(type(of:error))")
+                  failures += 1
+              }
+          }
+          guard failures == 0 else { exit(12) }
+          print("V3_MAC_OWNER_WALLPAPER_APPLIED_AND_READBACK_VERIFIED")
+          SWIFT
+          /usr/bin/swift "$scratch/apply-wallpaper.swift" "$destination"
+          echo "v3.wallpaper.v2ServiceChanges=false"
+          echo "v3.wallpaper.tailnetSettingsChanges=false"
