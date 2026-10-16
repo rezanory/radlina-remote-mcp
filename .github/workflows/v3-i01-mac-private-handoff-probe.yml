@@ -1,0 +1,56 @@
+name: V3 I01 Mac Taildrop and Keychain Capability Probe (manual)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-private-handoff-probe
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Verify real Mac owner and private credential handoff prerequisites only
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          CLI='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+          [[ -x "$CLI" ]]
+          "$CLI" status --json | node -e '
+            let x="";process.stdin.on("data",c=>x+=c);process.stdin.on("end",()=>{
+              const s=JSON.parse(x);
+              if(s.BackendState!=="Running"||s.Self?.Online!==true||s.CurrentTailnet?.Name!=="rezanory.github")process.exit(17);
+              console.log("i01.mac.tailnetAuthenticatedOnline=true");
+            });'
+          if "$CLI" file get --help >/dev/null 2>&1; then
+            echo 'i01.mac.taildropFileGetCliSupported=true'
+          else
+            echo 'i01.mac.taildropFileGetCliSupported=false'
+          fi
+          if xcrun --find swift >/dev/null 2>&1; then
+            echo 'i01.mac.nativeSwiftSecurityFrameworkAvailable=true'
+          else
+            echo 'i01.mac.nativeSwiftSecurityFrameworkAvailable=false'
+          fi
+          /usr/bin/security default-keychain -d user >/dev/null
+          echo 'i01.mac.userKeychainAccessible=true'
+          for service in com.radlina.remote-mcp.v3.s03-writer-token com.radlina.remote-mcp.v3.s03-writer-hmac-base64; do
+            if /usr/bin/security find-generic-password -s "$service" -a amirsheikhzadeh >/dev/null 2>&1; then
+              echo 'i01.mac.writerKeychainItemAlreadyPresent=true'
+            else
+              echo 'i01.mac.writerKeychainItemAlreadyPresent=false'
+            fi
+          done
+          echo 'V3_I01_PRIVATE_CREDENTIAL_TRANSFER_READONLY_PROBE_COMPLETE'
