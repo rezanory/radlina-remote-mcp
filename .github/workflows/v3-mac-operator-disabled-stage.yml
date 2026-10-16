@@ -32,7 +32,7 @@ jobs:
           [[ "$(id -un)" == "amirsheikhzadeh" ]]
           [[ "$(node --version)" == "v24.20.0" ]]
           node --input-type=module <<'STAGE_ONLY'
-          import {readFileSync,openSync,writeSync,closeSync,existsSync,lstatSync,constants} from 'node:fs';
+          import {readFileSync,openSync,writeSync,closeSync,existsSync,lstatSync,mkdirSync,constants} from 'node:fs';
           import {createHash,createPublicKey,verify} from 'node:crypto';
           import {execFileSync} from 'node:child_process';
           import {homedir} from 'node:os';
@@ -48,9 +48,11 @@ jobs:
           const manifest=join(release,'RELEASE_MANIFEST.json');
           const tsx=join(release,'node_modules','tsx','dist','cli.mjs');
           const entry=join(release,'scripts','operations','v3-mac-operator-cycle.ts');
-          const launch=join(home,'Library','LaunchAgents');
+          // Stage candidate outside LaunchAgents: the official later full
+          // Mac installer must never be blocked by a pre-existing canonical plist.
+          const candidates=join(base,'candidates');
           const name='com.radlina.remote-mcp.v3.mac-operator';
-          const plist=join(launch,name+'.plist');
+          const plist=join(candidates,name+'.disabled.plist');
           const hash=x=>createHash('sha256').update(x).digest('hex');
           for(const file of [policy,manifest,tsx,entry]) {
             if(!existsSync(file)||!lstatSync(file).isFile()||lstatSync(file).isSymbolicLink())throw Error('pinned V3 file absent or symbolic link');
@@ -87,8 +89,10 @@ jobs:
           const s=JSON.parse(execFileSync(tailscale,['status','--json'],{encoding:'utf8',timeout:15000,maxBuffer:1024*1024}));
           if(s.BackendState!=='Running'||s.CurrentTailnet?.Name!=='rezanory.github'||s.Self?.Online!==true||
             hash(s.Self?.ID||'')!==expectedMacNode)throw Error('live P03 signed Mac Tailscale identity not active');
-          if(!existsSync(launch)||!lstatSync(launch).isDirectory()||lstatSync(launch).isSymbolicLink())
-            throw Error('existing native per-user LaunchAgents directory required');
+          mkdirSync(candidates,{recursive:true,mode:0o700});
+          const stageDir=lstatSync(candidates);
+          if(!stageDir.isDirectory()||stageDir.isSymbolicLink()||(stageDir.mode&0o077)!==0)
+            throw Error('private V3 candidate directory required');
           if(existsSync(plist))throw Error('operator plist exists; never replace without owner-reviewed migration');
           const node=process.execPath;
           if(!node.startsWith('/'))throw Error('Node runtime must be absolute');
@@ -113,8 +117,9 @@ jobs:
           console.log('v3.macOperator.plistSha256='+hash(readFileSync(plist)));
           console.log('v3.macOperator.ownerSignatureVerified=true');
           console.log('v3.macOperator.plistMode0600=true');
-          console.log('v3.macOperator.installedDisabled=true');
+          console.log('v3.macOperator.candidateStagedDisabled=true');
+          console.log('v3.macOperator.launchAgentsModified=false');
           console.log('v3.macOperator.bootstrapInvoked=false');
           console.log('v3.macOperator.s03WitnessTouched=false');
-          console.log('V3_MAC_OPERATOR_DISABLED_PHYSICAL_STAGE_SUCCESS_NOT_I01_ACCEPTANCE');
+          console.log('V3_MAC_OPERATOR_DISABLED_CANDIDATE_STAGED_NO_LAUNCHD_MUTATION');
           STAGE_ONLY
