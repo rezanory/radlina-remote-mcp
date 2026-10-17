@@ -1,0 +1,74 @@
+name: V3 I01 Mac Keychain Write + Taildrop Readiness
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-keychain-taildrop-readiness
+  cancel-in-progress: false
+jobs:
+  check:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Verify owner-local Keychain add/copy/remove using disposable NON-PRODUCTION probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == radlina-macbook-main ]]
+          [[ "$(hostname)" == amirs-MacBook-Pro.local ]]
+          [[ "$(id -un)" == amirsheikhzadeh ]]
+          [[ "$(uname -s)" == Darwin && "$(uname -m)" == x86_64 ]]
+          [[ "$(node --version)" == v24.20.0 ]]
+          swift - <<'SWIFT'
+          import Foundation
+          import Security
+          let account = "amirsheikhzadeh"
+          let name = "com.radlina.remote-mcp.v3.i01-keychain-readiness-" + UUID().uuidString.lowercased()
+          var data = Data(count: 32)
+          let randomStatus = data.withUnsafeMutableBytes { bytes -> Int32 in
+            guard let address = bytes.baseAddress else { return -1 }
+            return SecRandomCopyBytes(kSecRandomDefault, 32, address)
+          }
+          guard randomStatus == errSecSuccess else { fatalError("OS cryptographic RNG unavailable") }
+          let query: [String:Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: account,
+            kSecAttrService as String: name,
+          ]
+          var insert = query
+          insert[kSecValueData as String] = data
+          let status = SecItemAdd(insert as CFDictionary, nil)
+          guard status == errSecSuccess else { fatalError("owner Keychain local insert unavailable status=\(status)") }
+          defer { _ = SecItemDelete(query as CFDictionary) }
+          var check = query
+          check[kSecReturnData as String] = true
+          check[kSecMatchLimit as String] = kSecMatchLimitOne
+          var returned: CFTypeRef?
+          let readStatus = SecItemCopyMatching(check as CFDictionary, &returned)
+          guard readStatus == errSecSuccess, let roundtrip = returned as? Data,
+            roundtrip == data else { fatalError("Keychain local readback denied") }
+          data.resetBytes(in: 0..<data.count)
+          print("I01_MAC_KEYCHAIN_NONSECRET_WRITE_READ_DELETE_PASS")
+          SWIFT
+          CLI=/Applications/Tailscale.app/Contents/MacOS/Tailscale
+          [[ -x "$CLI" ]]
+          "$CLI" status --json | node -e '
+            let x="";process.stdin.on("data",c=>x+=c);process.stdin.on("end",()=>{
+              const s=JSON.parse(x);
+              const p=Object.values(s.Peer||{}).filter(p=>p.Online===true&&p.OS==="windows"&&
+                String(p.DNSName||"").replace(/\\.$/,"").toLowerCase()==="laptop-13qineif.taile17c9e.ts.net");
+              if(s.BackendState!=="Running"||s.Self?.Online!==true||
+                s.CurrentTailnet?.Name!=="rezanory.github"||p.length!==1)process.exit(18);
+              console.log("I01_MAC_TO_WINDOWS_TAILNET_PEER_PIN_PRESENT");
+            });'
+          "$CLI" file cp --targets | grep -Ei 'laptop-13qineif' >/dev/null
+          echo 'I01_MAC_TAILDROP_WINDOWS_RECEIVER_ADVERTISED'
+          echo 'I01_MAC_CREDENTIAL_GENERATION_NOT_YET_EXECUTED'
