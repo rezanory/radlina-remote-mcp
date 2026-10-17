@@ -1,0 +1,69 @@
+name: V3 I01 Mac Ingress and Agent Readiness (No Secrets)
+on:
+  push:
+    branches: [production/controller-full-control-v1]
+    paths:
+      - .github/workflows/v3-i01-mac-ingress-readiness-20261017.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-ingress-readiness-no-secret
+  cancel-in-progress: false
+jobs:
+  inspect:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Mac V3-only service state and Cloudflare credential PATH metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          BASE="$HOME/.local/share/radlina/v3-beta/macbook-main-s03"
+          LAUNCH="$HOME/Library/LaunchAgents"
+          check_private() {
+            local file="$1" name="$2"
+            if [[ -f "$file" && ! -L "$file" && "$(stat -f '%Lp' "$file")" == 600 ]]; then
+              echo "$name=present-private-0600"
+            else
+              echo "$name=missing-or-not-private"
+            fi
+          }
+          check_private "$BASE/s03-writer-token.secret" S03_WRITER_TOKEN_FILE
+          check_private "$BASE/s03-writer-hmac.b64" S03_WRITER_HMAC_FILE
+          # Path candidates are metadata ONLY. No token contents or plist payloads.
+          for f in "$BASE/cloudflare-tunnel-token.secret" "$BASE/cloudflare-tunnel-token.local" "$BASE/cloudflared-token.secret" "$BASE/tunnel-token.secret"; do
+            if [[ -e "$f" ]]; then
+              echo 'CLOUDFLARE_DEFAULT_TOKEN_CANDIDATE_PRESENT=true'
+              check_private "$f" CLOUDFLARE_TOKEN_CANDIDATE
+            fi
+          done
+          if command -v cloudflared >/dev/null 2>&1; then
+            echo 'CLOUDFLARED_EXECUTABLE_ON_PATH=yes'
+          else
+            echo 'CLOUDFLARED_EXECUTABLE_ON_PATH=no'
+          fi
+          domain="gui/$(id -u)"
+          launchctl print "$domain" >/dev/null 2>&1 || domain="user/$(id -u)"
+          for label in             com.radlina.remote-mcp.v3.mac-heartbeat             com.radlina.remote-mcp.v3.mac-s03-witness             com.radlina.remote-mcp.v3.mac-operator             com.radlina.remote-mcp.v3.mac-s03-cloudflare; do
+            if [[ -f "$LAUNCH/$label.plist" && ! -L "$LAUNCH/$label.plist" ]]; then
+              echo "MAC_PLIST_$label=present"
+            else
+              echo "MAC_PLIST_$label=missing"
+            fi
+            if launchctl print "$domain/$label" >/dev/null 2>&1; then
+              echo "MAC_LAUNCHCTL_$label=registered"
+            else
+              echo "MAC_LAUNCHCTL_$label=unregistered"
+            fi
+          done
+          echo 'I01_READ_ONLY_NO_CREDS_ACCESSED_NO_AGENT_MODIFIED'
