@@ -16,8 +16,8 @@ export type I01PhysicalRelayPorts = {
   outbox: I01DurableSealedOutbox;
   consent: I01SqliteTargetLocalConsentMailbox;
   s02e: I01S02EConsentController;
-  fleet: F01SealedFleetTransport;
-  fleetApprovals: F01SignedReleaseConsentMailbox;
+  fleet?: F01SealedFleetTransport;
+  fleetApprovals?: F01SignedReleaseConsentMailbox;
 };
 const physicalSession = z.object({
   deviceId: z.enum(["macbook-main", "windows-main"]),
@@ -155,11 +155,15 @@ export function installV3PhysicalAgentRelayRoutes(
       res.status(403).json({error:"physical_s02e_decision_denied"});
     }
   });
+  // Fleet routes are absent, not inert fakes, during real I01-only activation.
+  const fleet=ports.fleet;
+  const fleetApprovals=ports.fleetApprovals;
+  if(fleet && fleetApprovals){
   app.post("/v3/fleet/consent-claim",json,async(req,res)=>{
     res.setHeader("cache-control","no-store");
     try{
       const parsed=claim.parse(req.body);
-      const prompt=await ports.fleetApprovals.poll(parsed.session);
+      const prompt=await fleetApprovals.poll(parsed.session);
       if(!prompt){res.status(204).end();return;}
       res.status(200).json({
         schema:"radlina.v3.f01.release-approval-prompt/v1",
@@ -171,7 +175,7 @@ export function installV3PhysicalAgentRelayRoutes(
     res.setHeader("cache-control","no-store");
     try{
       const parsed=fleetApproval.parse(req.body);
-      await ports.fleetApprovals.decide(parsed.session,parsed.signed);
+      await fleetApprovals.decide(parsed.session,parsed.signed);
       res.status(202).json({accepted:true});
     }catch{res.status(403).json({error:"physical_fleet_consent_decision_denied"});}
   });
@@ -179,7 +183,7 @@ export function installV3PhysicalAgentRelayRoutes(
     res.setHeader("cache-control","no-store");
     try{
       const parsed=claim.parse(req.body);
-      const operation=await ports.fleet.claim(parsed.session);
+      const operation=await fleet.claim(parsed.session);
       if(!operation){res.status(204).end();return;}
       res.status(200).json({
         schema:"radlina.v3.f01.leased-fleet-command/v1",
@@ -194,12 +198,13 @@ export function installV3PhysicalAgentRelayRoutes(
     res.setHeader("cache-control","no-store");
     try{
       const parsed=fleetReport.parse(req.body);
-      await ports.fleet.report(parsed.session,parsed.leaseId,parsed.response);
+      await fleet.report(parsed.session,parsed.leaseId,parsed.response);
       res.status(202).json({accepted:true});
     }catch{
       res.status(403).json({error:"physical_fleet_receipt_denied"});
     }
   });
+  }
   app.post("/v3/agent/report",json,async(req,res)=>{
     res.setHeader("cache-control","no-store");
     try{
