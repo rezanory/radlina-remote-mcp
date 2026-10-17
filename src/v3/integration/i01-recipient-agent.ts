@@ -97,6 +97,55 @@ export class I01TargetReplayLedger{
       "state TEXT NOT NULL CHECK(state IN ('pending','completed','uncertain')),"+
       "local_audit_hash TEXT,created_at_ms INTEGER NOT NULL);"
     );
+    // Signed exact result is durable before HTTP report. A lost ACK never
+    // triggers native re-execution; owner reconciliation can read this original.
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_i01_target_signed_replies("+
+      "request_id TEXT PRIMARY KEY REFERENCES v3_i01_target_operations(request_id),"+
+      "response_json TEXT NOT NULL,response_sha256 TEXT NOT NULL,"+
+      "created_at_ms INTEGER NOT NULL);"
+    );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_i01_target_delivery_leases("+
+      "request_id TEXT PRIMARY KEY,lease_id TEXT NOT NULL UNIQUE,"+
+      "reported_at_ms INTEGER);"
+    );
+  }
+  recordLease(requestId:string,leaseId:string):void{
+    if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(requestId)||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(leaseId))
+      throw new I01TargetDenied("exact original physical lease UUID required");
+    this.db.prepare(
+      "INSERT OR IGNORE INTO v3_i01_target_delivery_leases(request_id,lease_id) VALUES(?,?)",
+    ).run(requestId,leaseId);
+    const saved=this.db.prepare(
+      "SELECT lease_id FROM v3_i01_target_delivery_leases WHERE request_id=?",
+    ).get(requestId) as {lease_id:string}|undefined;
+    if(saved?.lease_id!==leaseId)
+      throw new I01TargetDenied("different target lease replay denied");
+  }
+  nextUndelivered():{requestId:string;leaseId:string;reply:I01SignedDeviceResponse}|undefined{
+    const row=this.db.prepare(
+      "SELECT l.request_id,l.lease_id FROM v3_i01_target_delivery_leases l "+
+      "JOIN v3_i01_target_operations o ON o.request_id=l.request_id "+
+      "JOIN v3_i01_target_signed_replies r ON r.request_id=l.request_id "+
+      "WHERE l.reported_at_ms IS NULL AND o.state='completed' "+
+      "ORDER BY o.created_at_ms LIMIT 1",
+    ).get() as {request_id:string;lease_id:string}|undefined;
+    if(!row)return undefined;
+    const reply=this.getCompletedSigned(row.request_id);
+    if(!reply)throw new I01TargetDenied("original signed receipt is missing");
+    return{requestId:row.request_id,leaseId:row.lease_id,reply};
+  }
+  markReported(requestId:string):void{
+    const result=this.db.prepare(
+      "UPDATE v3_i01_target_delivery_leases SET reported_at_ms=? "+
+      "WHERE request_id=? AND reported_at_ms IS NULL",
+    ).run(Date.now(),requestId);
+    if(Number(result.changes)!==1){
+      const row=this.db.prepare("SELECT reported_at_ms FROM v3_i01_target_delivery_leases WHERE request_id=?").get(requestId) as {reported_at_ms:number|null}|undefined;
+      if(!row?.reported_at_ms)throw new I01TargetDenied("recipient report ACK not durably bound");
+    }
   }
   reserve(requestId:string,nonce:string,operationHash:string):void{
     // Unique constraints serialize duplicate arrivals in SQLite; no network retry.
@@ -105,12 +154,41 @@ export class I01TargetReplayLedger{
       "VALUES(?,?,?,'pending',?)"
     ).run(requestId,nonce,operationHash,Date.now());
   }
-  complete(requestId:string,auditHash:string):void{
-    const changed=this.db.prepare(
-      "UPDATE v3_i01_target_operations SET state='completed',local_audit_hash=? "+
-      "WHERE request_id=? AND state='pending'"
-    ).run(auditHash,requestId);
-    if(Number(changed.changes)!==1)throw new I01TargetDenied("target receipt persistence CAS failed");
+  completeSigned(requestId:string,auditHash:string,response:I01SignedDeviceResponse):void{
+    if(response.requestId!==requestId||!HASH.test(auditHash))
+      throw new I01TargetDenied("exact I01 signed response/request association required");
+    const serialized=canonicalJson(response);
+    if(Buffer.byteLength(serialized,"utf8")>256*1024)
+      throw new I01TargetDenied("target signed reply cannot exceed bounded local storage");
+    this.db.exec("BEGIN IMMEDIATE");
+    try{
+      const saved=this.db.prepare(
+        "INSERT INTO v3_i01_target_signed_replies(" +
+        "request_id,response_json,response_sha256,created_at_ms) VALUES(?,?,?,?)",
+      ).run(requestId,serialized,sha256(serialized),Date.now());
+      const updated=this.db.prepare(
+        "UPDATE v3_i01_target_operations SET state='completed',local_audit_hash=? "+
+        "WHERE request_id=? AND state='pending'",
+      ).run(auditHash,requestId);
+      if(Number(saved.changes)!==1||Number(updated.changes)!==1)
+        throw new I01TargetDenied("target signed result/receipt durable CAS conflict");
+      this.db.exec("COMMIT");
+    }catch(error){
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+  /** Read-only exact result; never re-execute an unknown native operation. */
+  getCompletedSigned(requestId:string):I01SignedDeviceResponse|undefined{
+    const row=this.db.prepare(
+      "SELECT r.response_json,r.response_sha256,o.state FROM v3_i01_target_signed_replies r "+
+      "JOIN v3_i01_target_operations o ON o.request_id=r.request_id "+
+      "WHERE r.request_id=? LIMIT 1",
+    ).get(requestId) as {response_json:string;response_sha256:string;state:string}|undefined;
+    if(!row)return undefined;
+    if(row.state!=="completed"||sha256(row.response_json)!==row.response_sha256)
+      throw new I01TargetDenied("physical signed result integrity mismatch");
+    return JSON.parse(row.response_json) as I01SignedDeviceResponse;
   }
   uncertain(requestId:string):void{
     this.db.prepare(
@@ -212,12 +290,13 @@ export class I01RecipientExecutionAgent{
       const deviceSignatureBase64=await this.signer.signCanonical(canonicalJson(signedData));
       if(Buffer.from(deviceSignatureBase64,"base64").length!==64)
         throw new I01TargetDenied("protected recipient device signing key unavailable");
-      this.journal.complete(op.requestId,anchored.localAuditReceiptHash);
-      return {
+      const signedResponse:I01SignedDeviceResponse={
         ...signedData,
         ...(output===undefined?{}:{output}),
         deviceSignatureBase64,
       };
+      this.journal.completeSigned(op.requestId,anchored.localAuditReceiptHash,signedResponse);
+      return signedResponse;
     }catch(error){
       this.journal.uncertain(op.requestId);
       throw error;

@@ -13,6 +13,7 @@ import { DatabaseSync } from "node:sqlite";
 
 import * as z from "zod/v4";
 import { canonicalJson, sha256 } from "../../utils/json.js";
+import { missingV3PhysicalAcceptancePrerequisites } from "./final4-physical-dependencies.js";
 
 export const V3_FINAL_GATES = ["P08", "I01", "F01", "AC01"] as const;
 export type V3FinalGateId = typeof V3_FINAL_GATES[number];
@@ -182,11 +183,13 @@ export class V3IndependentPhysicalAcceptanceLedger {
        evidence.execution.nativeChatGPTToolName==="v3_admin_status")) {
       throw new V3FinalAcceptanceDenied("AC01 requires native ChatGPT V3 write/execute call and both hosts");
     }
-    const prerequisites:Record<V3FinalGateId,V3FinalGateId[]>={
-      P08:[],I01:["P08"],F01:["P08","I01"],AC01:["P08","I01","F01"],
-    };
-    for(const need of prerequisites[evidence.gate]){
-      if(!this.get(need)) throw new V3FinalAcceptanceDenied("independent prerequisite gate missing: "+need);
+    // Development of F01/AC01 may begin early; acceptance remains strictly
+    // sequential and always requires genuine physical prerequisite entries.
+    const missing=missingV3PhysicalAcceptancePrerequisites(
+      evidence.gate,gate=>Boolean(this.get(gate)),
+    );
+    if(missing.length){
+      throw new V3FinalAcceptanceDenied("independent prerequisite gate missing: "+missing[0]);
     }
     const evidenceHash=sha256(canonicalJson(evidence));
     this.db.prepare(

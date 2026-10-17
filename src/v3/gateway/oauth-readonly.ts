@@ -26,7 +26,9 @@ import {
   type P08HeartbeatPins,
 } from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
-import { registerV3FinalFourTools, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
+import { registerV3FinalFourTools, registeredV3PhysicalToolNames, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
+import { installV3PhysicalAgentRelayRoutes, type I01PhysicalRelayPorts } from "../integration/i01-agent-relay-http.js";
+import type { V3FinalFourFactoryContext, V3ComposedPhysicalFinalFour } from "../control-plane/v3-physical-final4-runtime.js";
 
 const V3_SCOPES = new Set(["device:read", "filesystem:read", "filesystem:write", "offline_access"]);
 const WRITE_ANNOTATIONS = {
@@ -51,6 +53,8 @@ export type V3ReadOnlyGatewayOptions = {
   macHeartbeatPins?: P08HeartbeatPins;
   /** Never inferred from environment: inject only after real physical adapters exist. */
   finalFour?: V3FinalFourMcpPorts;
+  physicalRelay?: I01PhysicalRelayPorts;
+  finalFourFactory?: (context: V3FinalFourFactoryContext) => Promise<V3ComposedPhysicalFinalFour>;
 };
 
 export type V3ReadOnlyGateway = {
@@ -75,7 +79,7 @@ function independentState(stateDirectory: string, productionDirectory: string): 
 
 class ScopedV3AuthService extends AuthService {
   constructor(config: AppConfig, store: Store, private readonly acceptedScopes: ReadonlySet<string>) {
-    super(config, store);
+    super(config, store, acceptedScopes);
   }
   override oauthMetadata() {
     return { ...super.oauthMetadata(), scopes_supported: [...this.acceptedScopes] };
@@ -126,7 +130,7 @@ function buildScopedV3Server(
           "get_device",
           "v3_admin_status",
           ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
-          ...(finalFour ? ["v3_exact_device_execute", "v3_fleet_plan", "v3_fleet_run", "v3_release_acceptance_status"] : []),
+          ...(finalFour ? registeredV3PhysicalToolNames(finalFour) : []),
         ],
       }),
   );
@@ -166,12 +170,13 @@ function buildScopedV3Server(
       success({
         generation: "v3",
         mode: windowsFiles ? "oauth-scoped-local-windows" : "oauth-readonly-pre-enrollment",
-        productionReady: finalFour?.acceptance.readiness().productionReady ?? false,
+        productionReady: finalFour?.acceptance?.readiness().productionReady ?? false,
         remoteExecutionEnabled: Boolean(finalFour),
         deviceCount: registry.list().length,
         localWindowsFileOperationsEnabled: Boolean(windowsFiles),
         macSignedHeartbeatIngressEnabled: Boolean(macIngress),
-        finalFourPortsBound: Boolean(finalFour),
+        finalFourPortsBound: Boolean(finalFour?.fleet && finalFour?.acceptance),
+        i01PortsBound: Boolean(finalFour),
       }),
   );
   if (windowsFiles) {
@@ -260,14 +265,22 @@ export async function startV3ReadOnlyOAuthGateway(
   let server: Server | undefined;
   let windowsFiles: V3WindowsScopedFiles | undefined;
   let macIngress: V3MacSignedHeartbeatIngress | undefined;
+  let composed: V3ComposedPhysicalFinalFour | undefined;
   const acceptedScopes = new Set(V3_SCOPES);
-  if (options.finalFour) {
+  if (options.finalFour || options.finalFourFactory) {
     acceptedScopes.add("device:execute");
     acceptedScopes.add("fleet:control");
   }
   try {
     const auth = new ScopedV3AuthService(cfg, store, acceptedScopes);
     await auth.initialize();
+    if (options.finalFourFactory) {
+      composed = await options.finalFourFactory({config:cfg,store,registry,stateRoot,auth});
+    }
+    const finalFour = composed?.finalFour ?? options.finalFour;
+    // Only real bound fleet authority may advertise its OAuth control scope.
+    if(!finalFour?.fleet)acceptedScopes.delete("fleet:control");
+    const physicalRelay = composed?.physicalRelay ?? options.physicalRelay;
     if (options.macHeartbeatPins) {
       macIngress = new V3MacSignedHeartbeatIngress(registry, options.macHeartbeatPins);
     }
@@ -307,6 +320,7 @@ export async function startV3ReadOnlyOAuthGateway(
       next();
     });
     auth.install(app);
+    if (physicalRelay) installV3PhysicalAgentRelayRoutes(app, physicalRelay);
     if (macIngress) {
       let recentAt = 0;
       const ingress = macIngress;
@@ -330,7 +344,7 @@ export async function startV3ReadOnlyOAuthGateway(
       });
     }
     const mcpHandler = createMcpHandler(
-      () => buildScopedV3Server(registry, windowsFiles, macIngress, options.finalFour),
+      () => buildScopedV3Server(registry, windowsFiles, macIngress, finalFour),
       {
         legacy: "reject",
       },
@@ -362,6 +376,7 @@ export async function startV3ReadOnlyOAuthGateway(
             active.close((err) => (err ? reject(err) : resolve())),
           );
         } finally {
+          await composed?.close();
           await windowsFiles?.close();
           registry.close();
           store.close();
@@ -370,6 +385,7 @@ export async function startV3ReadOnlyOAuthGateway(
     };
   } catch (error) {
     if (server?.listening) await new Promise<void>((resolve) => server!.close(() => resolve()));
+    await composed?.close();
     await windowsFiles?.close();
     registry.close();
     store.close();

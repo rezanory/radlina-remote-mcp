@@ -75,6 +75,11 @@ export interface F01PhysicalTransport {
    * and must atomically switch its own V3 release, not the controller's files.
    */
   perform<T>(message: F01SignedCommand): Promise<F01SignedReply<T>>;
+  /** Recover original sealed owner command and original signed target result;
+   * no lease claim, service action or unsigned re-execution. */
+  readOriginalReturned?(operationId:string):Promise<{
+    command:F01SignedCommand;reply:F01SignedReply<unknown>;
+  }|null>;
 }
 export interface F01IndependentAuditPort {
   anchorPhysicalReceipt(input: {
@@ -82,7 +87,9 @@ export interface F01IndependentAuditPort {
     deviceId: string;
     commandHash: string;
     deviceReceiptHash: string;
-    deviceSignature: string;
+    devicePublicKeyPem: string;
+    ownerSignedCommand: F01SignedCommand;
+    signedReply: F01SignedReply<unknown>;
   }): Promise<{durable:true; anchorId:string}>;
 }
 export class F01PhysicalBlocked extends Error {
@@ -122,8 +129,8 @@ export class V3ExactFleetRecipientConsent implements FleetRecipientConsentPort {
     }
   }
 }
-function signedReplyMatches<T extends {deviceId:string}>(
-  reply: F01SignedReply<T>,
+function signedReplyMatches(
+  reply: F01SignedReply<unknown>,
   operation:F01PhysicalCommand,
   identity:{agentInstanceId:string;publicKeyPem:string},
 ):boolean {
@@ -131,6 +138,8 @@ function signedReplyMatches<T extends {deviceId:string}>(
     reply.operationId!==operation.operationId ||
     reply.deviceId!==operation.deviceId ||
     reply.agentInstanceId!==identity.agentInstanceId ||
+    typeof reply.payload!=="object"||reply.payload===null||
+    !("deviceId" in reply.payload)||
     reply.payload.deviceId!==operation.deviceId) return false;
   const bound = {
     schema:reply.schema,operationId:reply.operationId,
@@ -179,6 +188,33 @@ export class F01PhysicalDispatchJournal {
       "UPDATE v3_f01_physical_dispatches SET state='anchored',anchor_id=? WHERE operation_key=? AND state='pending'"
     ).run(anchorId,key);
     if(Number(change.changes)!==1)throw new F01PhysicalBlocked("fleet receipt anchor CAS failed");
+  }
+  unresolved(operationId:string):{
+    operationKey:string;commandHash:string;planId:string;deviceId:string;
+    action:string;state:string;
+  }|undefined{
+    const value=this.db.prepare(
+      "SELECT operation_key,command_hash,plan_id,device_id,action,state "+
+      "FROM v3_f01_physical_dispatches WHERE operation_id=?",
+    ).get(operationId) as {
+      operation_key:string;command_hash:string;plan_id:string;
+      device_id:string;action:string;state:string;
+    }|undefined;
+    return value?{
+      operationKey:value.operation_key,commandHash:value.command_hash,
+      planId:value.plan_id,deviceId:value.device_id,action:value.action,
+      state:value.state,
+    }:undefined;
+  }
+  anchorManual(key:string,anchorId:string):void{
+    if(!anchorId||anchorId.length>256)
+      throw new F01PhysicalBlocked("exact independent signed S03 fleet ACK required");
+    const changed=this.db.prepare(
+      "UPDATE v3_f01_physical_dispatches SET state='anchored',anchor_id=? "+
+      "WHERE operation_key=? AND state='uncertain'",
+    ).run(anchorId,key);
+    if(Number(changed.changes)!==1)
+      throw new F01PhysicalBlocked("F01 unknown operation manual anchor CAS failed");
   }
   uncertain(key:string):void {
     this.db.prepare(
@@ -242,13 +278,17 @@ export class V3PhysicalSignedFleetAgent implements FleetDeviceAgentPort, FleetRe
     }));
     this.journal.reserve(key,command.operationId,this.plan.planId,id,action,sha256(canonical));
     try{
-      const received=await this.transport.perform<T>({command,ownerSignatureBase64:signature});
+      const signedCommand:F01SignedCommand={command,ownerSignatureBase64:signature};
+      const received=await this.transport.perform<T>(signedCommand);
       if(!signedReplyMatches(received,command,identity))
         throw new F01PhysicalBlocked("P03 signed physical switch receipt invalid");
       const receiptHash=sha256(canonicalJson(received.payload));
       const anchored=await this.audit.anchorPhysicalReceipt({
         planId:this.plan.planId,deviceId:id,commandHash:sha256(canonical),
-        deviceReceiptHash:receiptHash,deviceSignature:received.deviceSignatureBase64,
+        deviceReceiptHash:receiptHash,
+        devicePublicKeyPem:identity.publicKeyPem,
+        ownerSignedCommand:signedCommand,
+        signedReply:received,
       });
       if(!anchored.durable||!anchored.anchorId)
         throw new F01PhysicalBlocked("missing independently persisted S03 fleet audit");
@@ -256,6 +296,48 @@ export class V3PhysicalSignedFleetAgent implements FleetDeviceAgentPort, FleetRe
       this.signedReceipts.add(receiptHash);
       return received.payload;
     }catch(e){this.journal.uncertain(key);throw e;}
+  }
+  /** Explicit owner-initiated re-anchoring of an ORIGINAL signed F01 reply.
+   * Never invokes transport.perform(), preflight(), activate() or rollback().
+   */
+  async reconcileUnknown(operationId:string):Promise<{
+    operationId:string;anchorId:string;deviceId:string;manualReceiptReconciled:true;
+    fleetPlanAccepted:false;
+  }>{
+    const record=this.journal.unresolved(operationId);
+    if(!record||record.state!=="uncertain"||record.planId!==this.plan.planId||
+      !this.transport.readOriginalReturned)
+      throw new F01PhysicalBlocked("no unresolved original fleet command available");
+    const original=await this.transport.readOriginalReturned(operationId);
+    if(!original)throw new F01PhysicalBlocked("original signed F01 receipt not yet delivered");
+    const {command,reply:signedReply}=original;
+    const op=command.command;
+    if(op.operationId!==operationId||op.planId!==this.plan.planId||
+      op.deviceId!==record.deviceId||op.action!==record.action||
+      sha256(canonicalJson(op))!==record.commandHash||
+      sha256(canonicalJson({planId:op.planId,deviceId:op.deviceId,action:op.action,
+        target:op.targetManifestSha256,previous:op.previousManifestSha256}))!==record.operationKey||
+      ![this.plan.targetManifestSha256,this.plan.rollbackManifestSha256].includes(op.targetManifestSha256)||
+      ![this.plan.targetManifestSha256,this.plan.rollbackManifestSha256].includes(op.previousManifestSha256)||
+      op.targetManifestSha256===op.previousManifestSha256)
+      throw new F01PhysicalBlocked("fleet manual recovery differs from original signed plan");
+    const identity=this.identity.requireFreshTrusted(op.deviceId);
+    if(!signedReplyMatches(signedReply,op,identity))
+      throw new F01PhysicalBlocked("original physical P03 fleet receipt invalid");
+    const receiptHash=sha256(canonicalJson(signedReply.payload));
+    const ack=await this.audit.anchorPhysicalReceipt({
+      planId:this.plan.planId,deviceId:op.deviceId,
+      commandHash:sha256(canonicalJson(op)),deviceReceiptHash:receiptHash,
+      devicePublicKeyPem:identity.publicKeyPem,
+      ownerSignedCommand:command,signedReply,
+    });
+    if(!ack.durable||!ack.anchorId)
+      throw new F01PhysicalBlocked("independent original S03 fleet ACK not durable");
+    this.journal.anchorManual(record.operationKey,ack.anchorId);
+    // Plan state intentionally remains in its original manual_intervention
+    // phase; anchoring historical evidence is NEVER approval to resume rollout.
+    return{operationId,anchorId:ack.anchorId,deviceId:op.deviceId,
+      manualReceiptReconciled:true,fleetPlanAccepted:false};
   }
   async preflight(deviceId:string,target:string,previous:string):Promise<FleetAttestation>{
     const result=await this.operation<FleetAttestation>(deviceId,"fleet.preflight",target,previous);

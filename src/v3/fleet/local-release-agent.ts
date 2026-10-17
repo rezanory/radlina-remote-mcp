@@ -65,6 +65,54 @@ export class F01LocalReplayStore {
       "state TEXT NOT NULL CHECK(state IN ('pending','anchored','uncertain')),"+
       "local_receipt_hash TEXT, created_at_ms INTEGER NOT NULL);"
     );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_f01_target_signed_replies("+
+      "operation_id TEXT PRIMARY KEY REFERENCES v3_f01_target_switches(operation_id),"+
+      "response_json TEXT NOT NULL,response_sha256 TEXT NOT NULL,created_at_ms INTEGER NOT NULL);"
+    );
+    this.db.exec(
+      "CREATE TABLE IF NOT EXISTS v3_f01_target_delivery_leases("+
+      "operation_id TEXT PRIMARY KEY,lease_id TEXT NOT NULL UNIQUE,reported_at_ms INTEGER);"
+    );
+  }
+  recordLease(operationId:string,leaseId:string):void{
+    const check=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+    if(!check.test(operationId)||!check.test(leaseId))
+      throw new F01RecipientDenied("exact original fleet lease UUID required");
+    this.db.prepare(
+      "INSERT OR IGNORE INTO v3_f01_target_delivery_leases(operation_id,lease_id) VALUES(?,?)",
+    ).run(operationId,leaseId);
+    const saved=this.db.prepare(
+      "SELECT lease_id FROM v3_f01_target_delivery_leases WHERE operation_id=?",
+    ).get(operationId) as {lease_id:string}|undefined;
+    if(saved?.lease_id!==leaseId)
+      throw new F01RecipientDenied("different native fleet lease replay denied");
+  }
+  nextUndelivered():{operationId:string;leaseId:string;reply:F01SignedReply<NativeFleetResult>}|undefined{
+    const row=this.db.prepare(
+      "SELECT l.operation_id,l.lease_id FROM v3_f01_target_delivery_leases l "+
+      "JOIN v3_f01_target_switches o ON o.operation_id=l.operation_id "+
+      "JOIN v3_f01_target_signed_replies r ON r.operation_id=l.operation_id "+
+      "WHERE l.reported_at_ms IS NULL AND o.state='anchored' "+
+      "ORDER BY o.created_at_ms LIMIT 1",
+    ).get() as {operation_id:string;lease_id:string}|undefined;
+    if(!row)return undefined;
+    const reply=this.getAnchoredSigned(row.operation_id);
+    if(!reply)throw new F01RecipientDenied("original signed release reply missing");
+    return{operationId:row.operation_id,leaseId:row.lease_id,reply};
+  }
+  markReported(operationId:string):void{
+    const updated=this.db.prepare(
+      "UPDATE v3_f01_target_delivery_leases SET reported_at_ms=? "+
+      "WHERE operation_id=? AND reported_at_ms IS NULL",
+    ).run(Date.now(),operationId);
+    if(Number(updated.changes)!==1){
+      const saved=this.db.prepare(
+        "SELECT reported_at_ms FROM v3_f01_target_delivery_leases WHERE operation_id=?",
+      ).get(operationId) as {reported_at_ms:number|null}|undefined;
+      if(!saved?.reported_at_ms)
+        throw new F01RecipientDenied("fleet signed report acceptance not durably recorded");
+    }
   }
   reserve(command:F01PhysicalCommand):void{
     this.db.prepare(
@@ -72,13 +120,38 @@ export class F01LocalReplayStore {
       " VALUES(?,?,?,'pending',?)"
     ).run(command.operationId,command.nonce,sha256(canonicalJson(command)),Date.now());
   }
-  anchored(id:string,receiptHash:string):void{
+  anchoredSigned(id:string,receiptHash:string,reply:F01SignedReply<NativeFleetResult>):void{
+    if(!/^[a-f0-9]{64}$/u.test(receiptHash)||reply.operationId!==id)
+      throw new F01RecipientDenied("exact F01 local receipt and operation id required");
+    const serialized=canonicalJson(reply);
+    if(Buffer.byteLength(serialized,"utf8")>256*1024)
+      throw new F01RecipientDenied("bounded physical fleet signed receipt required");
+    this.db.exec("BEGIN IMMEDIATE");
+    try{
+      const saved=this.db.prepare(
+        "INSERT INTO v3_f01_target_signed_replies(operation_id,response_json,response_sha256,created_at_ms) "+
+        "VALUES(?,?,?,?)",
+      ).run(id,serialized,sha256(serialized),Date.now());
+      const row=this.db.prepare(
+        "UPDATE v3_f01_target_switches SET state='anchored',local_receipt_hash=? "+
+        "WHERE operation_id=? AND state='pending'",
+      ).run(receiptHash,id);
+      if(Number(saved.changes)!==1||Number(row.changes)!==1)
+        throw new F01RecipientDenied("target switch signed receipt durable CAS conflict");
+      this.db.exec("COMMIT");
+    }catch(error){this.db.exec("ROLLBACK");throw error;}
+  }
+  /** Owner-local recovery reads signed evidence; no native service execution. */
+  getAnchoredSigned(id:string):F01SignedReply<NativeFleetResult>|undefined{
     const row=this.db.prepare(
-      "UPDATE v3_f01_target_switches SET state='anchored',local_receipt_hash=? "+
-      "WHERE operation_id=? AND state='pending'"
-    ).run(receiptHash,id);
-    if(Number(row.changes)!==1)
-      throw new F01RecipientDenied("target switch receipt commit conflict");
+      "SELECT r.response_json,r.response_sha256,o.state FROM v3_f01_target_signed_replies r "+
+      "JOIN v3_f01_target_switches o ON o.operation_id=r.operation_id "+
+      "WHERE r.operation_id=? LIMIT 1",
+    ).get(id) as {response_json:string;response_sha256:string;state:string}|undefined;
+    if(!row)return undefined;
+    if(row.state!=="anchored"||sha256(row.response_json)!==row.response_sha256)
+      throw new F01RecipientDenied("signed target fleet response integrity changed");
+    return JSON.parse(row.response_json) as F01SignedReply<NativeFleetResult>;
   }
   uncertain(id:string):void{
     this.db.prepare(
@@ -186,8 +259,9 @@ export class F01PhysicalRecipientAgent{
       const signature=await this.identity.signReceipt(canonicalJson(response));
       if(Buffer.from(signature,"base64").length!==64)
         throw new F01RecipientDenied("recipient P03 release signing key unavailable");
-      this.journal.anchored(command.operationId,localReceipt.localReceiptHash);
-      return{...response,deviceSignatureBase64:signature};
+      const signedReply:F01SignedReply<NativeFleetResult>={...response,deviceSignatureBase64:signature};
+      this.journal.anchoredSigned(command.operationId,localReceipt.localReceiptHash,signedReply);
+      return signedReply;
     }catch(error){
       this.journal.uncertain(command.operationId);
       throw error;

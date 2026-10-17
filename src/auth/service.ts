@@ -169,7 +169,18 @@ export class AuthService implements OAuthTokenVerifier {
   constructor(
     private readonly config: AppConfig,
     private readonly store: Store,
+    private readonly allowedScopes: ReadonlySet<string> = new Set<string>(ALL_SCOPES),
   ) {
+    // V2 preserves its historical exact allowlist by default. Only a separate
+    // V3 issuer may explicitly add scoped execution/fleet privileges.
+    if (!allowedScopes.has("device:read") || allowedScopes.size > 32 ||
+        [...allowedScopes].some(item =>
+          !ALL_SCOPES.includes(item as (typeof ALL_SCOPES)[number]) &&
+          !(new URL(config.server.publicUrl).origin === "https://v3-mcp.radlina.com" &&
+            ["device:execute", "fleet:control"].includes(item))
+        )) {
+      throw new Error("issuer-isolated OAuth scope allowlist invalid");
+    }
     const base = new URL(config.server.publicUrl);
     this.issuer = base.origin;
     this.resourceUrl = new URL("/mcp", `${base.origin}/`);
@@ -433,7 +444,7 @@ export class AuthService implements OAuthTokenVerifier {
       grant_types_supported: ["authorization_code", "refresh_token"],
       token_endpoint_auth_methods_supported: ["none"],
       code_challenge_methods_supported: ["S256"],
-      scopes_supported: [...ALL_SCOPES],
+      scopes_supported: [...this.allowedScopes],
     };
   }
 
@@ -522,7 +533,7 @@ export class AuthService implements OAuthTokenVerifier {
     const scopes = [...new Set(scope.split(" ").filter(Boolean))];
     if (
       scopes.length === 0 ||
-      scopes.some((item) => !ALL_SCOPES.includes(item as (typeof ALL_SCOPES)[number]))
+      scopes.some((item) => !this.allowedScopes.has(item))
     ) {
       oauthError(response, 400, "invalid_scope", "one or more requested scopes are not supported");
       return;

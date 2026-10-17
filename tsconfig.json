@@ -38,13 +38,25 @@
     "scripts/operations/v3-verify-mac-identity-proof.ts",
     "scripts/acceptance/v3-windows-protected-identity.ts",
     "scripts/operations/v3-owner-signing.ts",
+    "scripts/operations/v3-owner-interactive-cycle.ts",
+    "scripts/operations/v3-mac-operator-cycle.ts",
+    "scripts/operations/v3-mac-fleet-cycle.ts",
+    "scripts/operations/v3-windows-operator-cycle.ts",
+    "scripts/operations/v3-windows-fleet-cycle.ts",
+    "scripts/operations/v3-s03-mac-witness-daemon.ts",
     "scripts/operations/v3-windows-live-enrollment.ts",
     "scripts/operations/v3-windows-signed-heartbeat.ts",
     "scripts/operations/v3-physical-mac-proof-20261012.ts",
     "scripts/operations/v3-p03-mac-owner-stage-20261012.ts",
     "scripts/operations/v3-p03-mac-owner-admit-20261012.ts",
     "scripts/operations/v3-p03-mac-signed-heartbeat-20261012.ts",
-    "scripts/acceptance/v3-windows-identity-negatives.ts"
+    "scripts/acceptance/v3-windows-identity-negatives.ts",
+    "scripts/operations/v3-final4-native-switch-reconcile.ts",
+    "scripts/operations/v3-final4-stage-windows-release.ts",
+    "scripts/operations/v3-final4-native-switch-status.ts",
+    "scripts/operations/v3-final4-owner-policies.ts",
+    "scripts/operations/v3-mac-heartbeat-sender.ts",
+    "scripts/operations/v3-s03-mac-keychain-prepare.ts"
   ],
   "exclude": ["dist", "node_modules"]
 }
