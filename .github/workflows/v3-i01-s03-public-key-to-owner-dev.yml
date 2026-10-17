@@ -1,0 +1,53 @@
+name: V3 I01 Export Pinned Mac S03 Public Key (public only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-public-witness-export
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Verify real public Ed25519 identity and export PUBLIC key only
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          node --input-type=module <<'PUBLIC'
+          import {readFileSync,lstatSync} from 'node:fs';
+          import {createPublicKey,createHash} from 'node:crypto';
+          import {homedir} from 'node:os';
+          import {join} from 'node:path';
+          const root=join(homedir(),'.local/share/radlina/v3-beta/macbook-main-s03');
+          const file=join(root,'witness-public.pem');
+          const receiptFile=join(root,'witness-public-receipt.json');
+          const fingerprint='32f04e1a18f49fffd5111b98d70dc1f157326a356df3834f8c34b4d2bc7a2238';
+          for(const p of [root,file,receiptFile]){
+            const s=lstatSync(p);
+            if(s.isSymbolicLink()||(s.mode&0o077)!==0||(!s.isFile()&&!s.isDirectory()))throw Error('private owner-managed S03 public identity path invalid');
+          }
+          const pem=readFileSync(file,'utf8');
+          const key=createPublicKey(pem);
+          if(key.asymmetricKeyType!=='ed25519')throw Error('Ed25519 public key required');
+          const calculated=createHash('sha256').update(key.export({type:'spki',format:'der'})).digest('hex');
+          const receipt=JSON.parse(readFileSync(receiptFile,'utf8'));
+          if(calculated!==fingerprint||receipt.fingerprint!==fingerprint||
+            receipt.publicKeyPem!==pem||receipt.deviceId!=='macbook-main-s03'||
+            receipt.schema!=='radlina.v3.s03.mac-public-key-preparation/v1'||
+            receipt.keychainPrivateKeyExported!==false)throw Error('Pinned real S03 public identity mismatch');
+          console.log('I01_S03_REAL_MAC_PUBLIC_KEY_PIN_VERIFIED='+fingerprint);
+          console.log('I01_S03_PUBLIC_PEM_BASE64='+Buffer.from(pem,'utf8').toString('base64'));
+          console.log('I01_S03_NO_PRIVATE_KEY_OR_WRITER_CREDENTIAL_EXPORTED=true');
+          PUBLIC
