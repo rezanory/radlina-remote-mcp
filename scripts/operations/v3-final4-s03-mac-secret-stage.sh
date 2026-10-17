@@ -20,24 +20,15 @@ if [[ -e "$TOKEN" || -e "$HMAC" ]]; then
 fi
 # These Keychain entries must be populated separately by the owner before
 # installation. If either is missing, abort without generating weaker keys.
-TOKEN_VALUE="$(/usr/bin/security find-generic-password -w \
-  -s 'com.radlina.remote-mcp.v3.s03-writer-token' -a 'amirsheikhzadeh')"
-HMAC_VALUE="$(/usr/bin/security find-generic-password -w \
-  -s 'com.radlina.remote-mcp.v3.s03-writer-hmac-base64' -a 'amirsheikhzadeh')"
-[[ "$(printf '%s' "$TOKEN_VALUE" | wc -c | tr -d ' ')" -ge 32 ]]
-[[ "$(printf '%s' "$TOKEN_VALUE" | wc -c | tr -d ' ')" -le 512 ]]
-[[ "$TOKEN_VALUE" != *$'\n'* && "$TOKEN_VALUE" != *' '* ]]
-[[ "$HMAC_VALUE" =~ ^[A-Za-z0-9+/]+={0,2}$ ]]
-[[ "$(printf '%s' "$HMAC_VALUE" | wc -c | tr -d ' ')" -ge 44 ]]
-[[ "$(printf '%s' "$HMAC_VALUE" | wc -c | tr -d ' ')" -le 172 ]]
-TMP_TOKEN="$TOKEN.tmp.$$"
-TMP_HMAC="$HMAC.tmp.$$"
-trap 'rm -f "$TMP_TOKEN" "$TMP_HMAC"' EXIT
-( umask 077; printf '%s' "$TOKEN_VALUE" > "$TMP_TOKEN" )
-( umask 077; printf '%s' "$HMAC_VALUE" > "$TMP_HMAC" )
-chmod 600 "$TMP_TOKEN" "$TMP_HMAC"
-mv -n "$TMP_TOKEN" "$TOKEN"
-mv -n "$TMP_HMAC" "$HMAC"
-unset TOKEN_VALUE HMAC_VALUE
+# The real S03 daemon uses the existing dedicated V3 owner Keychain,
+# NOT the default login Keychain (unavailable to headless LaunchAgents).
+# The native importer receives no private values via argv, stdout or env.
+# It will fail closed until the legitimate owner has provisioned both items
+# into that SAME encrypted Keychain. No credential generation or rotation.
+HELPER="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/v3-final4-s03-dedicated-keychain-import.swift"
+[[ -f "$HELPER" && ! -L "$HELPER" ]]
+/usr/bin/swift "$HELPER" --stage
+[[ -f "$TOKEN" && -f "$HMAC" && ! -L "$TOKEN" && ! -L "$HMAC" ]]
+[[ "$(stat -f '%Lp' "$TOKEN")" == 600 && "$(stat -f '%Lp' "$HMAC")" == 600 ]]
 echo "V3_MAC_S03_WRITER_FILES_STAGED token=$TOKEN hmac=$HMAC"
 echo 'Keychain values not printed, no service started, no acceptance claimed'
