@@ -96,9 +96,12 @@ export function finalFourFactoryFromOwnerEnvironment():
       throw new Error("immutable final-four physical binding hash mismatch");
     }
     const approvedBinding=JSON.parse(bindingBytes.toString("utf8")) as V3FinalFourBindingConfig;
-    if(approvedBinding.schema!=="radlina.v3.final-four-production-binding/v1"){
-      throw new Error("unexpected final-four binding contract");
+    if(approvedBinding.schema!=="radlina.v3.final-four-production-binding/v1"&&
+      approvedBinding.schema!=="radlina.v3.i01-production-binding/v1"){
+      throw new Error("unexpected physical production binding contract");
     }
+    // Schema and owner-pinned SHA are both revalidated at the sole physical
+    // constructor. A development-only binding is never a live I01 binding.
     const bytes=await readFile(signedPolicyPath);
     if(!bytes.length||bytes.length>16384||sha256(bytes)!==macPolicyHash)
       throw new Error("explicit owner-approved Mac capability policy hash changed");
