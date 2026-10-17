@@ -1,0 +1,39 @@
+name: V3 I01 S03 Consent Binding Source Tests
+on:
+  push:
+    branches:
+      - feature/v3-final4-composition-20261012
+    paths:
+      - src/v3/audit/s03-mac-witness.ts
+      - tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
+      - .github/workflows/v3-i01-s03-consent-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v3-i01-s03-consent-ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout the exact workflow commit with no persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Node 24 development test runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+      - name: Install frozen dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck the entire V3 TypeScript project
+        run: npm run typecheck
+      - name: Lint the S03 witness and exact-consent regression test
+        run: node node_modules/eslint/bin/eslint.js src/v3/audit/s03-mac-witness.ts tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
+      - name: Run isolated I01 S03 approval binding and prior ACK regression tests
+        run: node node_modules/vitest/vitest.mjs run tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/s03-external-ack-recovery.test.ts --maxWorkers=2
