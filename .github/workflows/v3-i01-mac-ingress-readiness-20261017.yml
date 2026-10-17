@@ -40,6 +40,10 @@ jobs:
           }
           check_private "$BASE/s03-writer-token.secret" S03_WRITER_TOKEN_FILE
           check_private "$BASE/s03-writer-hmac.b64" S03_WRITER_HMAC_FILE
+          check_private "$BASE/witness-identity.json" S03_WITNESS_IDENTITY_FILE
+          check_private "$BASE/cloudflare-tunnel-token.secret" S03_TUNNEL_TOKEN_CONFIGURED_PATH
+          check_private "$HOME/.local/share/radlina/v3-beta/macbook-main-runner/v3-device.keychain-db" S03_DEDICATED_KEYCHAIN_DB
+          check_private "$HOME/.local/share/radlina/v3-beta/macbook-main-runner/keychain-password.local" S03_DEDICATED_KEYCHAIN_UNLOCK_METADATA
           # Path candidates are metadata ONLY. No token contents or plist payloads.
           for f in "$BASE/cloudflare-tunnel-token.secret" "$BASE/cloudflare-tunnel-token.local" "$BASE/cloudflared-token.secret" "$BASE/tunnel-token.secret"; do
             if [[ -e "$f" ]]; then
