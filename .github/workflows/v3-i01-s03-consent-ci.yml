@@ -5,7 +5,10 @@ on:
       - feature/v3-final4-composition-20261012
     paths:
       - src/v3/audit/s03-mac-witness.ts
+      - src/v3/acceptance/final4-physical-dependencies.ts
+      - src/v3/acceptance/ac01-final-gates.ts
       - tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
+      - tests/unit/v3/final4-physical-dependencies.test.ts
       - .github/workflows/v3-i01-s03-consent-ci.yml
   workflow_dispatch:
 
@@ -33,7 +36,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Typecheck the entire V3 TypeScript project
         run: npm run typecheck
-      - name: Lint the S03 witness and exact-consent regression test
-        run: node node_modules/eslint/bin/eslint.js src/v3/audit/s03-mac-witness.ts tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
-      - name: Run isolated I01 S03 approval binding and prior ACK regression tests
-        run: node node_modules/vitest/vitest.mjs run tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/s03-external-ack-recovery.test.ts --maxWorkers=2
+      - name: Lint I01 S03 witness and F01 AC01 dependency graph
+        run: node node_modules/eslint/bin/eslint.js src/v3/audit/s03-mac-witness.ts src/v3/acceptance/final4-physical-dependencies.ts src/v3/acceptance/ac01-final-gates.ts tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/final4-physical-dependencies.test.ts
+      - name: Run isolated I01 S03 consent and F01 AC01 acceptance-order regressions
+        run: node node_modules/vitest/vitest.mjs run tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/s03-external-ack-recovery.test.ts tests/unit/v3/final4-physical-dependencies.test.ts tests/unit/v3/final4-journal-reconciliation.test.ts --maxWorkers=2
