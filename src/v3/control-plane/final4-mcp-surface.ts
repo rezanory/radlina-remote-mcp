@@ -285,6 +285,6 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
       ownerAuth(context,"device:read",ports);
       return ok(acceptance.readiness());
     }catch(error){return denied(error);}
-  }  });
+  });
   }
 }
