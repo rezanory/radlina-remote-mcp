@@ -1,0 +1,41 @@
+name: V3 I01 Mac Full Physical Release Verification (Read-only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-release-hashes
+  cancel-in-progress: false
+jobs:
+  verify-native-macos-release:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 30
+    steps:
+      - name: Verify every native Mac V3 release file without installing or reading secrets
+        shell: bash
+        env:
+          RADLINA_V3_I01_RELEASE_SHA: 532bbb2aa32ceab8c2293ee10ec0f5859e604e2cf6d42569ee0bcc5710d795e9
+          RADLINA_V3_I01_SOURCE_SHA: e9fd8fe01cbbba0a79c331d9971886ca11f04a18
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == Darwin && "$(uname -m)" == x86_64 ]]
+          [[ "$(hostname)" == amirs-MacBook-Pro.local ]]
+          [[ "$(id -un)" == amirsheikhzadeh ]]
+          [[ "$(node --version)" == v24.20.0 ]]
+          ROOT="$HOME/.local/share/radlina/v3-beta/macbook-main-agent/releases/$RADLINA_V3_I01_RELEASE_SHA"
+          [[ -d "$ROOT" && ! -L "$ROOT" ]]
+          [[ -f "$ROOT/RELEASE_MANIFEST.json" && ! -L "$ROOT/RELEASE_MANIFEST.json" ]]
+          [[ "$(shasum -a 256 "$ROOT/RELEASE_MANIFEST.json" | awk '{print $1}')" == "$RADLINA_V3_I01_RELEASE_SHA" ]]
+          [[ -f "$ROOT/scripts/operations/verify-release.mjs" ]]
+          [[ -f "$ROOT/dist/src/admin/release-manifest.js" ]]
+          echo 'V3_I01_MAC_FULL_RELEASE_VERIFY_START'
+          node "$ROOT/scripts/operations/verify-release.mjs" "$ROOT" "$RADLINA_V3_I01_RELEASE_SHA"
+          echo 'V3_I01_MAC_FULL_RELEASE_VERIFY_PASS_ALL_NATIVE_FILES'
+          echo 'I01_NOT_ACCEPTED_V2_UNTOUCHED_NO_PRIVATE_KEYS_OR_SERVICES_MODIFIED'
