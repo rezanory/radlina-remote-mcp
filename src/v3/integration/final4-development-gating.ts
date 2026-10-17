@@ -6,6 +6,7 @@
  */
 export type FinalFourProvisionMode =
   | { name: "production"; schema: "radlina.v3.final-four-production-binding/v1"; deployable: true }
+  | { name: "i01"; schema: "radlina.v3.i01-production-binding/v1"; deployable: true }
   | { name: "development"; schema: "radlina.v3.final-four-development-binding/v1"; deployable: false };
 
 export function resolveFinalFourProvisionMode(
@@ -21,6 +22,15 @@ export function resolveFinalFourProvisionMode(
       deployable: true,
     };
   }
+  if (flag === "--prepare-i01") {
+    if (independentReviewerPublicKeyFile)
+      throw new Error("I01-only owner binding must not silently activate AC01 reviewer policy");
+    return {
+      name: "i01",
+      schema: "radlina.v3.i01-production-binding/v1",
+      deployable: true,
+    };
+  }
   if (flag === "--prepare-development") {
     // Do not silently ignore or downgrade a production reviewer input.
     if (independentReviewerPublicKeyFile)
@@ -31,5 +41,5 @@ export function resolveFinalFourProvisionMode(
       deployable: false,
     };
   }
-  throw new Error("explicit --prepare or --prepare-development operation required");
+  throw new Error("explicit --prepare, --prepare-i01 or --prepare-development operation required");
 }
