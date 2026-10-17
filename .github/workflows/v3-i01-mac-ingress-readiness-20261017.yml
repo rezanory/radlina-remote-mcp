@@ -83,7 +83,7 @@ jobs:
           if [[ -f "$CLOUD" && ! -L "$CLOUD" && -x "$CLOUD" ]]; then
             [[ "$(stat -f '%Lp' "$CLOUD")" == 700 ]]
             echo 'V3_MAC_CLOUDFLARED_BINARY_PRESENT=verified-regular-executable'
-            "$CLOUD" --version
+            /usr/bin/file "$CLOUD" | sed "s|$CLOUD|V3_MAC_CLOUDFLARED_FILE_TYPE|g"
             shasum -a 256 "$CLOUD" | awk '{print "V3_MAC_CLOUDFLARED_BINARY_SHA256="$1}'
           else
             echo 'V3_MAC_CLOUDFLARED_BINARY_PRESENT=false'
