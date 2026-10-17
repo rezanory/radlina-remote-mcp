@@ -1,0 +1,50 @@
+name: V3 I01 Mac Live Install Readiness (Read-only 2026-10-17)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-live-readonly-20261017
+  cancel-in-progress: false
+jobs:
+  preflight:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 5
+    steps:
+      - name: Read-only pre-install check for exact new Mac V3 release and real owner public pins
+        shell: bash
+        env:
+          RADLINA_V3_FINAL4_MAC_RELEASE_SHA256: d9081548ef3123697c5e64310079bf0164ca66d091546bd7f9abb72fad8e8dee
+          RADLINA_V3_MAC_OPERATOR_POLICY_SHA256: ff1fc20dad2f8f25d8644c80a473fa26bedfed8119354fc9cc20359ea2092cbc
+          RADLINA_V3_S03_WITNESS_POLICY_SHA256: 41615069fcec5283525d8ccc13d1d6a030273eb583f5da9869add557f7d7e87a
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          SHA="$RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
+          ROOT="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
+          RELEASE="$ROOT/releases/$SHA"
+          export RADLINA_V3_MAC_OPERATOR_POLICY_PATH="$ROOT/owner-policies/mac-operator-owner-signed-20261015.json"
+          export RADLINA_V3_S03_WITNESS_POLICY_PATH="$HOME/.local/share/radlina/v3-beta/macbook-main-s03/owner-witness-pins-20261016.json"
+          [[ -f "$RELEASE/scripts/operations/v3-final4-mac-i01-readiness.sh" ]]
+          set +e
+          bash "$RELEASE/scripts/operations/v3-final4-mac-i01-readiness.sh" --check-i01
+          code=$?
+          set -e
+          if [[ "$code" == 3 ]]; then
+            echo 'I01_MAC_READINESS_MISSING_REAL_INSTALL_PREREQUISITES_NOT_ACCEPTED'
+            exit 0
+          elif [[ "$code" == 0 ]]; then
+            echo 'I01_MAC_INSTALL_PREREQUISITES_PRESENT_NOT_PHYSICAL_GATE_ACCEPTANCE'
+            exit 0
+          else
+            echo 'I01_MAC_PREFLIGHT_SCRIPT_ERROR'
+            exit "$code"
+          fi
