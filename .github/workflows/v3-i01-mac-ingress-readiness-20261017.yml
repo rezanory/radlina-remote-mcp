@@ -66,4 +66,17 @@ jobs:
               echo "MAC_LAUNCHCTL_$label=unregistered"
             fi
           done
+          echo 'I01_MAC_CLOUDFLARED_BINARY_PATH_CHECK'
+          for binary in /usr/local/bin/cloudflared /opt/homebrew/bin/cloudflared \
+            "$HOME/.local/bin/cloudflared" \
+            "$HOME/.local/share/radlina/v3-beta/macbook-main-s03/bin/cloudflared" \
+            /Applications/cloudflared /opt/local/bin/cloudflared; do
+            if [[ -f "$binary" && ! -L "$binary" && -x "$binary" ]]; then
+              echo "CLOUDFLARED_BIN_FOUND=$binary"
+              shasum -a 256 "$binary" | awk '{print "CLOUDFLARED_BIN_SHA256="$1}'
+            fi
+          done
+          for brew in /usr/local/bin/brew /opt/homebrew/bin/brew; do
+            [[ ! -x "$brew" ]] || echo "BREW_EXECUTABLE_FOUND=$brew"
+          done
           echo 'I01_READ_ONLY_NO_CREDS_ACCESSED_NO_AGENT_MODIFIED'
