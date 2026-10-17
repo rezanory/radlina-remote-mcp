@@ -2,6 +2,7 @@ import {execFileSync} from "node:child_process";
 import {readFileSync} from "node:fs";
 import path from "node:path";
 import {describe,expect,it} from "vitest";
+import { bashForTest } from "./bash-test-executable.js";
 
 const bash=path.resolve("scripts/operations/v3-final4-s03-mac-secret-stage.sh");
 const swift=path.resolve("scripts/operations/v3-final4-s03-dedicated-keychain-import.swift");
@@ -10,7 +11,7 @@ const helper=readFileSync(swift,"utf8");
 
 describe("I01 import of existing writer secrets from physical dedicated Mac Keychain",()=>{
   it("remains a valid explicit --stage Bash entrypoint",()=>{
-    expect(()=>execFileSync("bash",["-n",bash],{timeout:10000})).not.toThrow();
+    expect(()=>execFileSync(bashForTest(),["-n",bash],{timeout:10000})).not.toThrow();
     expect(shell).toContain("'--stage'");
     expect(shell).toContain('[[ "$(id -un)" == \'amirsheikhzadeh\' ]]');
   });
