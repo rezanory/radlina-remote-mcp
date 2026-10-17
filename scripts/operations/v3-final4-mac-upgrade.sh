@@ -3,7 +3,8 @@
 # Source only. No automatic rollback on a native unknown outcome; never touches V2.
 set -euo pipefail
 umask 077
-[[ $# == 1 && "$1" == '--upgrade' ]]
+[[ $# == 1 && ( "$1" == '--upgrade' || "$1" == '--upgrade-i01' ) ]]
+UPGRADE_MODE="$1"
 [[ "$(uname -s)" == 'Darwin' && "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
 [[ "$(id -un)" == 'amirsheikhzadeh' ]]
 : "$RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
@@ -23,11 +24,20 @@ for id in "$PREV" "$NEXT"; do
   [[ -f "$manifest" && ! -L "$manifest" ]]
   [[ "$(shasum -a 256 "$manifest" | awk '{print $1}')" == "$id" ]]
 done
-for script in v3-mac-operator-cycle.ts v3-mac-fleet-cycle.ts v3-s03-mac-witness-daemon.ts; do
+REQUIRED_SCRIPTS=(v3-mac-operator-cycle.ts v3-s03-mac-witness-daemon.ts)
+if [[ "$UPGRADE_MODE" == '--upgrade' ]]; then
+  REQUIRED_SCRIPTS+=(v3-mac-fleet-cycle.ts)
+fi
+for script in "${REQUIRED_SCRIPTS[@]}"; do
   [[ -f "$NEW/scripts/operations/$script" ]]
 done
 [[ -f "$NEW/node_modules/tsx/dist/cli.mjs" ]]
-LABELS='com.radlina.remote-mcp.v3.mac-operator com.radlina.remote-mcp.v3.mac-fleet-agent com.radlina.remote-mcp.v3.mac-s03-witness'
+# I01-only upgrades must preserve Fleet exactly as installed/disabled.
+# Full upgrades require all three existing agents, as in the original contract.
+LABELS='com.radlina.remote-mcp.v3.mac-s03-witness com.radlina.remote-mcp.v3.mac-operator'
+if [[ "$UPGRADE_MODE" == '--upgrade' ]]; then
+  LABELS="$LABELS com.radlina.remote-mcp.v3.mac-fleet-agent"
+fi
 LAUNCH="$HOME/Library/LaunchAgents"
 STATE="$BASE/release-upgrades"
 mkdir -p -m 700 "$STATE"
@@ -74,4 +84,8 @@ for label in $LABELS; do
 done
 # A successful launchctl return is not independently verified device health.
 printf '%s' 'native-start-returned' > "$SESSION/state"
-echo "V3_MAC_RELEASE_UPGRADE_RECORDED id=$ID next=$NEXT acceptance=deferred"
+if [[ "$UPGRADE_MODE" == '--upgrade-i01' ]]; then
+  echo "V3_MAC_I01_RELEASE_UPGRADE_RECORDED id=$ID next=$NEXT fleet=untouched acceptance=deferred"
+else
+  echo "V3_MAC_RELEASE_UPGRADE_RECORDED id=$ID next=$NEXT acceptance=deferred"
+fi
