@@ -30,7 +30,7 @@ jobs:
           [[ "$(id -un)" == 'amirsheikhzadeh' ]]
           [[ "$(node --version)" == 'v24.20.0' ]]
           echo 'v3.macRunnerVerified=true'
-          SHA='dc5f17f68a43e05bccf8e94915f509e0bdfe92b381b63d58efacbeea0062cd3d'
+          SHA='b612ef1f0c84e9021ac12d350473fa613a6d94fef7fef58db6f47091182dc6e6'
           ROOT="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
           RELEASE="$ROOT/releases/$SHA"
           MANIFEST="$RELEASE/RELEASE_MANIFEST.json"
