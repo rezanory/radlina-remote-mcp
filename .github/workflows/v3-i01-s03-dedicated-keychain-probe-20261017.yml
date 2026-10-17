@@ -88,3 +88,45 @@ jobs:
           print("V3_I01_OWNER_DEDICATED_MAC_KEYCHAIN_WRITE_READ_DELETE_PASS")
           print("V3_I01_NO_PRODUCTION_WRITER_SECRET_GENERATED_OR_EXPORTED")
           SWIFT
+
+      - name: Inspect ONLY existing S03 writer item PRESENCE in owner-dedicated Mac Keychain
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          swift - <<'SWIFT'
+          import Foundation
+          import Security
+          let home=FileManager.default.homeDirectoryForCurrentUser
+          let base=home.appendingPathComponent(".local/share/radlina/v3-beta/macbook-main-runner")
+          let keychainPath=base.appendingPathComponent("v3-device.keychain-db")
+          let passPath=base.appendingPathComponent("keychain-password.local")
+          var ref:SecKeychain?
+          guard SecKeychainOpen(keychainPath.path,&ref)==errSecSuccess,let ref else {
+            fatalError("V3 dedicated Mac Keychain cannot be opened")
+          }
+          var p=try Data(contentsOf:passPath)
+          if p.last == 10 { p.removeLast() }
+          let status=p.withUnsafeBytes { SecKeychainUnlock(ref,UInt32(p.count),$0.baseAddress,true) }
+          p.resetBytes(in:0..<p.count)
+          guard status==errSecSuccess else { fatalError("V3 dedicated Mac Keychain cannot be unlocked") }
+          func present(_ service:String)->Bool {
+            let account="amirsheikhzadeh"
+            let status=service.withCString { svc in
+              account.withCString { acc in
+                SecKeychainFindGenericPassword(ref,UInt32(service.utf8.count),svc,
+                  UInt32(account.utf8.count),acc,nil,nil,nil)
+              }
+            }
+            if status != errSecSuccess && status != errSecItemNotFound {
+              fatalError("V3 dedicated Mac Keychain metadata lookup unavailable")
+            }
+            return status == errSecSuccess
+          }
+          // Does NOT request kSecReturnData and does NOT copy or print any secret bytes.
+          print("V3_S03_DEDICATED_WRITER_TOKEN_ITEM_PRESENT=\(present("com.radlina.remote-mcp.v3.s03-writer-token"))")
+          print("V3_S03_DEDICATED_WRITER_HMAC_ITEM_PRESENT=\(present("com.radlina.remote-mcp.v3.s03-writer-hmac-base64"))")
+          print("V3_S03_DEDICATED_KEYCHAIN_NO_SECRET_CONTENT_ACCESSED")
+          SWIFT
