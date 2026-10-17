@@ -33,6 +33,8 @@ jobs:
           [[ -d "$ROOT" && ! -L "$ROOT" ]]
           [[ -f "$ROOT/RELEASE_MANIFEST.json" && ! -L "$ROOT/RELEASE_MANIFEST.json" ]]
           [[ "$(shasum -a 256 "$ROOT/RELEASE_MANIFEST.json" | awk '{print $1}')" == "$RADLINA_V3_NATIVE_RELEASE_SHA" ]]
+          node "$ROOT/scripts/operations/verify-release.mjs" "$ROOT" "$RADLINA_V3_NATIVE_RELEASE_SHA" >/dev/null
+          echo 'V3_MAC_LOCAL_WITNESS_FULL_RELEASE_VERIFIED'
           SCRIPT="$ROOT/dist/scripts/operations/v3-s03-mac-keychain-prepare.js"
           [[ -f "$SCRIPT" && ! -L "$SCRIPT" ]]
           KEYCHAIN="$HOME/.local/share/radlina/v3-beta/macbook-main-runner/v3-device.keychain-db"
