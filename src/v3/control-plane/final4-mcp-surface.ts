@@ -29,8 +29,8 @@ export interface V3NativePluginAuthenticator {
 export interface V3FinalFourMcpPorts {
   authenticatedPlugin: V3NativePluginAuthenticator;
   execution: I01ConsentAndAuditDispatcher;
-  fleet: V3FleetControlPort;
-  acceptance: V3IndependentPhysicalAcceptanceLedger;
+  fleet?: V3FleetControlPort;
+  acceptance?: V3IndependentPhysicalAcceptanceLedger;
   s02e: I01S02EConsentController;
 }
 const WRITE={readOnlyHint:false,destructiveHint:false,idempotentHint:true,openWorldHint:false};
@@ -69,6 +69,19 @@ export const V3_FINAL4_MCP_TOOL_NAMES=[
   "v3_fleet_reconcile",
   "v3_release_acceptance_status",
 ] as const;
+export const V3_I01_MCP_TOOL_NAMES=[
+  "v3_consent_request",
+  "v3_consent_status",
+  "v3_exact_device_execute",
+  "v3_exact_device_reconcile",
+] as const;
+export function registeredV3PhysicalToolNames(ports:V3FinalFourMcpPorts):string[]{
+  return [
+    ...V3_I01_MCP_TOOL_NAMES,
+    ...(ports.fleet?["v3_fleet_plan","v3_fleet_run","v3_fleet_reconcile"]:[]),
+    ...(ports.acceptance?["v3_release_acceptance_status"]:[]),
+  ];
+}
 export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPorts):void{
   server.registerTool("v3_consent_request",{
     description:"Request bounded once-only, recipient-signed S02E consent for a specified V3 device, capability and exact input.",
@@ -198,6 +211,8 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
       }));
     }catch(error){return denied(error);}
   });
+  const fleet=ports.fleet;
+  if(fleet){
   server.registerTool("v3_fleet_plan",{
     description:"Create a two-physical-device F01 release plan without activating any release.",
     inputSchema:z.object({
@@ -222,7 +237,7 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
         canaryDeviceId:input.canaryDeviceId,
         createdAtMs:Date.now(),
       });
-      return ok(await ports.fleet.plan(plan));
+      return ok(await fleet.plan(plan));
     }catch(error){return denied(error);}
   });
   server.registerTool("v3_fleet_run",{
@@ -238,7 +253,7 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
       const bound=await ports.authenticatedPlugin.bindOwner({
         auth,workflowExecutionId:input.operationId,
       });
-      return ok(await ports.fleet.run(input.planId,bound.subject));
+      return ok(await fleet.run(input.planId,bound.subject));
     }catch(error){return denied(error);}
   });
   server.registerTool("v3_fleet_reconcile",{
@@ -253,11 +268,14 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
       const owner=await ports.authenticatedPlugin.bindOwner({
         auth,workflowExecutionId:input.ownerOperationId,
       });
-      if(!ports.fleet.reconcileUnknown)
+      if(!fleet.reconcileUnknown)
         throw Error("physical F01 signed manual receipt reconciliation unavailable");
-      return ok(await ports.fleet.reconcileUnknown(input.planId,input.operationId,owner.subject));
+      return ok(await fleet.reconcileUnknown(input.planId,input.operationId,owner.subject));
     }catch(error){return denied(error);}
   });
+  }
+  const acceptance=ports.acceptance;
+  if(acceptance){
   server.registerTool("v3_release_acceptance_status",{
     description:"Read four independent P08/I01/F01/AC01 gates. Code and test counts never imply acceptance.",
     inputSchema:z.object({}),
@@ -265,7 +283,8 @@ export function registerV3FinalFourTools(server:McpServer,ports:V3FinalFourMcpPo
   },async(_input,context)=>{
     try{
       ownerAuth(context,"device:read",ports);
-      return ok(ports.acceptance.readiness());
+      return ok(acceptance.readiness());
     }catch(error){return denied(error);}
-  });
+  }  });
+  }
 }
