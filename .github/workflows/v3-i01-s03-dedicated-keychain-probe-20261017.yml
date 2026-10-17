@@ -1,0 +1,90 @@
+name: V3 I01 Dedicated Mac Keychain Scoped Write Probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: v3-i01-dedicated-keychain-probe-20261017
+  cancel-in-progress: false
+jobs:
+  mac:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 6
+    steps:
+      - name: Verify V3 owner-local dedicated Keychain with non-secret disposable item
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          swift - <<'SWIFT'
+          import Foundation
+          import Security
+          let base = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local/share/radlina/v3-beta/macbook-main-runner")
+          let keychainFile = base.appendingPathComponent("v3-device.keychain-db")
+          let passFile = base.appendingPathComponent("keychain-password.local")
+          for file in [keychainFile,passFile] {
+            let attrs = try FileManager.default.attributesOfItem(atPath:file.path)
+            guard let n = attrs[.posixPermissions] as? NSNumber, (n.intValue & 0o077) == 0 else {
+              fatalError("dedicated Keychain protected file permissions unavailable")
+            }
+          }
+          var ref:SecKeychain?
+          let opened = SecKeychainOpen(keychainFile.path,&ref)
+          guard opened == errSecSuccess, let ref else {
+            fatalError("existing dedicated Keychain unavailable status=\(opened)")
+          }
+          var password = try Data(contentsOf:passFile)
+          guard password.count >= 40 && password.count <= 201 else {
+            fatalError("owner-managed dedicated Keychain unlock input unavailable")
+          }
+          if password.last == 10 { password.removeLast() }
+          let unlock = password.withUnsafeBytes { bytes in
+            SecKeychainUnlock(ref,UInt32(password.count),bytes.baseAddress,true)
+          }
+          password.resetBytes(in:0..<password.count)
+          guard unlock == errSecSuccess else {
+            fatalError("existing dedicated Mac owner Keychain cannot unlock status=\(unlock)")
+          }
+          let service = "com.radlina.remote-mcp.v3.i01-dedicated-keychain-probe-" + UUID().uuidString.lowercased()
+          let account = "amirsheikhzadeh"
+          let data = Data(repeating:0x46,count:32)
+          var item:SecKeychainItem?
+          let status = service.withCString { svc in
+            account.withCString { acc in
+              data.withUnsafeBytes { bytes in
+                SecKeychainAddGenericPassword(ref,UInt32(service.utf8.count),svc,
+                  UInt32(account.utf8.count),acc,UInt32(data.count),bytes.baseAddress,&item)
+              }
+            }
+          }
+          guard status == errSecSuccess, let item else {
+            fatalError("dedicated Keychain item add failed status=\(status)")
+          }
+          defer { _ = SecKeychainItemDelete(item) }
+          var bytesLength:UInt32 = 0
+          var bytesPointer:UnsafeMutableRawPointer?
+          let read = service.withCString { svc in
+            account.withCString { acc in
+              SecKeychainFindGenericPassword(ref,UInt32(service.utf8.count),svc,
+                UInt32(account.utf8.count),acc,&bytesLength,&bytesPointer,nil)
+            }
+          }
+          guard read == errSecSuccess, let bytesPointer, bytesLength == UInt32(data.count) else {
+            fatalError("owner dedicated Keychain local readback failed status=\(read)")
+          }
+          let fetched = Data(bytes:bytesPointer,count:Int(bytesLength))
+          SecKeychainItemFreeContent(nil,bytesPointer)
+          guard fetched == data else { fatalError("keychain data roundtrip mismatch") }
+          print("V3_I01_OWNER_DEDICATED_MAC_KEYCHAIN_WRITE_READ_DELETE_PASS")
+          print("V3_I01_NO_PRODUCTION_WRITER_SECRET_GENERATED_OR_EXPORTED")
+          SWIFT
