@@ -15,7 +15,7 @@ import os from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import * as z from "zod/v4";
 import { canonicalJson, sha256 } from "../../utils/json.js";
-import { i01SignedOwnerEnvelopeSchema, i01SignedDeviceResponseSchema } from "../integration/i01-secured-dispatch.js";
+import { i01SignedOwnerEnvelopeSchema, i01SignedDeviceResponseSchema, type I01ExactSignedOperation } from "../integration/i01-secured-dispatch.js";
 import { f01SignedCommandSchema } from "../fleet/physical-adapters.js";
 import { signedDistributedAuditRecordSchema } from "./distributed.js";
 import type { S03AnchorAcknowledgment, S03AnchorEvent } from "./s03-remote-anchor.js";
@@ -86,6 +86,44 @@ function identityCheck(policy:S03WitnessTrustPolicy,deviceId:string,key:string,i
     throw new S03WitnessDenied("independent device P03 key/instance pin mismatch");
   }
 }
+/**
+ * Independently bind a recipient's signed local decision to the EXACT
+ * cross-device operation. A valid Ed25519 signature alone does not prove that
+ * the consent was issued for this workflow, input, subject, or attempt.
+ * Timestamps are checked against the owner-signed operation issuance so
+ * durable S03 reconciliation does not depend on delayed network delivery.
+ */
+export function assertS03ExactRecipientConsentBinding(
+  operation:Pick<I01ExactSignedOperation,
+    "workflowExecutionId"|"nodeId"|"attempt"|"sourceDeviceId"|
+    "targetDeviceId"|"subject"|"capability"|"inputSha256"|"issuedAtMs">,
+  approval:{
+    operationSha256:string;sourceDeviceId:string;targetDeviceId:string;
+    subject:string;issuedAtMs:number;expiresAtMs:number;
+  },
+):void{
+  const expected=sha256(canonicalJson({
+    workflowExecutionId:operation.workflowExecutionId,
+    nodeId:operation.nodeId,
+    attempt:operation.attempt,
+    sourceDeviceId:operation.sourceDeviceId,
+    targetDeviceId:operation.targetDeviceId,
+    subject:operation.subject,
+    capability:operation.capability,
+    inputSha256:operation.inputSha256,
+  }));
+  if(approval.operationSha256!==expected||
+    approval.subject!==operation.subject||
+    approval.sourceDeviceId!==operation.sourceDeviceId||
+    approval.targetDeviceId!==operation.targetDeviceId||
+    !Number.isSafeInteger(approval.issuedAtMs)||
+    !Number.isSafeInteger(approval.expiresAtMs)||
+    approval.issuedAtMs>operation.issuedAtMs||
+    approval.expiresAtMs<=operation.issuedAtMs||
+    approval.expiresAtMs-approval.issuedAtMs>120000){
+    throw new S03WitnessDenied("recipient approval is not bound to exact owner operation");
+  }
+}
 function independentlyVerify(event:S03AnchorEvent,policy:S03WitnessTrustPolicy):void{
   if(Math.abs(Date.now()-Date.parse(event.issuedAt))>60000||
     event.recordHash.length!==64){
@@ -108,11 +146,10 @@ function independentlyVerify(event:S03AnchorEvent,policy:S03WitnessTrustPolicy):
     identityCheck(policy,op.targetDeviceId,input.targetPublicKeyPem,receipt.agentInstanceId);
     if(op.recipientApprovalHash!==sha256(canonicalJson(grant))||
       !exactSignature(input.targetPublicKeyPem,grant.approval,grant.deviceSignatureBase64)||
-      !grant.approval.localUserApproved||
-      grant.approval.targetDeviceId!==op.targetDeviceId||
-      grant.approval.sourceDeviceId!==op.sourceDeviceId){
+      !grant.approval.localUserApproved){
       throw new S03WitnessDenied("recipient physical signature/approval mismatch");
     }
+    assertS03ExactRecipientConsentBinding(op,grant.approval);
     const signedResponse={
       schema:response.schema,requestId:response.requestId,
       receipt:response.receipt,outputSha256:response.outputSha256,
