@@ -63,7 +63,7 @@ jobs:
             account.withCString { acc in
               data.withUnsafeBytes { bytes in
                 SecKeychainAddGenericPassword(ref,UInt32(service.utf8.count),svc,
-                  UInt32(account.utf8.count),acc,UInt32(data.count),bytes.baseAddress,&item)
+                  UInt32(account.utf8.count),acc,UInt32(data.count),bytes.baseAddress!,&item)
               }
             }
           }
