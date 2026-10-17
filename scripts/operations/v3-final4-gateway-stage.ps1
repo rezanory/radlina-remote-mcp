@@ -10,6 +10,7 @@ param(
   [Parameter(Mandatory=$true)][string]$MacOperatorPolicySha256,
   [Parameter(Mandatory=$true)][string]$S03WriterTokenFile,
   [Parameter(Mandatory=$true)][string]$S03HmacDpapiFile,
+  [switch]$I01Only,
   [Parameter(ParameterSetName='Stage')][switch]$Stage,
   [Parameter(ParameterSetName='Apply',Mandatory=$true)][switch]$Apply
 )
@@ -50,12 +51,16 @@ $binding=Get-Content -LiteralPath $config -Raw -Encoding UTF8 | ConvertFrom-Json
 $devTag=$binding.PSObject.Properties['developmentOnly']
 $activationTag=$binding.PSObject.Properties['productionActivationPermitted']
 $reviewerTag=$binding.PSObject.Properties['independentReviewerPublicKeyPem']
-if ($binding.schema -cne 'radlina.v3.final-four-production-binding/v1' -or
-    ($null -ne $devTag -and $devTag.Value -eq $true) -or
+$i01Tag=$binding.PSObject.Properties['i01Only']
+$isFull=$binding.schema -ceq 'radlina.v3.final-four-production-binding/v1'
+$isI01=$binding.schema -ceq 'radlina.v3.i01-production-binding/v1'
+if (($null -ne $devTag -and $devTag.Value -eq $true) -or
     ($null -ne $activationTag -and $activationTag.Value -eq $false) -or
-    $null -eq $reviewerTag -or
-    [string]::IsNullOrWhiteSpace([string]$reviewerTag.Value)) {
-  throw 'Development-only or unreviewed V3 configuration cannot be staged or applied to production service'
+    ($I01Only -and (-not $isI01 -or $null -eq $i01Tag -or
+      $i01Tag.Value -ne $true -or $null -ne $reviewerTag)) -or
+    (-not $I01Only -and (-not $isFull -or $null -eq $reviewerTag -or
+      [string]::IsNullOrWhiteSpace([string]$reviewerTag.Value)))) {
+  throw 'Explicit I01-only owner production schema or full reviewer-pinned binding required'
 }
 if ((Get-FileHash -LiteralPath $macPolicy -Algorithm SHA256).Hash.ToLowerInvariant() -cne $MacOperatorPolicySha256) {
   throw 'Owner-signed V3 Mac policy digest mismatch'
