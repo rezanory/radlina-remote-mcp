@@ -127,14 +127,28 @@ function verifyStore(db:DatabaseSync,contract:StoreContract):void {
  * Failing halfway cannot destroy data; completed v1 stamps remain valid.
  * No owner acceptance or production deployment is implied by schema stamping.
  */
+export function requireI01SchemaBaseline(stateDirectory:string):void {
+  // I01 needs only its real authenticated transport, recipient consent,
+  // origin and owner-signing stores. F01/AC01 tables are not prerequisites.
+  requireV3SchemaBaseline(stateDirectory,finalFourSqliteSchemaManifest.filter(
+    contract=>!["fleet-relay.sqlite3","fleet-recipient-consent.sqlite3",
+      "fleet-plans.sqlite3","acceptance.sqlite3"].includes(contract.file),
+  ));
+}
 export function requireFinalFourSchemaBaseline(stateDirectory:string):void {
+  requireV3SchemaBaseline(stateDirectory,finalFourSqliteSchemaManifest);
+}
+function requireV3SchemaBaseline(
+  stateDirectory:string,
+  manifest:readonly StoreContract[],
+):void {
   if(process.platform!=="win32"||!path.win32.isAbsolute(stateDirectory)||
     !stateDirectory.toLowerCase().startsWith("e:\\")||
     stateDirectory.toLowerCase().includes("\\v2\\")){
     throw new V3FinalFourMigrationDenied("isolated E: physical V3 schema root required");
   }
   const storeRoot=path.win32.join(stateDirectory,"final4");
-  for(const contract of finalFourSqliteSchemaManifest){
+  for(const contract of manifest){
     const filename=path.win32.join(storeRoot,contract.file);
     const state=lstatSync(filename);
     if(!state.isFile()||state.isSymbolicLink())
