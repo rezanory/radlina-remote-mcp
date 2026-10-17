@@ -31,6 +31,13 @@ S03POLICY="$RADLINA_V3_S03_WITNESS_POLICY_PATH"
 TOKEN="$RADLINA_V3_S03_WRITER_TOKEN_FILE"
 HMAC="$RADLINA_V3_S03_HMAC_KEY_FILE"
 [[ -d "$RELEASE" && ! -L "$RELEASE" && -f "$TSX" ]]
+# Verify EVERY release artifact before touching staged credentials or creating
+# any LaunchAgent. A correct manifest SHA alone does not prove that a file in
+# the already-staged release directory has not changed since initial staging.
+VERIFIER="$RELEASE/scripts/operations/verify-release.mjs"
+[[ -f "$VERIFIER" && ! -L "$VERIFIER" ]]
+node "$VERIFIER" "$RELEASE" "$RADLINA_V3_FINAL4_MAC_RELEASE_SHA256"
+echo 'V3_MAC_I01_FULL_NATIVE_RELEASE_PREINSTALL_VERIFIED'
 # Only explicitly pre-provisioned owner Keychain credentials may stage missing files.
 # Never generate, log or embed S03 secrets into LaunchAgent XML.
 if [[ ! -f "$TOKEN" || ! -f "$HMAC" ]]; then
