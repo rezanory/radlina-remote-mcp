@@ -10,6 +10,16 @@ on:
       - tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
       - tests/unit/v3/final4-physical-dependencies.test.ts
       - .github/workflows/v3-i01-s03-consent-ci.yml
+  pull_request:
+    branches:
+      - feature/v3-final4-codeonly-20261012
+    paths:
+      - src/v3/audit/s03-mac-witness.ts
+      - src/v3/acceptance/final4-physical-dependencies.ts
+      - src/v3/acceptance/ac01-final-gates.ts
+      - tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
+      - tests/unit/v3/final4-physical-dependencies.test.ts
+      - .github/workflows/v3-i01-s03-consent-ci.yml
   workflow_dispatch:
 
 permissions:
