@@ -44,6 +44,19 @@ $hmac=ExactPrivateFile $S03HmacDpapiFile 'machine-DPAPI S03 HMAC'
 if ((Get-FileHash -LiteralPath $config -Algorithm SHA256).Hash.ToLowerInvariant() -cne $OwnerBindingConfigSha256) {
   throw 'Owner-pinned V3 binding policy digest mismatch'
 }
+# Development-only public policies can be generated before final reviewer
+# approval, but must NEVER activate real physical ports or reach WinSW.
+$binding=Get-Content -LiteralPath $config -Raw -Encoding UTF8 | ConvertFrom-Json
+$devTag=$binding.PSObject.Properties['developmentOnly']
+$activationTag=$binding.PSObject.Properties['productionActivationPermitted']
+$reviewerTag=$binding.PSObject.Properties['independentReviewerPublicKeyPem']
+if ($binding.schema -cne 'radlina.v3.final-four-production-binding/v1' -or
+    ($null -ne $devTag -and $devTag.Value -eq $true) -or
+    ($null -ne $activationTag -and $activationTag.Value -eq $false) -or
+    $null -eq $reviewerTag -or
+    [string]::IsNullOrWhiteSpace([string]$reviewerTag.Value)) {
+  throw 'Development-only or unreviewed V3 configuration cannot be staged or applied to production service'
+}
 if ((Get-FileHash -LiteralPath $macPolicy -Algorithm SHA256).Hash.ToLowerInvariant() -cne $MacOperatorPolicySha256) {
   throw 'Owner-signed V3 Mac policy digest mismatch'
 }

@@ -15,6 +15,7 @@ import * as z from "zod/v4";
 import { canonicalJson, sha256 } from "../../src/utils/json.js";
 import { SqliteDeviceRegistry } from "../../src/v3/device/registry.js";
 import { V3WindowsProtectedOwnerSigner } from "../../src/v3/security/windows-owner-signer.js";
+import { resolveFinalFourProvisionMode } from "../../src/v3/integration/final4-development-gating.js";
 
 const HASH=z.string().regex(/^[a-f0-9]{64}$/u);
 const inputSchema=z.object({
@@ -25,12 +26,13 @@ const inputSchema=z.object({
   allowedCapabilities:z.array(z.enum([
     "device.health","filesystem.read","filesystem.write",
   ])).min(1).max(3),
-  independentReviewerPublicKeyFile:z.string().min(5).max(4096),
+  independentReviewerPublicKeyFile:z.string().min(5).max(4096).optional(),
   s03WitnessPublicKeyFile:z.string().min(5).max(4096),
   expiresAt:z.string().datetime({offset:true}),
 }).strict();
 const ROOT="E:\\radlina-v3-oauth-standalone";
 const OUT=path.win32.join(ROOT,"final4","owner-policies");
+const DEV_OUT=path.win32.join(ROOT,"final4","development-only-owner-policies");
 
 function publicKey(text:string):{pem:string;fingerprint:string}{
   if(Buffer.byteLength(text,"utf8")>4096)throw Error("bounded public key material only");
@@ -68,14 +70,16 @@ function trusted(registry:SqliteDeviceRegistry,id:"macbook-main"|"windows-main")
 
 if(process.platform!=="win32"||os.hostname().toLowerCase()!=="laptop-13qineif"||
   os.userInfo().username.toLowerCase()!=="radlina"||
-  process.argv.length!==4||process.argv[2]!=="--prepare"||
+  process.argv.length!==4||!["--prepare","--prepare-development"].includes(process.argv[2]??"")||
   !path.win32.isAbsolute(process.argv[3]??"")){
-  throw Error("manual interactive Windows V3 owner --prepare <absolute-input.json> required");
+  throw Error("manual interactive Windows V3 owner --prepare or --prepare-development <absolute-input.json> required");
 }
 const inputFile=requireFile(process.argv[3]!);
 const bytes=await readFile(inputFile);
 if(bytes.byteLength>16384)throw Error("bounded V3 owner input document required");
 const input=inputSchema.parse(JSON.parse(bytes.toString("utf8")));
+const mode=resolveFinalFourProvisionMode(process.argv[2]!,input.independentReviewerPublicKeyFile);
+const outputRoot=mode.deployable?OUT:DEV_OUT;
 if(input.allowedCapabilities[0]!=="device.health"||
   new Set(input.allowedCapabilities).size!==input.allowedCapabilities.length||
   new Set(input.authorizedChatGPTClientIds).size!==input.authorizedChatGPTClientIds.length||
@@ -88,12 +92,14 @@ if(expires<=now||expires-now>30*24*60*60*1000){
 }
 const signer=await V3WindowsProtectedOwnerSigner.open();
 const owner=publicKey(signer.publicKeyPem);
-const reviewer=publicKey(await readFile(requireFile(input.independentReviewerPublicKeyFile),"utf8"));
+const reviewer=mode.deployable
+  ? publicKey(await readFile(requireFile(input.independentReviewerPublicKeyFile!),"utf8"))
+  : undefined;
 const witness=publicKey(await readFile(requireFile(input.s03WitnessPublicKeyFile),"utf8"));
-if(owner.fingerprint===reviewer.fingerprint||
-  witness.fingerprint===reviewer.fingerprint||
-  owner.fingerprint===witness.fingerprint){
-  throw Error("P03 owner, independent reviewer and physical Mac S03 witness keys must differ");
+if(owner.fingerprint===witness.fingerprint||
+  (reviewer!==undefined&&(owner.fingerprint===reviewer.fingerprint||
+    witness.fingerprint===reviewer.fingerprint))){
+  throw Error("P03 owner, final reviewer and physical Mac S03 witness keys must differ");
 }
 const registry=new SqliteDeviceRegistry(path.win32.join(ROOT,"v3-devices.sqlite3"));
 let windows,mac;
@@ -127,10 +133,10 @@ const chatGPTPolicy={
   allowedCapabilities:input.allowedCapabilities,
   ownerApprovedAt:new Date(now).toISOString(),
 };
-const chatPolicyPath=path.win32.join(OUT,"native-chatgpt-owner.json");
-const macPolicyPath=path.win32.join(OUT,"mac-operator-signed.json");
-const physicalConfigPath=path.win32.join(OUT,"final4-binding.json");
-const macWitnessPolicyPath=path.win32.join(OUT,"mac-s03-witness-policy.json");
+const chatPolicyPath=path.win32.join(outputRoot,"native-chatgpt-owner.json");
+const macPolicyPath=path.win32.join(outputRoot,"mac-operator-signed.json");
+const physicalConfigPath=path.win32.join(outputRoot,"final4-binding.json");
+const macWitnessPolicyPath=path.win32.join(outputRoot,"mac-s03-witness-policy.json");
 const macWitnessPolicy={
   schema:"radlina.v3.s03.witness-pins/v1" as const,
   ownerPublicKeyPem:owner.pem,
@@ -148,7 +154,7 @@ const macWitnessPolicy={
 };
 const chatJSON=canonicalJson(chatGPTPolicy);
 const config={
-  schema:"radlina.v3.final-four-production-binding/v1",
+  schema:mode.schema,
   ownerOAuthClientPolicyPath:chatPolicyPath,
   ownerOAuthClientPolicyHash:sha256(chatJSON+"\n"),
   windowsDeviceFingerprint:windows.identity.publicKeyFingerprint,
@@ -156,14 +162,18 @@ const config={
   macTailnetNodeHash:mac.tailnet,
   windowsTailnetNodeHash:windows.tailnet,
   ownerPublicKeyPem:owner.pem,
-  independentReviewerPublicKeyPem:reviewer.pem,
+  ...(reviewer?{independentReviewerPublicKeyPem:reviewer.pem}:{
+    developmentOnly:true as const,
+    productionActivationPermitted:false as const,
+    gateAcceptancePermitted:false as const,
+  }),
   s03:{
     endpoint:"https://v3-audit.radlina.com/api/v1/anchor" as const,
     witnessPublicKeyPem:witness.pem,
     witnessFingerprint:witness.fingerprint,
   },
 };
-await mkdir(OUT,{recursive:true});
+await mkdir(outputRoot,{recursive:true});
 for(const [file,data] of [
   [chatPolicyPath,chatJSON],
   [macPolicyPath,canonicalJson(signedMacPolicy)],
@@ -173,7 +183,11 @@ for(const [file,data] of [
   await writeFile(file,data+"\n",{flag:"wx",encoding:"utf8"});
 }
 process.stdout.write(JSON.stringify({
-  result:"V3_FINAL4_REAL_OWNER_PUBLIC_PIN_POLICIES_PREPARED",
+  result:mode.deployable
+    ?"V3_FINAL4_REAL_OWNER_PUBLIC_PIN_POLICIES_PREPARED"
+    :"V3_FINAL4_DEVELOPMENT_ONLY_PUBLIC_POLICIES_PREPARED_NOT_DEPLOYABLE",
+  mode:mode.name,
+  productionDeploymentAllowed:mode.deployable,
   paths:{
     nativeChatGPT:chatPolicyPath,
     macOperator:macPolicyPath,
@@ -187,5 +201,5 @@ process.stdout.write(JSON.stringify({
     macIndependentWitness:sha256(canonicalJson(macWitnessPolicy)+"\n"),
   },
   ownerKeyUnchanged:true,macKeyUnchanged:true,
-  reviewerKeyIsExternal:true,notDeployed:true,
+  reviewerKeyIsExternal:reviewer!==undefined,notDeployed:true,
 })+"\n");
