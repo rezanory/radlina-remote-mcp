@@ -79,4 +79,13 @@ jobs:
           for brew in /usr/local/bin/brew /opt/homebrew/bin/brew; do
             [[ ! -x "$brew" ]] || echo "BREW_EXECUTABLE_FOUND=$brew"
           done
+          CLOUD="$BASE/bin/cloudflared"
+          if [[ -f "$CLOUD" && ! -L "$CLOUD" && -x "$CLOUD" ]]; then
+            [[ "$(stat -f '%Lp' "$CLOUD")" == 700 ]]
+            echo 'V3_MAC_CLOUDFLARED_BINARY_PRESENT=verified-regular-executable'
+            "$CLOUD" --version
+            shasum -a 256 "$CLOUD" | awk '{print "V3_MAC_CLOUDFLARED_BINARY_SHA256="$1}'
+          else
+            echo 'V3_MAC_CLOUDFLARED_BINARY_PRESENT=false'
+          fi
           echo 'I01_READ_ONLY_NO_CREDS_ACCESSED_NO_AGENT_MODIFIED'
