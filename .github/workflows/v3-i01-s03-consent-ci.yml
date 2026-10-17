@@ -9,6 +9,8 @@ on:
       - src/v3/acceptance/ac01-final-gates.ts
       - tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
       - tests/unit/v3/final4-physical-dependencies.test.ts
+      - scripts/operations/v3-final4-mac-i01-readiness.sh
+      - tests/unit/v3/mac-i01-readiness-preflight.test.ts
       - .github/workflows/v3-i01-s03-consent-ci.yml
   pull_request:
     branches:
@@ -19,6 +21,8 @@ on:
       - src/v3/acceptance/ac01-final-gates.ts
       - tests/unit/v3/s03-exact-recipient-consent-binding.test.ts
       - tests/unit/v3/final4-physical-dependencies.test.ts
+      - scripts/operations/v3-final4-mac-i01-readiness.sh
+      - tests/unit/v3/mac-i01-readiness-preflight.test.ts
       - .github/workflows/v3-i01-s03-consent-ci.yml
   workflow_dispatch:
 
@@ -46,7 +50,9 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Typecheck the entire V3 TypeScript project
         run: npm run typecheck
-      - name: Lint I01 S03 witness and F01 AC01 dependency graph
-        run: node node_modules/eslint/bin/eslint.js src/v3/audit/s03-mac-witness.ts src/v3/acceptance/final4-physical-dependencies.ts src/v3/acceptance/ac01-final-gates.ts tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/final4-physical-dependencies.test.ts
+      - name: Lint I01 Mac preflight and S03 / F01 AC01 dependency graph
+        run: node node_modules/eslint/bin/eslint.js src/v3/audit/s03-mac-witness.ts src/v3/acceptance/final4-physical-dependencies.ts src/v3/acceptance/ac01-final-gates.ts tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/final4-physical-dependencies.test.ts tests/unit/v3/mac-i01-readiness-preflight.test.ts
+      - name: Validate read-only Mac preflight Bash source
+        run: bash -n scripts/operations/v3-final4-mac-i01-readiness.sh
       - name: Run isolated I01 S03 consent and F01 AC01 acceptance-order regressions
-        run: node node_modules/vitest/vitest.mjs run tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/s03-external-ack-recovery.test.ts tests/unit/v3/final4-physical-dependencies.test.ts tests/unit/v3/final4-journal-reconciliation.test.ts --maxWorkers=2
+        run: node node_modules/vitest/vitest.mjs run tests/unit/v3/s03-exact-recipient-consent-binding.test.ts tests/unit/v3/s03-external-ack-recovery.test.ts tests/unit/v3/final4-physical-dependencies.test.ts tests/unit/v3/final4-journal-reconciliation.test.ts tests/unit/v3/mac-i01-readiness-preflight.test.ts --maxWorkers=2
