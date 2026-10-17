@@ -33,6 +33,7 @@ const inputSchema=z.object({
 const ROOT="E:\\radlina-v3-oauth-standalone";
 const OUT=path.win32.join(ROOT,"final4","owner-policies");
 const DEV_OUT=path.win32.join(ROOT,"final4","development-only-owner-policies");
+const I01_OUT=path.win32.join(ROOT,"final4","i01-only-owner-policies");
 
 function publicKey(text:string):{pem:string;fingerprint:string}{
   if(Buffer.byteLength(text,"utf8")>4096)throw Error("bounded public key material only");
@@ -70,16 +71,16 @@ function trusted(registry:SqliteDeviceRegistry,id:"macbook-main"|"windows-main")
 
 if(process.platform!=="win32"||os.hostname().toLowerCase()!=="laptop-13qineif"||
   os.userInfo().username.toLowerCase()!=="radlina"||
-  process.argv.length!==4||!["--prepare","--prepare-development"].includes(process.argv[2]??"")||
+  process.argv.length!==4||!["--prepare","--prepare-i01","--prepare-development"].includes(process.argv[2]??"")||
   !path.win32.isAbsolute(process.argv[3]??"")){
-  throw Error("manual interactive Windows V3 owner --prepare or --prepare-development <absolute-input.json> required");
+  throw Error("manual interactive Windows V3 owner --prepare, --prepare-i01 or --prepare-development <absolute-input.json> required");
 }
 const inputFile=requireFile(process.argv[3]!);
 const bytes=await readFile(inputFile);
 if(bytes.byteLength>16384)throw Error("bounded V3 owner input document required");
 const input=inputSchema.parse(JSON.parse(bytes.toString("utf8")));
 const mode=resolveFinalFourProvisionMode(process.argv[2]!,input.independentReviewerPublicKeyFile);
-const outputRoot=mode.deployable?OUT:DEV_OUT;
+const outputRoot=mode.name==="i01"?I01_OUT:mode.deployable?OUT:DEV_OUT;
 if(input.allowedCapabilities[0]!=="device.health"||
   new Set(input.allowedCapabilities).size!==input.allowedCapabilities.length||
   new Set(input.authorizedChatGPTClientIds).size!==input.authorizedChatGPTClientIds.length||
@@ -162,11 +163,12 @@ const config={
   macTailnetNodeHash:mac.tailnet,
   windowsTailnetNodeHash:windows.tailnet,
   ownerPublicKeyPem:owner.pem,
-  ...(reviewer?{independentReviewerPublicKeyPem:reviewer.pem}:{
-    developmentOnly:true as const,
-    productionActivationPermitted:false as const,
-    gateAcceptancePermitted:false as const,
-  }),
+  ...(reviewer?{independentReviewerPublicKeyPem:reviewer.pem}:
+    mode.name==="i01"?{i01Only:true as const}:{
+      developmentOnly:true as const,
+      productionActivationPermitted:false as const,
+      gateAcceptancePermitted:false as const,
+    }),
   s03:{
     endpoint:"https://v3-audit.radlina.com/api/v1/anchor" as const,
     witnessPublicKeyPem:witness.pem,
@@ -183,9 +185,11 @@ for(const [file,data] of [
   await writeFile(file,data+"\n",{flag:"wx",encoding:"utf8"});
 }
 process.stdout.write(JSON.stringify({
-  result:mode.deployable
-    ?"V3_FINAL4_REAL_OWNER_PUBLIC_PIN_POLICIES_PREPARED"
-    :"V3_FINAL4_DEVELOPMENT_ONLY_PUBLIC_POLICIES_PREPARED_NOT_DEPLOYABLE",
+  result:mode.name==="i01"
+    ?"V3_I01_ONLY_REAL_OWNER_PUBLIC_PIN_POLICIES_PREPARED"
+    :mode.deployable
+      ?"V3_FINAL4_REAL_OWNER_PUBLIC_PIN_POLICIES_PREPARED"
+      :"V3_FINAL4_DEVELOPMENT_ONLY_PUBLIC_POLICIES_PREPARED_NOT_DEPLOYABLE",
   mode:mode.name,
   productionDeploymentAllowed:mode.deployable,
   paths:{
