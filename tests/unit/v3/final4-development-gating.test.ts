@@ -44,7 +44,7 @@ describe("V3 deferred reviewer gate for development, not deployment", () => {
   it("emits only nondeployable development config to its own directory", () => {
     expect(ownerScript).toContain("const DEV_OUT=path.win32.join(ROOT,");
     expect(ownerScript).toContain('"development-only-owner-policies"');
-    expect(ownerScript).toContain("const outputRoot=mode.deployable?OUT:DEV_OUT");
+    expect(ownerScript).toContain("const outputRoot=mode.name==="i01"?I01_OUT:mode.deployable?OUT:DEV_OUT");
     expect(ownerScript).toContain("productionActivationPermitted:false as const");
     expect(ownerScript).toContain("gateAcceptancePermitted:false as const");
     expect(ownerScript).toContain("V3_FINAL4_DEVELOPMENT_ONLY_PUBLIC_POLICIES_PREPARED_NOT_DEPLOYABLE");
@@ -53,9 +53,9 @@ describe("V3 deferred reviewer gate for development, not deployment", () => {
   });
 
   it("refuses deployment or binding with development-only schema", () => {
-    expect(serviceScript).toContain("if ($binding.schema -cne 'radlina.v3.final-four-production-binding/v1'");
+    expect(serviceScript).toContain("$isFull=$binding.schema -ceq 'radlina.v3.final-four-production-binding/v1'");
     expect(serviceScript).toContain("$binding.PSObject.Properties['developmentOnly']");
-    expect(serviceScript).toContain("Development-only or unreviewed V3 configuration cannot be staged or applied");
+    expect(serviceScript).toContain("Explicit I01-only owner production schema or full reviewer-pinned binding required");
     expect(physicalRuntime).toContain('schema:z.literal("radlina.v3.final-four-production-binding/v1")');
     expect(physicalRuntime).toContain("independentReviewerPublicKeyPem:z.string()");
   });
