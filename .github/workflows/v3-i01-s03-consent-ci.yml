@@ -22,6 +22,8 @@ on:
       - scripts/operations/v3-final4-owner-policies.ts
       - scripts/operations/v3-final4-gateway-stage.ps1
       - tests/unit/v3/i01-only-physical-composition.test.ts
+      - tests/unit/v3/final4-development-gating.test.ts
+      - tests/unit/v3/final4-mcp-discovery.test.ts
       - tests/unit/v3/mac-i01-full-release-preinstall.test.ts
       - .github/workflows/v3-i01-s03-consent-ci.yml
   pull_request:
@@ -46,6 +48,8 @@ on:
       - scripts/operations/v3-final4-owner-policies.ts
       - scripts/operations/v3-final4-gateway-stage.ps1
       - tests/unit/v3/i01-only-physical-composition.test.ts
+      - tests/unit/v3/final4-development-gating.test.ts
+      - tests/unit/v3/final4-mcp-discovery.test.ts
       - tests/unit/v3/mac-i01-full-release-preinstall.test.ts
       - .github/workflows/v3-i01-s03-consent-ci.yml
   workflow_dispatch:
