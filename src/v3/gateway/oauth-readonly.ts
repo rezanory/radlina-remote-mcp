@@ -26,7 +26,7 @@ import {
   type P08HeartbeatPins,
 } from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
-import { registerV3FinalFourTools, V3_FINAL4_MCP_TOOL_NAMES, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
+import { registerV3FinalFourTools, registeredV3PhysicalToolNames, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 import { installV3PhysicalAgentRelayRoutes, type I01PhysicalRelayPorts } from "../integration/i01-agent-relay-http.js";
 import type { V3FinalFourFactoryContext, V3ComposedPhysicalFinalFour } from "../control-plane/v3-physical-final4-runtime.js";
 
@@ -130,7 +130,7 @@ function buildScopedV3Server(
           "get_device",
           "v3_admin_status",
           ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
-          ...(finalFour ? V3_FINAL4_MCP_TOOL_NAMES : []),
+          ...(finalFour ? registeredV3PhysicalToolNames(finalFour) : []),
         ],
       }),
   );
@@ -170,12 +170,13 @@ function buildScopedV3Server(
       success({
         generation: "v3",
         mode: windowsFiles ? "oauth-scoped-local-windows" : "oauth-readonly-pre-enrollment",
-        productionReady: finalFour?.acceptance.readiness().productionReady ?? false,
+        productionReady: finalFour?.acceptance?.readiness().productionReady ?? false,
         remoteExecutionEnabled: Boolean(finalFour),
         deviceCount: registry.list().length,
         localWindowsFileOperationsEnabled: Boolean(windowsFiles),
         macSignedHeartbeatIngressEnabled: Boolean(macIngress),
-        finalFourPortsBound: Boolean(finalFour),
+        finalFourPortsBound: Boolean(finalFour?.fleet && finalFour?.acceptance),
+        i01PortsBound: Boolean(finalFour),
       }),
   );
   if (windowsFiles) {
@@ -277,6 +278,8 @@ export async function startV3ReadOnlyOAuthGateway(
       composed = await options.finalFourFactory({config:cfg,store,registry,stateRoot,auth});
     }
     const finalFour = composed?.finalFour ?? options.finalFour;
+    // Only real bound fleet authority may advertise its OAuth control scope.
+    if(!finalFour?.fleet)acceptedScopes.delete("fleet:control");
     const physicalRelay = composed?.physicalRelay ?? options.physicalRelay;
     if (options.macHeartbeatPins) {
       macIngress = new V3MacSignedHeartbeatIngress(registry, options.macHeartbeatPins);
