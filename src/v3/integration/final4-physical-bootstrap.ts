@@ -29,11 +29,10 @@ import { V3PhysicalFleetOrchestrator } from "../fleet/physical-composition.js";
 import { V3IndependentPhysicalAcceptanceLedger } from "../acceptance/ac01-final-gates.js";
 import type { V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 import type { I01PhysicalRelayPorts } from "./i01-agent-relay-http.js";
-import { requireFinalFourSchemaBaseline } from "./final4-schema-migrations.js";
+import { requireFinalFourSchemaBaseline,requireI01SchemaBaseline } from "./final4-schema-migrations.js";
 
 const digest=z.string().regex(/^[a-f0-9]{64}$/u);
-const configSchema=z.object({
-  schema:z.literal("radlina.v3.final-four-production-binding/v1"),
+const commonBinding=z.object({
   ownerOAuthClientPolicyPath:z.string().min(10).max(4096),
   ownerOAuthClientPolicyHash:digest,
   windowsDeviceFingerprint:digest,
@@ -41,13 +40,22 @@ const configSchema=z.object({
   macTailnetNodeHash:digest,
   windowsTailnetNodeHash:digest,
   ownerPublicKeyPem:z.string().includes("BEGIN PUBLIC KEY").max(4096),
-  independentReviewerPublicKeyPem:z.string().includes("BEGIN PUBLIC KEY").max(4096),
   s03:z.object({
     endpoint:z.literal("https://v3-audit.radlina.com/api/v1/anchor"),
     witnessPublicKeyPem:z.string().includes("BEGIN PUBLIC KEY").max(4096),
     witnessFingerprint:digest,
   }).strict(),
-}).strict();
+});
+const configSchema=z.discriminatedUnion("schema",[
+  commonBinding.extend({
+    schema:z.literal("radlina.v3.final-four-production-binding/v1"),
+    independentReviewerPublicKeyPem:z.string().includes("BEGIN PUBLIC KEY").max(4096),
+  }).strict(),
+  commonBinding.extend({
+    schema:z.literal("radlina.v3.i01-production-binding/v1"),
+    i01Only:z.literal(true),
+  }).strict(),
+]);
 export type V3FinalFourBindingConfig=z.infer<typeof configSchema>;
 export class V3PhysicalPortsNotConfigured extends Error{
   constructor(msg:string){super(msg);this.name="V3PhysicalPortsNotConfigured";}
@@ -150,12 +158,15 @@ export function createV3FinalFourPhysicalComposition(input:{
       path.join(state,"final4","target-local-consent.sqlite3"),
       physicalSession,physical,
     ));
-    const fleetTransport=own(new F01SealedFleetTransport(
+    // Real I01-only activation MUST NOT construct F01 fleet ports or stores.
+    // Those remain absent, not mocked, until their separate release gate.
+    const full=config.schema==="radlina.v3.final-four-production-binding/v1";
+    const fleetTransport=full?own(new F01SealedFleetTransport(
       path.join(state,"final4","fleet-relay.sqlite3"),crypt,physicalSession,
-    ));
-    const fleetApprovals=own(new F01SignedReleaseConsentMailbox(
+    )):undefined;
+    const fleetApprovals=full?own(new F01SignedReleaseConsentMailbox(
       path.join(state,"final4","fleet-recipient-consent.sqlite3"),physicalSession,physical,
-    ));
+    )):undefined;
     const ownerSigner=own(new V3OwnerProtectedSigningBroker(
       path.join(state,"final4","owner-signing.sqlite3"),
     ));
@@ -171,6 +182,7 @@ export function createV3FinalFourPhysicalComposition(input:{
       physical,origins,origins,consent,mailbox,ownerSigner,outbox,
       new HmacDistributedAuditSigner(hmacKey),external,
     );
+    const fullPorts=full?(()=>{
     const fleetStore=own(new SqliteFleetStore(path.join(state,"final4","fleet-plans.sqlite3")));
     const fleet=new V3PhysicalFleetOrchestrator({
       registry,store:fleetStore,
@@ -182,8 +194,8 @@ export function createV3FinalFourPhysicalComposition(input:{
             throw Error("physical V3 owner subject mismatch");
         },
       },
-      consent:fleetApprovals,
-      recipientLocal:fleetApprovals,
+      consent:fleetApprovals!,
+      recipientLocal:fleetApprovals!,
       identities:{
         requireFreshTrusted:(id:string)=>{
           const d=physical.resolve(id,"device.health");
@@ -194,7 +206,7 @@ export function createV3FinalFourPhysicalComposition(input:{
         },
       },
       protectedSigner:ownerSigner,
-      physicalTransport:fleetTransport,
+      physicalTransport:fleetTransport!,
       externalAudit:external,
       isolatedStateRoot:path.join(state,"final4"),
     });
@@ -202,21 +214,26 @@ export function createV3FinalFourPhysicalComposition(input:{
       path.join(state,"final4","acceptance.sqlite3"),
       config.ownerPublicKeyPem,config.independentReviewerPublicKeyPem,
     ));
+      return{fleet,acceptance};
+    })():undefined;
     // Adopt only structurally verified existing V3 tables into the v1 schema
     // baseline before accepting any remote tool request. This is not an
     // owner acceptance decision and does not touch P03 or V2 databases.
-    requireFinalFourSchemaBaseline(state);
+    if(full)requireFinalFourSchemaBaseline(state);
+    else requireI01SchemaBaseline(state);
     // The shared registry belongs to the gateway and must be closed exactly
     // once by gateway shutdown, AFTER the physical ports are released.
     return{
       finalFour:{
         authenticatedPlugin:origins,
         execution:dispatch,
-        fleet,
-        acceptance,
         s02e,
+        ...(fullPorts??{}),
       },
-      relay:{outbox,consent:mailbox,s02e,fleet:fleetTransport,fleetApprovals},
+      relay:{
+        outbox,consent:mailbox,s02e,
+        ...(fleetTransport&&fleetApprovals?{fleet:fleetTransport,fleetApprovals}:{}),
+      },
       close,
     };
   }catch(error){
