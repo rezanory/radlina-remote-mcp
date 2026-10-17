@@ -93,7 +93,7 @@ if(expires<=now||expires-now>30*24*60*60*1000){
 }
 const signer=await V3WindowsProtectedOwnerSigner.open();
 const owner=publicKey(signer.publicKeyPem);
-const reviewer=mode.deployable
+const reviewer=mode.name==="production"
   ? publicKey(await readFile(requireFile(input.independentReviewerPublicKeyFile!),"utf8"))
   : undefined;
 const witness=publicKey(await readFile(requireFile(input.s03WitnessPublicKeyFile),"utf8"));
