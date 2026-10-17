@@ -1,0 +1,66 @@
+name: V3 I01 Mac Cloudflared Binary Stage (Public Pinned)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-cloudflared-binary-stage
+  cancel-in-progress: false
+jobs:
+  install-public-binary:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 10
+    steps:
+      - name: Owner-scoped pinned V3-only public cloudflared without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == 'Darwin' && "$(uname -m)" == 'x86_64' ]]
+          [[ "$(hostname)" == 'amirs-MacBook-Pro.local' ]]
+          [[ "$(id -un)" == 'amirsheikhzadeh' ]]
+          VERSION=2026.10.1
+          EXPECTED=3b0dbaf378337e9d7fb6cd235a76d1d6a7dee434c2d8edf9281164fb6a3837ab
+          DESTDIR="$HOME/.local/share/radlina/v3-beta/macbook-main-s03/bin"
+          DEST="$DESTDIR/cloudflared"
+          [[ ! -e "$DEST" && ! -L "$DEST" ]] || {
+            echo 'V3_CLOUDFLARED_ALREADY_EXISTS_REFUSE_OVERWRITE'
+            exit 16
+          }
+          mkdir -p -m 700 "$DESTDIR"
+          [[ ! -L "$DESTDIR" && "$(stat -f '%Lp' "$DESTDIR")" == 700 ]]
+          TMP="$(mktemp -d "$DESTDIR/.v3-cloudflared-public.XXXXXX")"
+          trap 'rm -rf "$TMP"' EXIT
+          URL="https://github.com/cloudflare/cloudflared/releases/download/$VERSION/cloudflared-darwin-amd64.tgz"
+          curl -fL --retry 2 --connect-timeout 15 --max-time 210 -o "$TMP/cloudflared.tgz" "$URL"
+          ACTUAL="$(shasum -a 256 "$TMP/cloudflared.tgz" | awk '{print $1}')"
+          [[ "$ACTUAL" == "$EXPECTED" ]] || {
+            echo "V3_CLOUDFLARED_ARCHIVE_SHA_MISMATCH expected=$EXPECTED actual=$ACTUAL"
+            exit 17
+          }
+          ENTRIES="$(tar -tzf "$TMP/cloudflared.tgz")"
+          [[ "$ENTRIES" == 'cloudflared' || "$ENTRIES" == './cloudflared' ]] || {
+            echo 'V3_CLOUDFLARED_SINGLE_FLAT_BINARY_REQUIRED'
+            exit 18
+          }
+          [[ "$(tar -tvzf "$TMP/cloudflared.tgz" | head -n 1 | cut -c1)" == '-' ]] || {
+            echo 'V3_CLOUDFLARED_ARCHIVE_LINK_REFUSED'
+            exit 18
+          }
+          tar -xOzf "$TMP/cloudflared.tgz" "$ENTRIES" > "$TMP/cloudflared"
+          chmod 700 "$TMP/cloudflared"
+          "$TMP/cloudflared" --version | grep -F "$VERSION" >/dev/null
+          [[ ! -e "$DEST" && ! -L "$DEST" ]]
+          mv -n "$TMP/cloudflared" "$DEST"
+          [[ -f "$DEST" && ! -L "$DEST" && -x "$DEST" ]]
+          "$DEST" --version
+          echo "V3_I01_CLOUDFLARED_PINNED_PUBLIC_BINARY_STAGED version=$VERSION"
+          echo "V3_I01_CLOUDFLARED_ARCHIVE_SHA256=$EXPECTED"
+          echo 'V2_UNTOUCHED_NO_TUNNEL_STARTED_NO_SECRET_ACCESSED_NO_GATE_ACCEPTED'
