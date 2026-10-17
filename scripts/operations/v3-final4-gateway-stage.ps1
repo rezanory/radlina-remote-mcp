@@ -91,12 +91,27 @@ foreach ($item in $settings.GetEnumerator()) {
 $candidates='E:\radlina-v3-runtime\candidates'
 [void](New-Item -ItemType Directory -Path $candidates -Force)
 $candidate=Join-Path $candidates ('RadlinaV3OAuthBeta.final4.'+$ReleaseManifestSha256+'.xml')
+# Stage and Apply are separate owner-approved steps. The Apply step must
+# consume the *same* pre-staged, verified XML; it must not create a new candidate
+# or silently replace one that differs from the currently pinned policy.
 if (Test-Path -LiteralPath $candidate) {
-  throw 'Candidate already exists; reconcile rather than overwrite'
-}
-$doc.Save($candidate)
-if (-not $Apply) {
+  $existing=Get-Item -LiteralPath $candidate -ErrorAction Stop
+  if ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint -or
+      -not ($existing -is [System.IO.FileInfo])) {
+    throw 'V3 candidate must be an existing regular non-symlink file'
+  }
+  [xml]$stagedDoc=Get-Content -LiteralPath $candidate -Raw -Encoding UTF8 -ErrorAction Stop
+  if ($stagedDoc.OuterXml -cne $doc.OuterXml) {
+    throw 'Previously staged V3 candidate does not match current owner-pinned inputs'
+  }
+  Write-Output ('V3_FINAL4_CANDIDATE_VERIFIED '+$candidate)
+} elseif ($Apply) {
+  throw 'V3 final-four Apply requires a prior separately staged owner-pinned candidate'
+} else {
+  $doc.Save($candidate)
   Write-Output ('V3_FINAL4_CANDIDATE_STAGED '+$candidate)
+}
+if (-not $Apply) {
   Write-Output 'V2 remains untouched; no deployment or acceptance was performed'
   return
 }
