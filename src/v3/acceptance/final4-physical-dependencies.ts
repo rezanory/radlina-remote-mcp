@@ -15,10 +15,10 @@ export type V3PhysicalAcceptanceGate=typeof V3_PHYSICAL_ACCEPTANCE_ORDER[number]
 export const V3_PHYSICAL_ACCEPTANCE_PREREQUISITES:{
   readonly [G in V3PhysicalAcceptanceGate]:readonly V3PhysicalAcceptanceGate[];
 }=Object.freeze({
-  P08:Object.freeze([]),
-  I01:Object.freeze(["P08"]),
-  F01:Object.freeze(["P08","I01"]),
-  AC01:Object.freeze(["P08","I01","F01"]),
+  P08:Object.freeze([] as const),
+  I01:Object.freeze(["P08"] as const),
+  F01:Object.freeze(["P08","I01"] as const),
+  AC01:Object.freeze(["P08","I01","F01"] as const),
 });
 
 export function missingV3PhysicalAcceptancePrerequisites(
