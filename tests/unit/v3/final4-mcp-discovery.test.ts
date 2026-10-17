@@ -33,6 +33,7 @@ describe("V3 standalone OAuth final-four MCP discovery (test-only ports)",()=>{
     // ports. No tool side effects, enrolled devices, signed receipt or
     // owner acceptance can result from this test.
     const finalFour={
+      fleet:{},
       acceptance:{readiness:()=>({productionReady:false})},
     } as unknown as V3FinalFourMcpPorts;
     let gateway:Awaited<ReturnType<typeof startV3ReadOnlyOAuthGateway>>|undefined;
