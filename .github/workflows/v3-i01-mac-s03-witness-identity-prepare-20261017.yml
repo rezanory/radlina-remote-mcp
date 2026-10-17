@@ -1,0 +1,49 @@
+name: V3 I01 Mac Independent S03 Witness Identity (Local Only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: radlina-v3-i01-mac-local-witness-identity
+  cancel-in-progress: false
+jobs:
+  owner-local-witness-identity:
+    if: >-
+      github.repository == 'rezanory/radlina-remote-mcp' &&
+      github.actor == 'rezanory' &&
+      github.triggering_actor == 'rezanory' &&
+      github.ref == 'refs/heads/production/controller-full-control-v1'
+    runs-on: [self-hosted, macOS, X64, radlina-macbook]
+    environment: v3-mac-dev-validation-no-review
+    timeout-minutes: 10
+    steps:
+      - name: Prepare only independent physical S03 witness identity in owner Mac Keychain
+        shell: bash
+        env:
+          RADLINA_V3_NATIVE_RELEASE_SHA: 532bbb2aa32ceab8c2293ee10ec0f5859e604e2cf6d42569ee0bcc5710d795e9
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$RUNNER_NAME" == 'radlina-macbook-main' ]]
+          [[ "$(uname -s)" == Darwin && "$(uname -m)" == x86_64 ]]
+          [[ "$(hostname)" == amirs-MacBook-Pro.local ]]
+          [[ "$(id -un)" == amirsheikhzadeh ]]
+          [[ "$(node --version)" == v24.20.0 ]]
+          ROOT="$HOME/.local/share/radlina/v3-beta/macbook-main-agent/releases/$RADLINA_V3_NATIVE_RELEASE_SHA"
+          [[ -d "$ROOT" && ! -L "$ROOT" ]]
+          [[ -f "$ROOT/RELEASE_MANIFEST.json" && ! -L "$ROOT/RELEASE_MANIFEST.json" ]]
+          [[ "$(shasum -a 256 "$ROOT/RELEASE_MANIFEST.json" | awk '{print $1}')" == "$RADLINA_V3_NATIVE_RELEASE_SHA" ]]
+          SCRIPT="$ROOT/dist/scripts/operations/v3-s03-mac-keychain-prepare.js"
+          [[ -f "$SCRIPT" && ! -L "$SCRIPT" ]]
+          KEYCHAIN="$HOME/.local/share/radlina/v3-beta/macbook-main-runner/v3-device.keychain-db"
+          PASSWORD="$HOME/.local/share/radlina/v3-beta/macbook-main-runner/keychain-password.local"
+          for f in "$KEYCHAIN" "$PASSWORD"; do
+            [[ -f "$f" && ! -L "$f" && "$(stat -f '%Lp' "$f")" == 600 ]]
+          done
+          node "$SCRIPT" --prepare
+          PUBLIC_DIR="$HOME/.local/share/radlina/v3-beta/macbook-main-s03"
+          for f in "$PUBLIC_DIR/witness-identity.json" "$PUBLIC_DIR/witness-public.pem" "$PUBLIC_DIR/witness-public-receipt.json"; do
+            [[ -f "$f" && ! -L "$f" && "$(stat -f '%Lp' "$f")" == 600 ]]
+          done
+          echo 'V3_I01_MAC_INDEPENDENT_S03_WITNESS_IDENTITY_PREPARED_OWNER_LOCAL'
+          echo 'V2_UNTOUCHED_NO_WRITER_OR_TUNNEL_CREDENTIAL_TRANSFER_NO_AGENT_STARTED_NO_GATE_ACCEPTED'
