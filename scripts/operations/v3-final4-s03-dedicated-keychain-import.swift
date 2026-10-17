@@ -108,7 +108,7 @@ do {
   try require(pass.count >= 40 && pass.count <= 200,
     "dedicated Keychain unlock metadata invalid")
   let unlock = pass.withUnsafeBytes {
-    SecKeychainUnlock(ref, UInt32(pass.count), $0.baseAddress, false)
+    SecKeychainUnlock(ref, UInt32(pass.count), $0.baseAddress, true)
   }
   pass.resetBytes(in: 0..<pass.count)
   try require(unlock == errSecSuccess,
