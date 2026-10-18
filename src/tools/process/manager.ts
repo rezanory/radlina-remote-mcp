@@ -35,7 +35,6 @@ export class ProcessManager {
   private readonly settlements = new Map<string, Promise<void>>();
   private readonly directory: string;
   private shuttingDown = false;
-  private readonly repeatGuard: ProcessRepeatGuard;
 
   constructor(
     private readonly config: AppConfig,
@@ -43,7 +42,6 @@ export class ProcessManager {
     private readonly policy: PolicyEngine,
   ) {
     this.directory = path.join(config.storage.directory, "process");
-    this.repeatGuard = new ProcessRepeatGuard(store);
   }
 
   async reconcile(): Promise<{ interrupted: number }> {
@@ -142,7 +140,7 @@ export class ProcessManager {
     if (requiresGuard && !input.repeatGuard)
       throw new AppError("POLICY_DENIED", "validation process requires repeatGuard evidence");
     if (input.repeatGuard) {
-      await this.repeatGuard.claim(
+      await new ProcessRepeatGuard(this.store).claim(
         subject, profileName, executable, input.args, cwd,
         input.env, input.repeatGuard, resolver,
       );
