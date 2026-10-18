@@ -11,7 +11,7 @@ describe("V3 final-four Stage → Apply contract", () => {
   it("requires a separately staged candidate before Apply", () => {
     expect(script).toContain("elseif ($Apply) {");
     expect(script).toContain("Apply requires a prior separately staged owner-pinned candidate");
-    expect(script).toContain("} else {\n  $doc.Save($candidate)");
+    expect(script).toMatch(/else\s*\{\s*\$doc\.Save\(\$candidate\)/u);
   });
 
   it("rejects tampered, symlinked or mismatched candidates before deployment", () => {

@@ -58,6 +58,7 @@ export const configSchema = z
       maxProcessRuntimeMs: positiveInt.max(24 * 3600 * 1000).default(900_000),
       maxSearchRuntimeMs: positiveInt.max(3600 * 1000).default(120_000),
       maxSessions: positiveInt.max(256).default(12),
+      requireRepeatGuardForTestCommands: z.boolean().default(false),
     }),
     reliability: z
       .strictObject({

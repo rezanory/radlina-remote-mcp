@@ -8,6 +8,7 @@ import type { AppConfig, WorkspaceProfile } from "../../config/schema.js";
 import { AppError } from "../../errors.js";
 import type { Store } from "../../persistence/store.js";
 import type { PolicyEngine } from "../../policy/engine.js";
+import { ProcessRepeatGuard, isValidationCommand, type RepeatGuardEvidence } from "../../policy/repeat-guard.js";
 import { decodeCursor, encodeCursor, sha256 } from "../../utils/json.js";
 import { resolveWindowsExecutable } from "../../utils/windows-executable.js";
 import type { SafePathResolver } from "../filesystem/safe-path.js";
@@ -102,6 +103,7 @@ export class ProcessManager {
       cwd: string;
       env?: Record<string, string>;
       timeoutMs?: number;
+      repeatGuard?: RepeatGuardEvidence;
     },
   ): Promise<unknown> {
     if (this.shuttingDown) throw new AppError("CONFLICT", "process manager is shutting down");
@@ -128,6 +130,20 @@ export class ProcessManager {
       if (value.length > 4096)
         throw new AppError("LIMIT_EXCEEDED", "environment value is too large");
       env[name] = value;
+    }
+    // Central mandatory pre-spawn boundary for test commands when enabled.
+    // This is checked after authorization/allowlisting, before creating logs
+    // or a process. A new MCP idempotencyKey cannot bypass the durable claim.
+    const requiresGuard =
+      this.config.policy.requireRepeatGuardForTestCommands &&
+      isValidationCommand(executable, input.args);
+    if (requiresGuard && !input.repeatGuard)
+      throw new AppError("POLICY_DENIED", "validation process requires repeatGuard evidence");
+    if (input.repeatGuard) {
+      await new ProcessRepeatGuard(this.store).claim(
+        subject, profileName, executable, input.args, cwd,
+        input.env, input.repeatGuard, resolver,
+      );
     }
     const id = randomUUID();
     await mkdir(this.directory, { recursive: true });
