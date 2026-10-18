@@ -64,6 +64,12 @@ describe("V3 original MCP pre-spawn validation no-repeat guard", () => {
       .rejects.toMatchObject({ code: "CONFLICT" });
   });
 
+  it("rejects a renamed gate for an identical command and unchanged evidence", async () => {
+    await claim();
+    await expect(claim({ ...evidence, gate: "G015" }))
+      .rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
   it("permits one new run when the actual authoritative state file changes", async () => {
     await claim();
     await writeFile(path.join(root, "runtime_state.json"), '{"w01":true}');
