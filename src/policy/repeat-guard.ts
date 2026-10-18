@@ -48,7 +48,9 @@ async function digestEvidence(files: string[], resolver: SafePathResolver): Prom
     if (total > MAX_ALL_FILES)
       throw new AppError("LIMIT_EXCEEDED", "repeat guard evidence aggregate exceeds limit");
     const content = await readFile(resolved);
-    if (content.length !== metadata.size)
+    const after = await stat(resolved);
+    if (content.length !== metadata.size || after.size !== metadata.size ||
+        after.mtimeMs !== metadata.mtimeMs)
       throw new AppError("CONFLICT", "repeat guard evidence changed while being read");
     hash.update(canonicalJson([path.win32.normalize(resolved).toLowerCase(), content.length]));
     hash.update("\0");
@@ -70,7 +72,7 @@ export class ProcessRepeatGuard {
         candidate_hash TEXT NOT NULL,
         state_hash TEXT NOT NULL,
         created_at INTEGER NOT NULL,
-        UNIQUE(subject_hash,profile,gate,command_hash,candidate_hash,state_hash)
+        UNIQUE(subject_hash,profile,command_hash,candidate_hash,state_hash)
       );
     `);
   }
@@ -96,9 +98,10 @@ export class ProcessRepeatGuard {
       env: env ?? {},
     }));
     const subjectHash = sha256(subject);
-    // Deliberately exclude operation/errorCode and idempotencyKey from the unique identity.
+    // Classification, gate name and MCP idempotencyKey cannot produce a fresh
+    // claim for the same subject/process/candidate/observed state.
     const fingerprint = sha256(canonicalJson([
-      subjectHash, profile, evidence.gate, commandHash, candidateHash, stateHash,
+      subjectHash, profile, commandHash, candidateHash, stateHash,
     ]));
     const result = this.store.db.prepare(`
       INSERT OR IGNORE INTO process_repeat_claims (
