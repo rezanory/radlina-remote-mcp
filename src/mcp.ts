@@ -756,10 +756,17 @@ export function buildMcpServer(
         timeoutMs: z.number().int().min(100).max(86_400_000).optional(),
         profile: profileInput,
         idempotencyKey: idempotencyInput,
+        repeatGuard: z.strictObject({
+          gate: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u),
+          operation: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u),
+          errorCode: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u),
+          candidateFiles: z.array(pathInput).min(1).max(16),
+          stateFiles: z.array(pathInput).min(1).max(16),
+        }).optional(),
       }),
       annotations: writeAnnotations,
     },
-    ({ executable, args, cwd, env, timeoutMs, profile, idempotencyKey }, context) => {
+    ({ executable, args, cwd, env, timeoutMs, profile, idempotencyKey, repeatGuard }, context) => {
       const selected = selectedProfile(runtime, profile);
       const input = {
         executable,
@@ -767,6 +774,7 @@ export function buildMcpServer(
         cwd,
         ...(env === undefined ? {} : { env }),
         ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...(repeatGuard === undefined ? {} : { repeatGuard }),
       };
       const auditArgs = {
         ...input,
@@ -776,6 +784,13 @@ export function buildMcpServer(
             `[sha256:${value.length}:${Buffer.from(value).toString("base64url").slice(0, 12)}]`,
         ),
         env: input.env ? Object.keys(input.env) : [],
+        // Persist bounded classification only, not test source/state paths.
+        repeatGuard: repeatGuard ? {
+          gate: repeatGuard.gate,
+          operation: repeatGuard.operation,
+          candidateFileCount: repeatGuard.candidateFiles.length,
+          stateFileCount: repeatGuard.stateFiles.length,
+        } : undefined,
       };
       return execute(
         runtime,
