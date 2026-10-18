@@ -30,5 +30,7 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Typecheck original V3 sources and guard
         run: npm run typecheck
-      - name: Focused original-repository SQLite guard tests
-        run: npx vitest run tests/unit/process-repeat-guard.test.ts
+      - name: Original-repository unit regression including repeat guard
+        run: npm run test:unit
+      - name: Original-repository security regression
+        run: npm run test:security
