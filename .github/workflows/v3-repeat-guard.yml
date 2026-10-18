@@ -13,6 +13,9 @@ on:
       - "feature/v3-no-repeat-process-guard-20261019"
 permissions:
   contents: read
+concurrency:
+  group: v3-no-repeat-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   windows-guard-validation:
     runs-on: windows-latest
