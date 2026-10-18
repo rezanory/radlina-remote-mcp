@@ -165,6 +165,7 @@ async function main(): Promise<void> {
       maxProcessRuntimeMs: 15_000,
       maxSearchRuntimeMs: 15_000,
       maxSessions: 16,
+      requireRepeatGuardForTestCommands: false,
     },
     reliability: {
       enabled: true,
