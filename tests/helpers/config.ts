@@ -32,6 +32,7 @@ export function testConfig(root: string): AppConfig {
       maxProcessRuntimeMs: 15_000,
       maxSearchRuntimeMs: 15_000,
       maxSessions: 4,
+      requireRepeatGuardForTestCommands: false,
     },
     reliability: {
       enabled: true,
