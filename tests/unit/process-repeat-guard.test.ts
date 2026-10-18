@@ -83,6 +83,22 @@ describe("V3 original MCP pre-spawn validation no-repeat guard", () => {
     await expect(claim()).resolves.toMatchObject({ claimed: true });
   });
 
+  it("persists a denied repeat across Store restart", async () => {
+    await claim();
+    store.close();
+    store = new Store(path.join(root, "db"));
+    guard = new ProcessRepeatGuard(store);
+    await expect(claim()).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("allows exactly one concurrent claim for the same command and state", async () => {
+    const outcomes = await Promise.allSettled([claim(), claim(), claim()]);
+    expect(outcomes.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+    expect(outcomes.filter((x) => x.status === "rejected")).toHaveLength(2);
+    const rows = store.db.prepare("SELECT COUNT(*) AS n FROM process_repeat_claims").get() as { n: number };
+    expect(rows.n).toBe(1);
+  });
+
   it("isolates owner identities so no subject can claim another owner's receipt", async () => {
     await claim();
     await expect(claim(evidence, "independent-tenant")).resolves.toMatchObject({ claimed: true });
