@@ -39,9 +39,17 @@ export async function createRuntime(
   explicitConfigPath?: string,
   options: { reconcileSessions?: boolean } = {},
 ): Promise<AppRuntime> {
-  const startedAt = Date.now();
   const config = await loadConfig(explicitConfigPath);
-  const configFile = explicitConfigPath ?? configPath();
+  return createRuntimeWithConfig(config, explicitConfigPath ?? configPath(), options);
+}
+
+/** Construct a separate runtime from an already validated, isolated V3 config. */
+export async function createRuntimeWithConfig(
+  config: AppConfig,
+  configFile: string,
+  options: { reconcileSessions?: boolean } = {},
+): Promise<AppRuntime> {
+  const startedAt = Date.now();
   const ripgrep = await stat(config.dependencies.ripgrepExecutable);
   if (!ripgrep.isFile()) throw new Error("configured ripgrep executable is not a regular file");
   const store = new Store(config.storage.directory);

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const script = readFileSync(
   resolve(process.cwd(), "scripts/operations/v3-final4-gateway-stage.ps1"),
   "utf8",
-);
+).replace(/\r\n/gu, "\n");
 
 describe("V3 final-four Stage → Apply contract", () => {
   it("requires a separately staged candidate before Apply", () => {

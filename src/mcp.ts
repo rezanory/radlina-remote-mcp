@@ -98,7 +98,21 @@ export function buildMcpServer(
   notifyToolsChanged?: () => void,
 ): McpServer {
   const server = new McpServer({ name: "radlina-remote-mcp", version: SERVER_VERSION });
+  registerV2McpTools(server, runtime, notifyToolsChanged);
+  return server;
+}
 
+/**
+ * Reuse actual V2 tool handlers in an independent V3 runtime.
+ * Legacy release activation must not be connected to V3: its WinSW service
+ * wrapper is hardwired to RadlinaRemoteMCP (the protected V2 service).
+ */
+export function registerV2McpTools(
+  server: McpServer,
+  runtime: AppRuntime,
+  notifyToolsChanged?: () => void,
+  options: { preserveV3Discovery?: boolean; includeLegacyUpgradeTools?: boolean } = {},
+): void {
   server.registerTool(
     "who_am_i",
     {
@@ -114,7 +128,7 @@ export function buildMcpServer(
         deviceId: os.hostname(),
       })),
   );
-  server.registerTool(
+  if (!options.preserveV3Discovery) server.registerTool(
     "list_devices",
     {
       description: "List the single workstation managed by this server.",
@@ -139,7 +153,7 @@ export function buildMcpServer(
         timestamp: new Date().toISOString(),
       })),
   );
-  server.registerTool(
+  if (!options.preserveV3Discovery) server.registerTool(
     "get_capabilities",
     {
       description: "Return enabled profiles, limits, and server capability groups.",
@@ -873,6 +887,7 @@ export function buildMcpServer(
       ),
   );
 
+  if (options.includeLegacyUpgradeTools !== false) {
   server.registerTool(
     "admin_stage_release",
     {
@@ -1034,6 +1049,7 @@ export function buildMcpServer(
       ),
   );
 
+  }
   server.registerTool(
     "get_effective_config",
     {
@@ -1203,6 +1219,4 @@ export function buildMcpServer(
         },
       ),
   );
-
-  return server;
 }
