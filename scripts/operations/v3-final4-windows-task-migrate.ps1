@@ -37,6 +37,11 @@ if ($expected.schema -cne 'radlina.v3.windows-task-migration-pins/v1') {
 $taskNames=@('RadlinaV3OwnerSigning','RadlinaV3WindowsRecipient','RadlinaV3WindowsFleet')
 $roles=@('OwnerSigning','WindowsRecipient','WindowsFleet')
 $launcher='E:\radlina-v3-runtime\supervisor\v3-final4-windows-task-launch.ps1'
+$hiddenHelper=Join-Path $PSScriptRoot 'v3-owner-hidden-task-action.ps1'
+if (-not (Test-Path -LiteralPath $hiddenHelper -PathType Leaf)) {
+  throw 'Version-bound V3 hidden task helper missing'
+}
+. $hiddenHelper
 if (-not (Test-Path -LiteralPath $launcher -PathType Leaf) -or
     (Get-Item -LiteralPath $launcher).Attributes.HasFlag([IO.FileAttributes]::ReparsePoint)) {
   throw 'Protected stable V3 task launcher must already be installed'
@@ -81,7 +86,7 @@ try {
   foreach ($item in $copies) {
     $arguments='-NoProfile -NonInteractive -File "'+$launcher+'" -Role '+$item.Role+
       ' -FinalFourConfigFile "'+$config+'" -FinalFourConfigSha256 '+$FinalFourConfigSha256
-    $action=New-ScheduledTaskAction -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -Argument $arguments -WorkingDirectory $supervisor
+    $action=New-V3HiddenOwnerTaskAction -Role $item.Role -PowerShellArguments $arguments -Supervisor $supervisor
     # Preserve exact original principal, triggers and settings.
     Set-ScheduledTask -TaskName $item.Name -TaskPath $taskPath -Action $action -ErrorAction Stop | Out-Null
     $state.rolesUpdated+= $item.Name

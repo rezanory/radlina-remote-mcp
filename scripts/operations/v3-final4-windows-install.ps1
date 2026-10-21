@@ -46,6 +46,11 @@ foreach ($file in @($operator,$fleet,$signer)) {
 # the verified active release from RadlinaV3OAuthBeta.xml on every cycle.
 $supervisor='E:\radlina-v3-runtime\supervisor'
 $sourceLauncher=Join-Path $release 'scripts\operations\v3-final4-windows-task-launch.ps1'
+$hiddenHelper=Join-Path $release 'scripts\operations\v3-owner-hidden-task-action.ps1'
+if (-not (Test-Path -LiteralPath $hiddenHelper -PathType Leaf)) {
+  throw 'Verified V3 hidden task action helper missing'
+}
+. $hiddenHelper
 $launcher=Join-Path $supervisor 'v3-final4-windows-task-launch.ps1'
 if (-not (Test-Path -LiteralPath $sourceLauncher -PathType Leaf)) {
   throw 'Version-safe V3 Windows task launcher not staged'
@@ -96,7 +101,7 @@ $trigger=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -Repetition
 $settings=New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 2) -StartWhenAvailable:$false -MultipleInstances IgnoreNew -Disable
 foreach ($task in $tasks) {
   $argument='-NoProfile -NonInteractive -File "'+$launcher+'" -Role '+$task.Role+' -FinalFourConfigFile "'+$config+'" -FinalFourConfigSha256 '+$FinalFourConfigSha256
-  $action=New-ScheduledTaskAction -Execute 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe' -Argument $argument -WorkingDirectory $supervisor
+  $action=New-V3HiddenOwnerTaskAction -Role $task.Role -PowerShellArguments $argument -Supervisor $supervisor
   Register-ScheduledTask -TaskName $task.Name -TaskPath '\RadlinaV3\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings | Out-Null
 }
 Write-Output 'V3_WINDOWS_FINAL4_INTERACTIVE_TASKS_INSTALLED'
