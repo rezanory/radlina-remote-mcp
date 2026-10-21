@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -32,6 +32,7 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
     const port = await openPort();
     let gateway: Awaited<ReturnType<typeof startV3ReadOnlyOAuthGateway>> | undefined;
     let client: Client | undefined;
+    let writer: Client | undefined;
     try {
       // Starting this runtime must not create or open the original V2 store.
       expect(existsSync(cfg.storage.directory)).toBe(false);
@@ -92,8 +93,26 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
         },
       });
       expect(denied.isError).toBe(true);
+      // A separately approved write scope must actually reach the V3-only filesystem runtime.
+      const writeToken = await issueToken(`http://127.0.0.1:${port}`, gateway.auth,
+        "device:read filesystem:read filesystem:write");
+      writer = new Client({ name: "v3-parity-writer", version: "1.0.0" },
+        { versionNegotiation: { mode: "auto" } });
+      await writer.connect(new StreamableHTTPClientTransport(new URL(gateway.url), {
+        requestInit: { headers: { authorization: `Bearer ${writeToken}` } },
+      }));
+      const output = path.join(root, "v3-parity-real-file.txt");
+      const written = await writer.callTool({ name: "write_file", arguments: {
+        path: output, content: "V3 isolated local parity write",
+        idempotencyKey: "b19fb34b-999c-43ed-b466-e236369414e5",
+      }});
+      expect(written.isError).not.toBe(true);
+      expect(await readFile(output, "utf8")).toBe("V3 isolated local parity write");
+      const readBack = await writer.callTool({ name: "read_file", arguments: { path: output } });
+      expect(readBack.isError).not.toBe(true);
       expect(existsSync(cfg.storage.directory)).toBe(false);
     } finally {
+      await writer?.close();
       await client?.close();
       await gateway?.shutdown();
       await rm(root, { recursive: true, force: true });
