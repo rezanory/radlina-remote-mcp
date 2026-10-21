@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -33,6 +34,7 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
     let gateway: Awaited<ReturnType<typeof startV3ReadOnlyOAuthGateway>> | undefined;
     let client: Client | undefined;
     let writer: Client | undefined;
+    let admin: Client | undefined;
     try {
       // Starting this runtime must not create or open the original V2 store.
       expect(existsSync(cfg.storage.directory)).toBe(false);
@@ -42,6 +44,7 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
         publicUrl: `http://127.0.0.1:${port}`,
         port,
         enableV2Compatibility: true,
+        v3StandaloneReleaseRoot: path.join(root, "standalone-v3-releases"),
       });
       expect(existsSync(cfg.storage.directory)).toBe(false);
       expect(existsSync(path.join(stateDirectory, "v2-compatibility", "state"))).toBe(true);
@@ -55,7 +58,7 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
       }));
       const names = (await client.listTools()).tools.map((tool) => tool.name);
       expect(new Set(names).size).toBe(names.length);
-      expect(names).toHaveLength(44);
+      expect(names).toHaveLength(48);
       const declared = await client.callTool({ name: "get_capabilities", arguments: {} });
       const reported = declared.structuredContent as { result: { tools: string[] } };
       expect(new Set(reported.result.tools)).toEqual(new Set(names));
@@ -65,10 +68,10 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
         "start_search", "search_results", "start_process", "read_process_output",
         "operator_submit", "operator_status", "operator_resume", "list_capabilities",
         "get_effective_config", "simulate_policy", "active_sessions",
+        "admin_stage_release", "admin_verify_release", "admin_upgrade_preflight", "admin_upgrade_status",
       ]) expect(names).toContain(name);
       for (const name of [
         "admin_activate_release", "admin_rollback_release", "admin_enable_trusted_owner",
-        "admin_stage_release",
       ]) expect(names).not.toContain(name);
       const capability = await client.callTool({ name: "v3_admin_status", arguments: {} });
       expect(capability.structuredContent).toMatchObject({
@@ -110,8 +113,51 @@ describe("V3 V2 compatibility in its own OAuth process", () => {
       expect(await readFile(output, "utf8")).toBe("V3 isolated local parity write");
       const readBack = await writer.callTool({ name: "read_file", arguments: { path: output } });
       expect(readBack.isError).not.toBe(true);
+      const source = path.join(root, "v3-release-fixture");
+      const entry = "dist/scripts/operations/v3-oauth-readonly-daemon.js";
+      const entryFile = path.join(source, ...entry.split("/"));
+      await mkdir(path.dirname(entryFile), { recursive: true });
+      const releaseBody = "export const v3Standalone = true;\n";
+      await writeFile(entryFile, releaseBody);
+      const hash = (value: string) => createHash("sha256").update(value).digest("hex");
+      const manifestRaw = JSON.stringify({
+        schema: "radlina.release-manifest.v2", version: "3.0.0-test",
+        entry, source: { gitSha: "a".repeat(40), gitTree: "b".repeat(40), branch: "v3-test" },
+        evidence: [{ name: "unit", bytes: 2, sha256: hash("ok") }],
+        files: [{ path: entry, bytes: Buffer.byteLength(releaseBody), sha256: hash(releaseBody) }],
+      }, null, 2) + "\n";
+      const manifest = hash(manifestRaw);
+      await writeFile(path.join(source, "RELEASE_MANIFEST.json"), manifestRaw);
+      const unauthenticatedStage = await writer.callTool({ name: "admin_stage_release", arguments: {
+        sourceRoot: source, expectedManifest: manifest,
+        idempotencyKey: "757a8b92-f4a3-462d-b542-bcce78393f41",
+      } });
+      expect(unauthenticatedStage.isError).toBe(true);
+      const adminToken = await issueToken(`http://127.0.0.1:${port}`, gateway.auth,
+        "device:read filesystem:read admin");
+      admin = new Client({ name: "v3-release-admin", version: "1.0.0" },
+        { versionNegotiation: { mode: "auto" } });
+      await admin.connect(new StreamableHTTPClientTransport(new URL(gateway.url), {
+        requestInit: { headers: { authorization: `Bearer ${adminToken}` } },
+      }));
+      const staged = await admin.callTool({ name: "admin_stage_release", arguments: {
+        sourceRoot: source, expectedManifest: manifest,
+        idempotencyKey: "c4c502e5-7f99-4fd8-8e88-8fe9fc7eb365",
+      } });
+      expect(staged.isError).not.toBe(true);
+      const verified = await admin.callTool({ name: "admin_verify_release", arguments: { manifest } });
+      expect(verified.structuredContent).toMatchObject({ result: { status: "PASS", v3Only: true } });
+      const preflight = await admin.callTool({ name: "admin_upgrade_preflight", arguments: { manifest } });
+      expect(preflight.structuredContent).toMatchObject({
+        result: { status: "PASS", service: "RadlinaV3OAuthBeta", mutationPerformed: false },
+      });
+      const upgradeStatus = await admin.callTool({ name: "admin_upgrade_status", arguments: {} });
+      expect(upgradeStatus.structuredContent).toMatchObject({
+        result: { stagedManifests: [manifest], activeManifest: null },
+      });
       expect(existsSync(cfg.storage.directory)).toBe(false);
     } finally {
+      await admin?.close();
       await writer?.close();
       await client?.close();
       await gateway?.shutdown();

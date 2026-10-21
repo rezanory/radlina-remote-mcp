@@ -73,7 +73,10 @@ const gateway=await startV3ReadOnlyOAuthGateway({
   stateDirectory,
   port: 7344,
   ...(enabled && configuredRoot ? { windowsFileRoot: configuredRoot } : {}),
-  ...(v2CompatibilityEnabled ? { enableV2Compatibility: true } : {}),
+  ...(v2CompatibilityEnabled ? {
+    enableV2Compatibility: true,
+    v3StandaloneReleaseRoot: "E:\\radlina-v3-runtime",
+  } : {}),
   ...(finalFourFactory ? { finalFourFactory } : {}),
   ...(macOwnerPublicPin
     ? {

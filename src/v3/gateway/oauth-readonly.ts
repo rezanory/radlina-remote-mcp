@@ -29,6 +29,8 @@ import {
 } from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
 import { V2_COMPATIBILITY_TOOL_NAMES } from "./v2-compatibility-tool-names.js";
+import { V3StandaloneReleaseStore } from "../upgrade/standalone-release-store.js";
+import { registerV3StandaloneReleaseTools, V3_STANDALONE_RELEASE_TOOL_NAMES } from "../upgrade/standalone-release-mcp.js";
 import { registerV3FinalFourTools, registeredV3PhysicalToolNames, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 import { installV3PhysicalAgentRelayRoutes, type I01PhysicalRelayPorts } from "../integration/i01-agent-relay-http.js";
 import type { V3FinalFourFactoryContext, V3ComposedPhysicalFinalFour } from "../control-plane/v3-physical-final4-runtime.js";
@@ -55,6 +57,8 @@ export type V3ReadOnlyGatewayOptions = {
   windowsFileRoot?: string;
   /** Explicit opt-in: bind V2 capability implementations to isolated V3 state, never V2 service state. */
   enableV2Compatibility?: boolean;
+  /** Absolute dedicated V3 service release root; must not overlap V2 state. */
+  v3StandaloneReleaseRoot?: string;
   macHeartbeatPins?: P08HeartbeatPins;
   /** Never inferred from environment: inject only after real physical adapters exist. */
   finalFour?: V3FinalFourMcpPorts;
@@ -110,6 +114,7 @@ function buildScopedV3Server(
   macIngress?: V3MacSignedHeartbeatIngress,
   finalFour?: V3FinalFourMcpPorts,
   v2Compatibility?: AppRuntime,
+  v3ReleaseStore?: V3StandaloneReleaseStore,
 ): McpServer {
   const server = new McpServer({
     name: "radlina-remote-mcp-v3-readonly",
@@ -138,6 +143,7 @@ function buildScopedV3Server(
           ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
           ...(finalFour ? registeredV3PhysicalToolNames(finalFour) : []),
           ...(v2Compatibility ? [...V2_COMPATIBILITY_TOOL_NAMES] : []),
+          ...(v3ReleaseStore ? [...V3_STANDALONE_RELEASE_TOOL_NAMES] : []),
         ],
       }),
   );
@@ -225,6 +231,7 @@ function buildScopedV3Server(
       preserveV3Discovery: true,
       includeLegacyUpgradeTools: false,
     });
+    if (v3ReleaseStore) registerV3StandaloneReleaseTools(server, v2Compatibility, v3ReleaseStore);
   }
   return server;
 }
@@ -282,6 +289,7 @@ export async function startV3ReadOnlyOAuthGateway(
   let macIngress: V3MacSignedHeartbeatIngress | undefined;
   let composed: V3ComposedPhysicalFinalFour | undefined;
   let v2Compatibility: AppRuntime | undefined;
+  let v3ReleaseStore: V3StandaloneReleaseStore | undefined;
   const acceptedScopes = new Set(V3_SCOPES);
   if (options.enableV2Compatibility) {
     for (const scope of ["process:read", "process:execute", "admin"]) acceptedScopes.add(scope);
@@ -294,6 +302,12 @@ export async function startV3ReadOnlyOAuthGateway(
     const auth = new ScopedV3AuthService(cfg, store, acceptedScopes);
     await auth.initialize();
     if (options.enableV2Compatibility) {
+      if (!options.v3StandaloneReleaseRoot) throw new Error("V3-only release root is required for V2 compatibility");
+      v3ReleaseStore = new V3StandaloneReleaseStore(options.v3StandaloneReleaseRoot, [
+        options.baseConfig.storage.directory,
+        options.baseConfig.audit.directory,
+        stateRoot,
+      ]);
       const compatibilityRoot = path.join(stateRoot, "v2-compatibility");
       const compatibilityConfig = configSchema.parse({
         ...cfg,
@@ -375,7 +389,7 @@ export async function startV3ReadOnlyOAuthGateway(
       });
     }
     const mcpHandler = createMcpHandler(
-      () => buildScopedV3Server(registry, windowsFiles, macIngress, finalFour, v2Compatibility),
+      () => buildScopedV3Server(registry, windowsFiles, macIngress, finalFour, v2Compatibility, v3ReleaseStore),
       {
         legacy: "reject",
       },
