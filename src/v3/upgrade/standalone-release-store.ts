@@ -122,6 +122,60 @@ export class V3StandaloneReleaseStore {
     };
   }
 
+  /**
+   * Verify the V3 process actually booted the owner-pinned release.
+   * Reading the staged manifest alone is insufficient: the configured
+   * WinSW working directory, the running Node cwd and the live local OAuth
+   * endpoint must all agree. This never accesses the V2 service.
+   *
+   * The optional probe is solely for deterministic tests; the MCP adapter
+   * always uses the real local HTTP probe.
+   */
+  async verifyPostRestart(
+    expectedManifest: string,
+    runtimeWorkingDirectory = process.cwd(),
+    probe?: () => Promise<boolean>,
+  ): Promise<unknown> {
+    const expected = normalizeManifestId(expectedManifest);
+    const configured = await this.status() as {
+      serviceDefinitionPresent: boolean;
+      activeManifest: string | null;
+    };
+    if (!configured.serviceDefinitionPresent || configured.activeManifest !== expected) {
+      throw new AppError("CONFLICT", "V3_POST_RESTART_MANIFEST_MISMATCH");
+    }
+    const releaseDirectory = path.resolve(this.release(expected));
+    if (path.resolve(runtimeWorkingDirectory).toLowerCase() !== releaseDirectory.toLowerCase()) {
+      throw new AppError("CONFLICT", "V3_POST_RESTART_RUNNING_DIRECTORY_MISMATCH");
+    }
+    const verified = await verifyReleaseRoot(releaseDirectory, expected);
+    const healthy = probe
+      ? await probe()
+      : await (async (): Promise<boolean> => {
+          const response = await fetch("http://127.0.0.1:7344/auth-health", {
+            signal: AbortSignal.timeout(4_000),
+          });
+          if (!response.ok) return false;
+          const body: unknown = await response.json();
+          if (!body || typeof body !== "object" || Array.isArray(body)) return false;
+          const health = body as Record<string, unknown>;
+          return health["status"] === "healthy"
+            && health["signingReady"] === true
+            && health["tokenEndpointReady"] === true;
+        })();
+    if (!healthy) throw new AppError("CONFLICT", "V3_POST_RESTART_LOCAL_OAUTH_UNHEALTHY");
+    return {
+      status: "PASS",
+      v3Only: true,
+      manifest: verified.manifestId,
+      service: "RadlinaV3OAuthBeta",
+      releaseHashVerified: true,
+      configuredReleaseMatches: true,
+      runningReleaseMatches: true,
+      localOAuthHealthy: true,
+    };
+  }
+
   async status(): Promise<unknown> {
     const rootExists = await stat(this.releasesRoot).then((s) => s.isDirectory()).catch(() => false);
     const entries = rootExists ? await readdir(this.releasesRoot) : [];
