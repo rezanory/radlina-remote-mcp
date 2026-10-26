@@ -14,12 +14,17 @@ readonly STATE="$HOME/.local/share/radlina/v3-beta/macbook-main-agent"
 readonly PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 readonly TSX="$STATE/signer-$SHA/node_modules/tsx/dist/cli.mjs"
 readonly SENDER="$STATE/v3-mac-heartbeat-sender.ts"
+readonly SOURCE="$STATE/signer-$SHA"
+[[ "$(node --version)" == 'v24.20.0' ]]
+[[ -d "$SOURCE" && ! -L "$SOURCE" ]]
+[[ "$(git -C "$SOURCE" rev-parse HEAD)" == "$SHA" ]]
 [[ -f "$PLIST" && ! -L "$PLIST" && "$(stat -f '%Lp' "$PLIST")" == '600' ]]
 [[ -f "$TSX" && ! -L "$TSX" && -f "$SENDER" && ! -L "$SENDER" ]]
 [[ ! -L "$STATE" ]]
 /usr/bin/plutil -lint "$PLIST" >/dev/null
 read_property() { /usr/libexec/PlistBuddy -c "Print :$1" "$PLIST"; }
 [[ "$(read_property Label)" == "$LABEL" ]]
+[[ "$(read_property ProgramArguments:0)" == "$(command -v node)" ]]
 [[ "$(read_property ProgramArguments:1)" == "$TSX" ]]
 [[ "$(read_property ProgramArguments:2)" == "$SENDER" ]]
 [[ "$(read_property EnvironmentVariables:RADLINA_V3_MAC_AGENT_SOURCE_SHA)" == "$SHA" ]]
