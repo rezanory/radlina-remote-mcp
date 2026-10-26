@@ -141,8 +141,9 @@ do {
   try check(unlocked == errSecSuccess, "dedicated Keychain owner-unlock denied")
   let tokenName = "com.radlina.remote-mcp.v3.s03-writer-token"
   let hmacName = "com.radlina.remote-mcp.v3.s03-writer-hmac-base64"
-  try check(try !existingItem(tokenName, from: keychain) &&
-    !existingItem(hmacName, from: keychain),
+  let hasExistingToken = try existingItem(tokenName, from: keychain)
+  let hasExistingHmac = try existingItem(hmacName, from: keychain)
+  try check(!hasExistingToken && !hasExistingHmac,
     "existing S03 writer items must be reconciled, not overwritten")
   var created = [SecKeychainItem]()
   do {
