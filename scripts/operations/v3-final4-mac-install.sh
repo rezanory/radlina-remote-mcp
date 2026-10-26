@@ -68,10 +68,20 @@ fi
 # Existing P08 is preserved rather than overwritten or re-enrolled.
 P08_LABEL='com.radlina.remote-mcp.v3.mac-heartbeat'
 P08_PLIST="$LAUNCH/$P08_LABEL.plist"
+if [[ -L "$P08_PLIST" ]]; then
+  echo 'V3 P08 LaunchAgent symlink refused' >&2; exit 16
+fi
 if [[ ! -f "$P08_PLIST" ]]; then
   [[ -f "$RELEASE/scripts/operations/v3-mac-launchagent-install.sh" ]]
   [[ -f "$RELEASE/scripts/operations/v3-mac-heartbeat-sender.ts" ]]
   bash "$RELEASE/scripts/operations/v3-mac-launchagent-install.sh" --install
+else
+  # A valid plist may remain after a macOS user-session restart even though
+  # launchctl no longer has a registered job. Restore only its pinned owner
+  # identity, without overwriting the plist or touching S03 credentials.
+  P08_RECOVERY="$RELEASE/scripts/operations/v3-p08-mac-reconcile-existing.sh"
+  [[ -f "$P08_RECOVERY" && ! -L "$P08_RECOVERY" ]]
+  bash "$P08_RECOVERY" --reconcile-existing
 fi
 
 esc() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
