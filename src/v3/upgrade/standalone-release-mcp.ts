@@ -24,6 +24,7 @@ export const V3_STANDALONE_RELEASE_TOOL_NAMES = [
   "admin_verify_release",
   "admin_upgrade_preflight",
   "admin_upgrade_status",
+  "admin_verify_post_restart",
 ] as const;
 
 /**
@@ -71,4 +72,12 @@ export function registerV3StandaloneReleaseTools(
     annotations: read,
   }, (_args, context) =>
     run(runtime, context, "admin_upgrade_status", {}, () => store.status()));
+
+  server.registerTool("admin_verify_post_restart", {
+    description: "Confirm the running V3-only service, pinned release and local OAuth health; never touch V2.",
+    inputSchema: z.object({ expectedManifest: manifestInput }),
+    annotations: read,
+  }, ({ expectedManifest }, context) =>
+    run(runtime, context, "admin_verify_post_restart", { expectedManifest },
+      () => store.verifyPostRestart(expectedManifest)));
 }
