@@ -19,6 +19,8 @@ import { AuthService } from "../../auth/service.js";
 import type { AppConfig } from "../../config/schema.js";
 import { configSchema } from "../../config/schema.js";
 import { Store } from "../../persistence/store.js";
+import { registerV2McpTools } from "../../mcp.js";
+import { closeRuntime, createRuntimeWithConfig, type AppRuntime } from "../../runtime.js";
 import { SqliteDeviceRegistry } from "../device/registry.js";
 import {
   V3MacSignedHeartbeatIngress,
@@ -26,6 +28,9 @@ import {
   type P08HeartbeatPins,
 } from "../device/mac-heartbeat-ingress.js";
 import { V3WindowsScopedFiles } from "./windows-scoped-files.js";
+import { V2_COMPATIBILITY_TOOL_NAMES } from "./v2-compatibility-tool-names.js";
+import { V3StandaloneReleaseStore } from "../upgrade/standalone-release-store.js";
+import { registerV3StandaloneReleaseTools, V3_STANDALONE_RELEASE_TOOL_NAMES } from "../upgrade/standalone-release-mcp.js";
 import { registerV3FinalFourTools, registeredV3PhysicalToolNames, type V3FinalFourMcpPorts } from "../control-plane/final4-mcp-surface.js";
 import { installV3PhysicalAgentRelayRoutes, type I01PhysicalRelayPorts } from "../integration/i01-agent-relay-http.js";
 import type { V3FinalFourFactoryContext, V3ComposedPhysicalFinalFour } from "../control-plane/v3-physical-final4-runtime.js";
@@ -50,6 +55,10 @@ export type V3ReadOnlyGatewayOptions = {
   publicUrl: string;
   port: number;
   windowsFileRoot?: string;
+  /** Explicit opt-in: bind V2 capability implementations to isolated V3 state, never V2 service state. */
+  enableV2Compatibility?: boolean;
+  /** Absolute dedicated V3 service release root; must not overlap V2 state. */
+  v3StandaloneReleaseRoot?: string;
   macHeartbeatPins?: P08HeartbeatPins;
   /** Never inferred from environment: inject only after real physical adapters exist. */
   finalFour?: V3FinalFourMcpPorts;
@@ -104,6 +113,8 @@ function buildScopedV3Server(
   windowsFiles?: V3WindowsScopedFiles,
   macIngress?: V3MacSignedHeartbeatIngress,
   finalFour?: V3FinalFourMcpPorts,
+  v2Compatibility?: AppRuntime,
+  v3ReleaseStore?: V3StandaloneReleaseStore,
 ): McpServer {
   const server = new McpServer({
     name: "radlina-remote-mcp-v3-readonly",
@@ -131,6 +142,8 @@ function buildScopedV3Server(
           "v3_admin_status",
           ...(windowsFiles ? ["v3_windows_write_text_file", "v3_windows_read_text_file"] : []),
           ...(finalFour ? registeredV3PhysicalToolNames(finalFour) : []),
+          ...(v2Compatibility ? [...V2_COMPATIBILITY_TOOL_NAMES] : []),
+          ...(v3ReleaseStore ? [...V3_STANDALONE_RELEASE_TOOL_NAMES] : []),
         ],
       }),
   );
@@ -177,6 +190,8 @@ function buildScopedV3Server(
         macSignedHeartbeatIngressEnabled: Boolean(macIngress),
         finalFourPortsBound: Boolean(finalFour?.fleet && finalFour?.acceptance),
         i01PortsBound: Boolean(finalFour),
+        v2CompatibilityEnabled: Boolean(v2Compatibility),
+        v2LegacyUpgradeOperationsIsolated: Boolean(v2Compatibility),
       }),
   );
   if (windowsFiles) {
@@ -211,6 +226,13 @@ function buildScopedV3Server(
     );
   }
   if (finalFour) registerV3FinalFourTools(server, finalFour);
+  if (v2Compatibility) {
+    registerV2McpTools(server, v2Compatibility, undefined, {
+      preserveV3Discovery: true,
+      includeLegacyUpgradeTools: false,
+    });
+    if (v3ReleaseStore) registerV3StandaloneReleaseTools(server, v2Compatibility, v3ReleaseStore);
+  }
   return server;
 }
 
@@ -266,7 +288,12 @@ export async function startV3ReadOnlyOAuthGateway(
   let windowsFiles: V3WindowsScopedFiles | undefined;
   let macIngress: V3MacSignedHeartbeatIngress | undefined;
   let composed: V3ComposedPhysicalFinalFour | undefined;
+  let v2Compatibility: AppRuntime | undefined;
+  let v3ReleaseStore: V3StandaloneReleaseStore | undefined;
   const acceptedScopes = new Set(V3_SCOPES);
+  if (options.enableV2Compatibility) {
+    for (const scope of ["process:read", "process:execute", "admin"]) acceptedScopes.add(scope);
+  }
   if (options.finalFour || options.finalFourFactory) {
     acceptedScopes.add("device:execute");
     acceptedScopes.add("fleet:control");
@@ -274,6 +301,24 @@ export async function startV3ReadOnlyOAuthGateway(
   try {
     const auth = new ScopedV3AuthService(cfg, store, acceptedScopes);
     await auth.initialize();
+    if (options.enableV2Compatibility) {
+      if (!options.v3StandaloneReleaseRoot) throw new Error("V3-only release root is required for V2 compatibility");
+      v3ReleaseStore = new V3StandaloneReleaseStore(options.v3StandaloneReleaseRoot, [
+        options.baseConfig.storage.directory,
+        options.baseConfig.audit.directory,
+        stateRoot,
+      ]);
+      const compatibilityRoot = path.join(stateRoot, "v2-compatibility");
+      const compatibilityConfig = configSchema.parse({
+        ...cfg,
+        storage: { directory: path.join(compatibilityRoot, "state") },
+        audit: { ...cfg.audit, directory: path.join(compatibilityRoot, "audit") },
+      });
+      v2Compatibility = await createRuntimeWithConfig(
+        compatibilityConfig,
+        path.join(compatibilityRoot, "v3-only-config.json"),
+      );
+    }
     if (options.finalFourFactory) {
       composed = await options.finalFourFactory({config:cfg,store,registry,stateRoot,auth});
     }
@@ -344,7 +389,7 @@ export async function startV3ReadOnlyOAuthGateway(
       });
     }
     const mcpHandler = createMcpHandler(
-      () => buildScopedV3Server(registry, windowsFiles, macIngress, finalFour),
+      () => buildScopedV3Server(registry, windowsFiles, macIngress, finalFour, v2Compatibility, v3ReleaseStore),
       {
         legacy: "reject",
       },
@@ -377,6 +422,7 @@ export async function startV3ReadOnlyOAuthGateway(
           );
         } finally {
           await composed?.close();
+          if (v2Compatibility) await closeRuntime(v2Compatibility);
           await windowsFiles?.close();
           registry.close();
           store.close();
@@ -386,6 +432,7 @@ export async function startV3ReadOnlyOAuthGateway(
   } catch (error) {
     if (server?.listening) await new Promise<void>((resolve) => server!.close(() => resolve()));
     await composed?.close();
+    if (v2Compatibility) await closeRuntime(v2Compatibility);
     await windowsFiles?.close();
     registry.close();
     store.close();

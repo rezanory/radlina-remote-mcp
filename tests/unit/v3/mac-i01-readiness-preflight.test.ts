@@ -2,13 +2,14 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { bashForTest } from "./bash-test-executable.js";
 
 const scriptPath=path.resolve("scripts/operations/v3-final4-mac-i01-readiness.sh");
 const source=readFileSync(scriptPath,"utf8");
 
 describe("Physical Mac I01 readiness is non-mutating and credential-blind",()=>{
   it("parses as a real Bash executable script",()=>{
-    expect(()=>execFileSync("bash",["-n",scriptPath],{
+    expect(()=>execFileSync(bashForTest(),["-n",scriptPath],{
       encoding:"utf8",timeout:10000,
     })).not.toThrow();
   });

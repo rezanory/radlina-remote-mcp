@@ -20,6 +20,10 @@ if (new URL(publicUrl).protocol !== "https:") {
 }
 const baseConfig = await loadConfig();
 const enabled = process.env["RADLINA_V3_LOCAL_WINDOWS_FILES"] === "1";
+const v2CompatibilityEnabled = process.env["RADLINA_V3_V2_COMPATIBILITY_ENABLE"] === "1";
+if (v2CompatibilityEnabled && (!enabled || process.platform !== "win32")) {
+  throw new Error("V3 V2 compatibility requires explicit isolated Windows V3 file activation");
+}
 const configuredRoot = process.env["RADLINA_V3_WINDOWS_FILE_ROOT"];
 if (enabled && !configuredRoot) {
   throw new Error(
@@ -69,6 +73,10 @@ const gateway=await startV3ReadOnlyOAuthGateway({
   stateDirectory,
   port: 7344,
   ...(enabled && configuredRoot ? { windowsFileRoot: configuredRoot } : {}),
+  ...(v2CompatibilityEnabled ? {
+    enableV2Compatibility: true,
+    v3StandaloneReleaseRoot: "E:\\radlina-v3-runtime",
+  } : {}),
   ...(finalFourFactory ? { finalFourFactory } : {}),
   ...(macOwnerPublicPin
     ? {
@@ -113,6 +121,7 @@ process.stdout.write(
     publicTlsVerified: false,
     executableTools: enabled ? 1 : 0,
     localWindowsFileOperationsEnabled: enabled,
+    v2CompatibilityEnabled,
     macSignedHeartbeatIngressEnabled: macHeartbeatEnabled,
     finalFourPhysicalPortsConfigured: Boolean(finalFourFactory),
     deviceEnrollmentLive: false,
